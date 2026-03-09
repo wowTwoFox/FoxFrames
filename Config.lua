@@ -1,5 +1,3 @@
-local LSM = LibStub("LibSharedMedia-3.0", true) -- Optional, returns nil if not available
-
 local addonName, addon = ...
 local FF = FoxFrames
 
@@ -49,6 +47,7 @@ function FF:GetTextures()
         end
     end
 
+    local LSM = LibStub("LibSharedMedia-3.0", true)
     if LSM then
         -- Use LibSharedMedia if available and add additional textures
         local statusBarTextures = LSM:List("statusbar")
