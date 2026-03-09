@@ -5,8 +5,10 @@
 ## Version: 1.0.0
 ## IconTexture: Interface\AddOns\FoxFrames\icon.png
 ## SavedVariables: FoxFramesDB
-## OptionalDeps: Ace3, LibSharedMedia-3.0
-## X-Embeds: Ace3, LibSharedMedia-3.0
+## OptionalDeps: Ace3, LibEQOL, LibSharedMedia-3.0
+## X-Embeds: Ace3, LibEQOL, LibSharedMedia-3.0
+## X-Curse-Project-ID: 1482279
+## Category: Raid Frames
 
 # Libs
 embeds.xml
@@ -18,7 +20,6 @@ Libs\AceAddon-3.0\AceAddon-3.0.xml
 Libs\AceEvent-3.0\AceEvent-3.0.xml
 Libs\AceDB-3.0\AceDB-3.0.xml
 Libs\AceConsole-3.0\AceConsole-3.0.xml
-Libs\AceConfig-3.0\AceConfig-3.0.xml
 
 # Lib Sharedmedia
 Libs\LibSharedMedia-3.0\LibSharedMedia-3.0.lua
