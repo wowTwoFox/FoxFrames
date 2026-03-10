@@ -85,7 +85,7 @@ function FF:SetupOptions()
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "ShowInSolo",
         name = "Show in Solo",
-        default = true,
+        default = FF.DEFAULT_SETTINGS.partyFrame.showInSolo,
         get = function() return FF.db.profile.partyFrame.showInSolo end,
         set = function(value)
             FF.db.profile.partyFrame.showInSolo = value
@@ -98,7 +98,7 @@ function FF:SetupOptions()
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "ShowTitle",
         name = "Show Title",
-        default = true,
+        default = FF.DEFAULT_SETTINGS.partyFrame.showTitle,
         get = function() 
             return FF.db.profile.partyFrame.showTitle 
         end,
@@ -113,7 +113,7 @@ function FF:SetupOptions()
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "UseClassColors",
         name = "Use Class Colors",
-        default = true,
+        default = FF.DEFAULT_SETTINGS.partyFrame.useClassColors,
         get = function() 
             return BlizzardSettings:GetClassColorSetting()
         end,
@@ -127,7 +127,7 @@ function FF:SetupOptions()
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "ShowTankRoleIcon",
         name = "Show Tank Role Icon",
-        default = true,
+        default = FF.DEFAULT_SETTINGS.partyFrame.showTankRoleIcon,
         get = function() return FF.db.profile.partyFrame.showTankRoleIcon end,
         set = function(value) 
             FF.db.profile.partyFrame.showTankRoleIcon = value
@@ -140,7 +140,7 @@ function FF:SetupOptions()
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "ShowHealerRoleIcon",
         name = "Show Healer Role Icon",
-        default = true,
+        default = FF.DEFAULT_SETTINGS.partyFrame.showHealerRoleIcon,
         get = function() return FF.db.profile.partyFrame.showHealerRoleIcon end,
         set = function(value) 
             FF.db.profile.partyFrame.showHealerRoleIcon = value
@@ -153,7 +153,7 @@ function FF:SetupOptions()
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "ShowDPSRoleIcon",
         name = "Show DPS Role Icon",
-        default = true,
+        default = FF.DEFAULT_SETTINGS.partyFrame.showDPSRoleIcon,
         get = function() return FF.db.profile.partyFrame.showDPSRoleIcon end,
         set = function(value)
             FF.db.profile.partyFrame.showDPSRoleIcon = value
@@ -166,7 +166,7 @@ function FF:SetupOptions()
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "ShowBuffCountdown",
         name = "Show Buff Countdown",
-        default = true,
+        default = FF.DEFAULT_SETTINGS.partyFrame.showBuffCountdown,
         get = function() return FF.db.profile.partyFrame.showBuffCountdown end,
         set = function(value)
             FF.db.profile.partyFrame.showBuffCountdown = value
@@ -179,7 +179,7 @@ function FF:SetupOptions()
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "ForceTopLeftAnchor",
         name = "Force Top Left Anchor",
-        default = true,
+        default = FF.DEFAULT_SETTINGS.partyFrame.forceTopLeftAnchor,
         get = function() return FF.db.profile.partyFrame.forceTopLeftAnchor end,
         set = function(value)
             FF.db.profile.partyFrame.forceTopLeftAnchor = value
@@ -197,10 +197,10 @@ function FF:SetupOptions()
     SettingsLib:CreateDropdown(rootCategory, {
         key = "ShowPlayerFrame",
         name = "Show Player Frame",
-        default = FF.PLAYER_FRAME_SHOW_TYPES.Always,
+        default = FF.DEFAULT_SETTINGS.playerFrame.showType,
         values = FF.PLAYER_FRAME_SHOW_TYPES,
         get = function()
-            return FF.db.profile.playerFrame.showType or FF.PLAYER_FRAME_SHOW_TYPES.Always
+            return FF.db.profile.playerFrame.showType or FF.DEFAULT_SETTINGS.playerFrame.showType
         end,
         set = function(value)
             FF.db.profile.playerFrame.showType = value

@@ -28,7 +28,7 @@ local function GroupChangeEvent(event, ...)
         return
     end
 
-    Utils:Log("GROUP_CHANGE_EVENT")
+    Utils:Log("GROUP_CHANGE_EVENT", event)
     FF:UpdateFrames()
 end
 
@@ -60,7 +60,7 @@ function FF:OnInitialize()
     -- Setup options
     self:SetupOptions()
     self:SetupFrames()
-    Utils:Log("FOX_FRAMES_LOADED")
+    Utils:Log("FOX_FRAMES_LOADED", self.db.profile)
 end
 
 function FF:OnEnable()
@@ -74,11 +74,6 @@ function FF:OnEnable()
     hooksecurefunc("CompactUnitFrame_UpdateRoleIcon", function(frame)
         self:UpdateRoleIcon(frame)
     end)
-
-    if self:InAllowedGroup() then
-        -- Apply anchor point on enable
-        self:GroupChangeEvent("INITIAL_STARTUP")
-    end
 end
 
 function FF:OnDisable()
