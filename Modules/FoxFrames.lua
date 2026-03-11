@@ -78,7 +78,7 @@ end
 
 function FF:SlashCommand(input)
     if not input or input:trim() == "" then
-        --LibStub("AceConfigDialog-3.0"):Open("FoxFrames")
+        FF:OpenSettings()
     else
         self:Print("Usage: /ff - open config")
     end

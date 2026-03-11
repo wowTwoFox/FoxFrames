@@ -32,4 +32,4 @@ Modules\FoxFrames.lua
 Modules\IncomingCasts.lua
 Modules\TargetedIcons.lua
 Core.lua
-Config.lua
+Settings.lua

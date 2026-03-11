@@ -73,12 +73,18 @@ function FF:GetTextures()
     return textures
 end
 
+function FF:OpenSettings()
+    if not self._rootCategory then return end
+    Settings.OpenToCategory(self._rootCategory:GetID())
+end
+
 function FF:SetupOptions()
     -- Build the options using LibEQOL
     local SettingsLib = LibStub("LibEQOLSettingsMode-1.0")
     local PREFIX = "FoxFrames_"
     local PARTY_FRAME_PREFIX = PREFIX .. "PartyFrame_"
     local rootCategory = SettingsLib:CreateRootCategory("Fox Frames")
+    self._rootCategory = rootCategory
 
     SettingsLib:CreateHeader(rootCategory, {
         name = "Party Frame Settings",
