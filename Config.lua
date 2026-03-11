@@ -185,7 +185,7 @@ function FF:SetupOptions()
             FF.db.profile.partyFrame.forceTopLeftAnchor = value
             FF:SetAlwaysUseTopLeftAnchor()
         end,
-        desc = "Forces the top left anchor on the party frame. Disable this if you want anything other than left aligned party frames",
+        desc = "By default, Blizzard's party frames will convert anchoring to top-left. This results in always top-left alignment of frames. Disabling this will allow you to use other anchor points such as center, bottom or right. You will need to re-anchor the party frames after changing this setting.",
         prefix = PARTY_FRAME_PREFIX
     })
 
@@ -206,6 +206,7 @@ function FF:SetupOptions()
             FF.db.profile.playerFrame.showType = value
             self:ShowPlayerFrameIfNeeded()
         end,
+        desc = "Control the visibility of the player frame. 'Always' will show the player frame regardless of group status. 'Solo' will only show the player frame when not in a party or raid. 'Never' will hide the player frame regardless of group status.",
         prefix = PARTY_FRAME_PREFIX
     })
 
