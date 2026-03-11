@@ -2,6 +2,7 @@ local addonName, addon = ...
 
 FoxFrames = LibStub("AceAddon-3.0"):NewAddon("FoxFrames", "AceConsole-3.0", "AceEvent-3.0")
 local FF = FoxFrames
+local Utils = addon and addon.Utils
 
 function FF:InAllowedGroup()
     if PartyStatus:InRaidGroup() then return true end
@@ -114,7 +115,7 @@ end
 
 function FF:UpdateFrames()
     local partyFrames = self:GetFrames()
-    Utils:Log("FF:UpdateFrames", partyFrames)
+    -- Utils:Log("FF:UpdateFrames", partyFrames)
 
     for _, frame in ipairs(partyFrames) do
         self:UpdateFrame(frame)
@@ -127,4 +128,7 @@ function FF:SetupFrames()
     self:ShowPartyFrameTitleIfNeeded()
     self:ShowPlayerFrameIfNeeded()
     self:UpdateFrames()
+
+    self:SetupIncomingCastIndicators()
+    self:UpdateIncomingCastIndicators()
 end

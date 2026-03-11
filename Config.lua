@@ -16,6 +16,13 @@ FF.DEFAULT_SETTINGS = {
         showBuffCountdown = false,
         healthBarTexture = FF.DEFAULT_TEXTURE,
         forceTopLeftAnchor = true,
+        trackIncomingCasts = false,
+
+        -- Incoming cast ("targeted spell") indicator icon layout
+        incomingCastIconCount = 3,
+        incomingCastIconScale = 1,
+        incomingCastIconSpacing = 0,
+        incomingCastIconBorder = true,
     }
 }
 
@@ -53,7 +60,7 @@ function FF:GetTextures()
         local statusBarTextures = LSM:List("statusbar")
         for _, name in pairs(statusBarTextures) do
             local path = LSM:Fetch("statusbar", name)
-            if not alreadyAddedPaths[path] then
+            if path and not alreadyAddedPaths[path] then
                 alreadyAddedPaths[path] = name
                 table.insert(textures, {
                     path = path,
@@ -253,4 +260,129 @@ function FF:SetupOptions()
     rootCategory, 
         "You need to reload the UI when setting the 'Default' texture."
     )
+
+    SettingsLib:CreateHeader(rootCategory, {
+        name = "Incoming Casts",
+    })
+
+    SettingsLib:CreateCheckboxButton(rootCategory, {
+        key = "TrackIncomingCasts",
+        name = "Track incoming casts",
+        default = FF.DEFAULT_SETTINGS.partyFrame.trackIncomingCasts,
+        get = function()
+            return FF.db.profile.partyFrame.trackIncomingCasts
+        end,
+        set = function(value)
+            FF.db.profile.partyFrame.trackIncomingCasts = value
+            if not value then
+                FF:SetIncomingCastIndicatorPreviewEnabled(false)
+            end
+        end,
+        prefix = PARTY_FRAME_PREFIX,
+
+        buttonText = "Toggle Preview",
+        buttonClick = function()
+            FF:SetIncomingCastIndicatorPreviewEnabled(not self._ffIncomingCastIndicatorPreviewEnabled)
+        end,
+        clickRequiresSet = true, -- button only active when checkbox is checked
+    })
+
+    SettingsLib:CreateSlider(rootCategory, {
+        key = "IncomingCastIconCount",
+        name = "Targeted spell icon count",
+        default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconCount,
+        min = 1,
+        max = 5,
+        step = 1,
+        formatter = function(value)
+            return string.format("%i", math.floor((value) + 0.5))
+        end,
+        get = function()
+            return FF.db.profile.partyFrame.incomingCastIconCount
+        end,
+        set = function(value)
+            FF.db.profile.partyFrame.incomingCastIconCount = value
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "How many targeted spell icons to show per party member.",
+        prefix = PARTY_FRAME_PREFIX,
+    })
+
+    SettingsLib:CreateSlider(rootCategory, {
+        key = "IncomingCastIconScale",
+        name = "Targeted spell icon scale",
+        default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconScale,
+        min = 0.5,
+        max = 2,
+        step = 0.10,
+        formatter = function(value)
+            return string.format("%d%%", math.floor((value * 100) + 0.5))
+        end,
+        get = function()
+            local profile = FF.db.profile.partyFrame
+            if profile.incomingCastIconScale ~= nil then
+                return profile.incomingCastIconScale
+            end
+
+            -- Backward compatibility: convert legacy pixel size to a scale.
+            local legacySize = profile.incomingCastIconSize
+            if type(legacySize) ~= "number" then
+                legacySize = tonumber(legacySize)
+            end
+            if type(legacySize) == "number" and legacySize > 0 then
+                return legacySize / 22
+            end
+
+            return FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconScale
+        end,
+        set = function(value)
+            local profile = FF.db.profile.partyFrame
+            profile.incomingCastIconScale = value
+            -- Prefer scale going forward.
+            profile.incomingCastIconSize = nil
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Scales each targeted spell icon without distorting borders/overlays.",
+        prefix = PARTY_FRAME_PREFIX,
+    })
+
+    SettingsLib:CreateSlider(rootCategory, {
+        key = "IncomingCastIconSpacing",
+        name = "Targeted spell icon spacing",
+        default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconSpacing,
+        min = 0,
+        max = 4,
+        step = 1,
+        formatter = function(value)
+            return string.format("%i", math.floor((value) + 0.5))
+        end,
+        get = function()
+            return FF.db.profile.partyFrame.incomingCastIconSpacing
+        end,
+        set = function(value)
+            FF.db.profile.partyFrame.incomingCastIconSpacing = value
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Horizontal space (in pixels) between targeted spell icons.",
+        prefix = PARTY_FRAME_PREFIX,
+    })
+
+    SettingsLib:CreateCheckbox(rootCategory, {
+        key = "IncomingCastIconBorder",
+        name = "Show targeted spell icon border",
+        default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconBorder,
+        get = function()
+            return FF.db.profile.partyFrame.incomingCastIconBorder
+        end,
+        set = function(value)
+            FF.db.profile.partyFrame.incomingCastIconBorder = value
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Toggle the border around targeted spell icons.",
+        prefix = PARTY_FRAME_PREFIX,
+    })
 end
