@@ -57,13 +57,16 @@ function FF:OnInitialize()
 
     self.db = LibStub("AceDB-3.0"):New("FoxFramesDB", defaults, true)
 
+    if self.MigrateAndSanitizeDB then
+        self:MigrateAndSanitizeDB()
+    end
+
     -- Register Custom Textures with LSM if available
     RegisterLSMTextures()
 
     -- Register slash commands
     self:RegisterChatCommand("ff", "SlashCommand")
     self:RegisterChatCommand("foxframes", "SlashCommand")
-    self:RegisterChatCommand("ffpreview", "PreviewSlashCommand")
 
     hooksecurefunc(CompactPartyFrame, "UpdateVisibility", function()
         FF:ShowPartyFrameIfNeeded()
@@ -114,5 +117,10 @@ end
 
 function FF:OnDisable()
     self:Print("Disabled.")
+
+    if self.StopIncomingCastIndicatorPreviewStream then
+        self:StopIncomingCastIndicatorPreviewStream()
+    end
+
     self:UnregisterAllEvents()
 end

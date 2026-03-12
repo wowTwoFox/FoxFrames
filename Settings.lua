@@ -18,18 +18,20 @@ FF.DEFAULT_SETTINGS = {
         healthBarTexture = FF.DEFAULT_TEXTURE,
         forceTopLeftAnchor = true,
         trackIncomingCasts = false,
-
-        -- Incoming cast ("targeted spell") indicator icon layout
-        incomingCastIconCount = 3,
-        incomingCastIconPosition = "BOTTOMLEFT",
-        incomingCastIconGrowDirection = "RIGHT",
-        incomingCastIconOffsetX = 2,
-        incomingCastIconOffsetY = 2,
-        incomingCastIconScale = 1,
-        incomingCastIconSpacing = 0,
-        incomingCastIconBorder = true,
-        incomingCastIconSwipe = true,
-        incomingCastIconCooldownText = true,
+    },
+    incomingCastBar = {
+        spellCount = 3,
+        position = "BOTTOMLEFT",
+        growthDirection = "RIGHT",
+        offsetX = 2,
+        offsetY = 2,
+        icon = {
+            scale = 1,
+            spacing = 0,
+            showBorder = true,
+            showSwipe = true,
+            showCooldownText = true,
+        },
     }
 }
 
@@ -83,6 +85,165 @@ end
 function FF:OpenSettings()
     if not self._rootCategory then return end
     Settings.OpenToCategory(self._rootCategory:GetID())
+end
+
+local function ClampNumber(value, minValue, maxValue, fallback)
+    local num = value
+    if type(num) ~= "number" then
+        num = tonumber(num)
+    end
+    if type(num) ~= "number" then
+        num = fallback
+    end
+    if type(num) ~= "number" then
+        num = minValue
+    end
+    if num < minValue then
+        num = minValue
+    elseif num > maxValue then
+        num = maxValue
+    end
+    return num
+end
+
+local function SanitizePosition(value, fallback)
+    if value == "TOPLEFT" or value == "BOTTOMLEFT" or value == "TOP" or value == "BOTTOM" or value == "TOPRIGHT" or value == "BOTTOMRIGHT" then
+        return value
+    end
+    return fallback
+end
+
+local function SanitizeGrowDirection(value, fallback)
+    if value == "RIGHT" or value == "LEFT" or value == "DOWN" or value == "UP" then
+        return value
+    end
+    return fallback
+end
+
+local function SanitizeBoolean(value, fallback)
+    if value == nil then
+        return fallback
+    end
+    return value == true
+end
+
+function FF:MigrateAndSanitizeDB()
+    local profile = self and self.db and self.db.profile
+    if type(profile) ~= "table" then
+        return
+    end
+
+    if type(profile.partyFrame) ~= "table" then
+        profile.partyFrame = {}
+    end
+    if type(profile.incomingCastBar) ~= "table" then
+        profile.incomingCastBar = {}
+    end
+
+    local defaults = self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.incomingCastBar or {}
+    local iconDefaults = defaults.icon or {}
+    local partyFrameProfile = profile.partyFrame
+    local incomingCastBarProfile = profile.incomingCastBar
+
+    local position = SanitizePosition(
+        incomingCastBarProfile.position,
+        defaults.position or "BOTTOMLEFT"
+    )
+
+    local growthDirection = incomingCastBarProfile.growthDirection
+    if growthDirection == nil then
+        if position == "TOPRIGHT" or position == "BOTTOMRIGHT" then
+            growthDirection = "LEFT"
+        else
+            growthDirection = defaults.growthDirection or "RIGHT"
+        end
+    end
+    growthDirection = SanitizeGrowDirection(growthDirection, defaults.growthDirection or "RIGHT")
+
+    local spellCount = ClampNumber(incomingCastBarProfile.spellCount, 1, 6, defaults.spellCount or 3)
+    spellCount = math.floor(spellCount + 0.5)
+
+    local offsetX = ClampNumber(incomingCastBarProfile.offsetX, -200, 200, defaults.offsetX or 2)
+    offsetX = math.floor(offsetX + 0.5)
+
+    local offsetY = ClampNumber(incomingCastBarProfile.offsetY, -200, 200, defaults.offsetY or 2)
+    offsetY = math.floor(offsetY + 0.5)
+
+    if type(incomingCastBarProfile.icon) ~= "table" then
+        incomingCastBarProfile.icon = {}
+    end
+    local iconProfile = incomingCastBarProfile.icon
+
+    local iconScale = ClampNumber(iconProfile.scale, 0.5, 3, iconDefaults.scale or 1)
+    iconScale = math.floor((iconScale * 100) + 0.5) / 100
+
+    local iconSpacing = ClampNumber(iconProfile.spacing, -10, 50, iconDefaults.spacing or 0)
+    iconSpacing = math.floor(iconSpacing + 0.5)
+
+    local iconShowBorder = SanitizeBoolean(iconProfile.showBorder, iconDefaults.showBorder ~= false)
+    local iconShowSwipe = SanitizeBoolean(iconProfile.showSwipe, iconDefaults.showSwipe ~= false)
+    local iconShowCooldownText = SanitizeBoolean(iconProfile.showCooldownText, iconDefaults.showCooldownText ~= false)
+
+    incomingCastBarProfile.spellCount = spellCount
+    incomingCastBarProfile.position = position
+    incomingCastBarProfile.growthDirection = growthDirection
+    incomingCastBarProfile.offsetX = offsetX
+    incomingCastBarProfile.offsetY = offsetY
+
+    iconProfile.scale = iconScale
+    iconProfile.spacing = iconSpacing
+    iconProfile.showBorder = iconShowBorder
+    iconProfile.showSwipe = iconShowSwipe
+    iconProfile.showCooldownText = iconShowCooldownText
+
+    partyFrameProfile.trackIncomingCasts = (partyFrameProfile.trackIncomingCasts == true)
+end
+
+local function GetIncomingCastBarProfile()
+    local profile = FF and FF.db and FF.db.profile
+    if type(profile) ~= "table" then
+        return nil
+    end
+
+    if type(profile.incomingCastBar) ~= "table" then
+        profile.incomingCastBar = {}
+    end
+
+    return profile.incomingCastBar
+end
+
+local function GetIncomingCastBarValue(key)
+    local incomingCastBarProfile = GetIncomingCastBarProfile()
+    return incomingCastBarProfile and incomingCastBarProfile[key]
+end
+
+local function SetIncomingCastBarValue(key, value)
+    local incomingCastBarProfile = GetIncomingCastBarProfile()
+    if incomingCastBarProfile then
+        incomingCastBarProfile[key] = value
+    end
+end
+
+local function GetIncomingCastBarIconValue(key)
+    local incomingCastBarProfile = GetIncomingCastBarProfile()
+    local iconProfile = incomingCastBarProfile and incomingCastBarProfile.icon
+    if type(iconProfile) ~= "table" then
+        return nil
+    end
+    return iconProfile[key]
+end
+
+local function SetIncomingCastBarIconValue(key, value)
+    local incomingCastBarProfile = GetIncomingCastBarProfile()
+    if not incomingCastBarProfile then
+        return
+    end
+
+    if type(incomingCastBarProfile.icon) ~= "table" then
+        incomingCastBarProfile.icon = {}
+    end
+
+    incomingCastBarProfile.icon[key] = value
 end
 
 function FF:SetupOptions()
@@ -313,10 +474,13 @@ function FF:SetupOptions()
         clickRequiresSet = true, -- button only active when checkbox is checked
     })
 
+    local incomingCastBarDefaults = FF.DEFAULT_SETTINGS.incomingCastBar
+    local incomingCastBarIconDefaults = incomingCastBarDefaults.icon or {}
+
     SettingsLib:CreateDropdown(rootCategory, {
         key = "IncomingCastIconPosition",
         name = "Targeted spell position",
-        default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconPosition,
+        default = incomingCastBarDefaults.position,
         values = {
             BOTTOMLEFT = "Bottom left",
             TOPLEFT = "Top left",
@@ -326,14 +490,14 @@ function FF:SetupOptions()
             TOP = "Top center",
         },
         get = function()
-            local pos = FF.db.profile.partyFrame.incomingCastIconPosition
+            local pos = GetIncomingCastBarValue("position")
             if pos ~= "TOPLEFT" and pos ~= "BOTTOMLEFT" and pos ~= "TOP" and pos ~= "BOTTOM" and pos ~= "TOPRIGHT" and pos ~= "BOTTOMRIGHT" then
-                pos = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconPosition
+                pos = incomingCastBarDefaults.position
             end
             return pos
         end,
         set = function(value)
-            FF.db.profile.partyFrame.incomingCastIconPosition = value
+            SetIncomingCastBarValue("position", value)
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
         end,
@@ -344,7 +508,7 @@ function FF:SetupOptions()
     SettingsLib:CreateDropdown(rootCategory, {
         key = "IncomingCastIconGrowDirection",
         name = "Grow Direction",
-        default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconGrowDirection,
+        default = incomingCastBarDefaults.growthDirection,
         values = {
             RIGHT = "Right",
             LEFT = "Left",
@@ -352,32 +516,29 @@ function FF:SetupOptions()
             UP = "Up",
         },
         get = function()
-            local profile = FF.db.profile.partyFrame
-
-            local pos = profile.incomingCastIconPosition
+            local pos = GetIncomingCastBarValue("position")
             if pos ~= "TOPLEFT" and pos ~= "BOTTOMLEFT" and pos ~= "TOP" and pos ~= "BOTTOM" and pos ~= "TOPRIGHT" and pos ~= "BOTTOMRIGHT" then
-                pos = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconPosition
+                pos = incomingCastBarDefaults.position
             end
 
-            local explicitDir = rawget(profile, "incomingCastIconGrowDirection")
-            local dir = explicitDir
+            local dir = GetIncomingCastBarValue("growthDirection")
 
             if dir == nil then
                 if pos == "TOPRIGHT" or pos == "BOTTOMRIGHT" then
                     dir = "LEFT"
                 else
-                    dir = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconGrowDirection
+                    dir = incomingCastBarDefaults.growthDirection
                 end
             end
 
             if dir ~= "RIGHT" and dir ~= "LEFT" and dir ~= "DOWN" and dir ~= "UP" then
-                dir = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconGrowDirection
+                dir = incomingCastBarDefaults.growthDirection
             end
 
             return dir
         end,
         set = function(value)
-            FF.db.profile.partyFrame.incomingCastIconGrowDirection = value
+            SetIncomingCastBarValue("growthDirection", value)
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
         end,
@@ -388,7 +549,7 @@ function FF:SetupOptions()
     SettingsLib:CreateSlider(rootCategory, {
         key = "IncomingCastIconOffsetX",
         name = "X offset",
-        default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconOffsetX,
+        default = incomingCastBarDefaults.offsetX,
         min = -40,
         max = 40,
         step = 1,
@@ -396,11 +557,14 @@ function FF:SetupOptions()
             return string.format("%ipx", math.floor((value) + 0.5))
         end,
         get = function()
-            local profile = FF.db.profile.partyFrame
-            return profile.incomingCastIconOffsetX or FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconOffsetX
+            local value = GetIncomingCastBarValue("offsetX")
+            if value == nil then
+                value = incomingCastBarDefaults.offsetX
+            end
+            return value
         end,
         set = function(value)
-            FF.db.profile.partyFrame.incomingCastIconOffsetX = value
+            SetIncomingCastBarValue("offsetX", value)
 
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
@@ -412,7 +576,7 @@ function FF:SetupOptions()
     SettingsLib:CreateSlider(rootCategory, {
         key = "IncomingCastIconOffsetY",
         name = "Y offset",
-        default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconOffsetY,
+        default = incomingCastBarDefaults.offsetY,
         min = -40,
         max = 40,
         step = 1,
@@ -420,11 +584,14 @@ function FF:SetupOptions()
             return string.format("%ipx", math.floor((value) + 0.5))
         end,
         get = function()
-            local profile = FF.db.profile.partyFrame
-            return profile.incomingCastIconOffsetY or FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconOffsetY
+            local value = GetIncomingCastBarValue("offsetY")
+            if value == nil then
+                value = incomingCastBarDefaults.offsetY
+            end
+            return value
         end,
         set = function(value)
-            FF.db.profile.partyFrame.incomingCastIconOffsetY = value
+            SetIncomingCastBarValue("offsetY", value)
 
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
@@ -436,18 +603,22 @@ function FF:SetupOptions()
     SettingsLib:CreateSlider(rootCategory, {
         key = "IncomingCastIconCount",
         name = "Targeted spell icon count",
-        default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconCount,
+        default = incomingCastBarDefaults.spellCount,
         min = 1,
-        max = 5,
+        max = 6,
         step = 1,
         formatter = function(value)
             return string.format("%i", math.floor((value) + 0.5))
         end,
         get = function()
-            return FF.db.profile.partyFrame.incomingCastIconCount
+            local value = GetIncomingCastBarValue("spellCount")
+            if value == nil then
+                value = incomingCastBarDefaults.spellCount
+            end
+            return value
         end,
         set = function(value)
-            FF.db.profile.partyFrame.incomingCastIconCount = value
+            SetIncomingCastBarValue("spellCount", value)
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
         end,
@@ -458,7 +629,7 @@ function FF:SetupOptions()
     SettingsLib:CreateSlider(rootCategory, {
         key = "IncomingCastIconScale",
         name = "Icon scale",
-        default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconScale,
+        default = incomingCastBarIconDefaults.scale,
         min = 0.5,
         max = 2,
         step = 0.10,
@@ -466,27 +637,15 @@ function FF:SetupOptions()
             return string.format("%d%%", math.floor((value * 100) + 0.5))
         end,
         get = function()
-            local profile = FF.db.profile.partyFrame
-            if profile.incomingCastIconScale ~= nil then
-                return profile.incomingCastIconScale
+            local value = GetIncomingCastBarIconValue("scale")
+            if value ~= nil then
+                return value
             end
 
-            -- Backward compatibility: convert legacy pixel size to a scale.
-            local legacySize = profile.incomingCastIconSize
-            if type(legacySize) ~= "number" then
-                legacySize = tonumber(legacySize)
-            end
-            if type(legacySize) == "number" and legacySize > 0 then
-                return legacySize / 22
-            end
-
-            return FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconScale
+            return incomingCastBarIconDefaults.scale
         end,
         set = function(value)
-            local profile = FF.db.profile.partyFrame
-            profile.incomingCastIconScale = value
-            -- Prefer scale going forward.
-            profile.incomingCastIconSize = nil
+            SetIncomingCastBarIconValue("scale", value)
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
         end,
@@ -497,7 +656,7 @@ function FF:SetupOptions()
     SettingsLib:CreateSlider(rootCategory, {
         key = "IncomingCastIconSpacing",
         name = "Icon spacing",
-        default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconSpacing,
+        default = incomingCastBarIconDefaults.spacing,
         min = -10,
         max = 20,
         step = 1,
@@ -505,10 +664,14 @@ function FF:SetupOptions()
             return string.format("%i", math.floor((value) + 0.5))
         end,
         get = function()
-            return FF.db.profile.partyFrame.incomingCastIconSpacing
+            local value = GetIncomingCastBarIconValue("spacing")
+            if value == nil then
+                value = incomingCastBarIconDefaults.spacing
+            end
+            return value
         end,
         set = function(value)
-            FF.db.profile.partyFrame.incomingCastIconSpacing = value
+            SetIncomingCastBarIconValue("spacing", value)
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
         end,
@@ -519,12 +682,16 @@ function FF:SetupOptions()
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "IncomingCastIconBorder",
         name = "Show icon border",
-        default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconBorder,
+        default = incomingCastBarIconDefaults.showBorder,
         get = function()
-            return FF.db.profile.partyFrame.incomingCastIconBorder
+            local value = GetIncomingCastBarIconValue("showBorder")
+            if value == nil then
+                value = incomingCastBarIconDefaults.showBorder
+            end
+            return value
         end,
         set = function(value)
-            FF.db.profile.partyFrame.incomingCastIconBorder = value
+            SetIncomingCastBarIconValue("showBorder", value)
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
         end,
@@ -535,12 +702,16 @@ function FF:SetupOptions()
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "IncomingCastIconSwipe",
         name = "Show cooldown swipe",
-        default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconSwipe,
+        default = incomingCastBarIconDefaults.showSwipe,
         get = function()
-            return FF.db.profile.partyFrame.incomingCastIconSwipe
+            local value = GetIncomingCastBarIconValue("showSwipe")
+            if value == nil then
+                value = incomingCastBarIconDefaults.showSwipe
+            end
+            return value
         end,
         set = function(value)
-            FF.db.profile.partyFrame.incomingCastIconSwipe = value
+            SetIncomingCastBarIconValue("showSwipe", value)
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
         end,
@@ -551,12 +722,16 @@ function FF:SetupOptions()
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "IncomingCastIconCooldownText",
         name = "Show cooldown text",
-        default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconCooldownText,
+        default = incomingCastBarIconDefaults.showCooldownText,
         get = function()
-            return FF.db.profile.partyFrame.incomingCastIconCooldownText
+            local value = GetIncomingCastBarIconValue("showCooldownText")
+            if value == nil then
+                value = incomingCastBarIconDefaults.showCooldownText
+            end
+            return value
         end,
         set = function(value)
-            FF.db.profile.partyFrame.incomingCastIconCooldownText = value
+            SetIncomingCastBarIconValue("showCooldownText", value)
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
         end,
