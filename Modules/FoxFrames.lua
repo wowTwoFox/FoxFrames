@@ -9,17 +9,21 @@ function FF:InAllowedGroup()
     return BlizzardSettings:GetUseRaidStylePartyFrames() and PartyStatus:InPartyGroup()
 end
 
-function FF:IsPlayerFrame(frame)
-    if not (frame and frame.unit) then
+function FF:IsPlayerUnit(unit)
+    if type(unit) ~= "string" or unit == "" then
         return false
     end
 
-    return UnitIsUnit(frame.unit, "player")
+    return UnitIsUnit(unit, "player")
 end
 
-function FF:SetAlwaysUseTopLeftAnchor()
+function FF:IsPlayerFrame(frame)
+    return self:IsPlayerUnit(frame and frame.unit)
+end
+
+function FF:SetAllowAnyAnchoring()
     if not PartyFrame then return end
-    PartyFrame.alwaysUseTopLeftAnchor = self.db.profile.partyFrame.forceTopLeftAnchor
+    PartyFrame.alwaysUseTopLeftAnchor = not self.db.profile.partyFrame.allowAnyAnchoring
 end
 
 function FF:ShowPartyFrameIfNeeded()
@@ -101,19 +105,16 @@ function FF:UpdateRoleIcon(frame)
 end
 
 function FF:SlashCommand(input)
-    print(input)
-    if not input or input:trim() == "" then
+    local trimmedInput = input and input:trim()
+
+    if not trimmedInput or trimmedInput == "" then
         FF:OpenSettings()
-    elseif input:trim() == "preview" then
+    elseif trimmedInput == "preview" or trimmedInput == "p" then
         FF:OpenSettings()
         FF:ToggleIncomingCastIndicatorPreview()
     else
         self:Print("Usage: /ff - open config")
     end
-end
-
-function FF:PreviewSlashCommand(input)
-    FF:ToggleIncomingCastIndicatorPreview()
 end
 
 function FF:UpdateHealthBarTexture(healthBar)
@@ -155,7 +156,7 @@ function FF:UpdateFrames()
 end
 
 function FF:SetupFrames()
-    self:SetAlwaysUseTopLeftAnchor()
+    self:SetAllowAnyAnchoring()
     self:ShowBuffCountdownIfNeeded()
     self:ShowDebuffCountdownIfNeeded()
     self:ShowPartyFrameTitleIfNeeded()

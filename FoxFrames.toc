@@ -30,6 +30,8 @@ Modules\PartyStatus.lua
 Modules\BlizzardSettings.lua
 Modules\FoxFrames.lua
 Modules\IncomingCasts.lua
-Modules\TargetedIcons.lua
+Modules\SpellIcon.lua
+Modules\SpellBar.lua
+Modules\IncomingCastsPreview.lua
 Core.lua
 Settings.lua

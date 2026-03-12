@@ -99,23 +99,23 @@ function FF:PruneIncomingCasts(now)
     end
 end
 
-function FF:_IncomingCast_Store(casterUnit, isChannel, spellIdFromEvent)
+function FF:_IncomingCast_ExtractCast(casterUnit, isChannel, spellIdFromEvent)
     self:InitIncomingCasts()
 
     if not ShouldTrackIncomingCasts() then
-        return
+        return nil
     end
 
     if not IsValidCasterUnit(casterUnit) then
-        return
+        return nil
     end
 
     if not (UnitExists and UnitExists(casterUnit)) then
-        return
+        return nil
     end
 
     if UnitCanAttack and not UnitCanAttack("player", casterUnit) then
-        return
+        return nil
     end
 
     local name, _, icon, _, _, _, _, notInterruptible, spellId
@@ -131,7 +131,7 @@ function FF:_IncomingCast_Store(casterUnit, isChannel, spellIdFromEvent)
             isChannel = isChannel,
             spellIdFromEvent = spellIdFromEvent,
         })
-        return
+        return nil
     end
 
     spellId = spellIdFromEvent or spellId
@@ -171,9 +171,26 @@ function FF:_IncomingCast_Store(casterUnit, isChannel, spellIdFromEvent)
     cast.endTime = nil
     cast.expiresAt = now + 240
 
+    return cast
+end
+
+function FF:_IncomingCast_Store(casterUnit, cast)
+    self:InitIncomingCasts()
+
+    if not casterUnit or type(casterUnit) ~= "string" then
+        return
+    end
+
+    if not cast or type(cast) ~= "table" then
+        return
+    end
+
+    if cast.casterUnit == nil then
+        cast.casterUnit = casterUnit
+    end
+
     self._incomingCastsByCasterUnit[casterUnit] = cast
     self._incomingCastsPendingByCasterUnit[casterUnit] = nil
-    self._ffIncomingCastIndicatorPreviewEnabled = false
     self:SendMessage(INCOMING_CAST_MESSAGE, casterUnit, cast)
 end
 
@@ -216,13 +233,37 @@ function FF:_IncomingCast_ProcessCast(casterUnit, isChannel, spellIdFromEvent)
                 end
             end
 
-            self:_IncomingCast_Store(casterUnit, isChannel, spellIdFromEvent)
+            local cast = self:_IncomingCast_ExtractCast(casterUnit, isChannel, spellIdFromEvent)
+            if not cast then
+                self._incomingCastsPendingByCasterUnit[casterUnit] = nil
+                return
+            end
+
+            if self.SetIncomingCastIndicatorPreviewEnabled then
+                self:SetIncomingCastIndicatorPreviewEnabled(false)
+            else
+                self._ffIncomingCastIndicatorPreviewEnabled = false
+            end
+
+            self:_IncomingCast_Store(casterUnit, cast)
         end)
         return
     end
 
     -- Fallback (should not happen in modern clients)
-    self:_IncomingCast_Store(casterUnit, isChannel, spellIdFromEvent)
+    local cast = self:_IncomingCast_ExtractCast(casterUnit, isChannel, spellIdFromEvent)
+    if not cast then
+        self._incomingCastsPendingByCasterUnit[casterUnit] = nil
+        return
+    end
+
+    if self.SetIncomingCastIndicatorPreviewEnabled then
+        self:SetIncomingCastIndicatorPreviewEnabled(false)
+    else
+        self._ffIncomingCastIndicatorPreviewEnabled = false
+    end
+
+    self:_IncomingCast_Store(casterUnit, cast)
 end
 
 function FF:_IncomingCast_Stop(casterUnit)
@@ -364,4 +405,278 @@ end
 
 function FF:PLAYER_FOCUS_CHANGED()
     return self:ScanAllEnemyCasts()
+end
+
+local function ClampNumber(value, minValue, maxValue, fallback)
+    local num = value
+    if type(num) ~= "number" then
+        num = tonumber(num)
+    end
+    if type(num) ~= "number" then
+        num = fallback
+    end
+    if type(num) ~= "number" then
+        num = minValue
+    end
+    if num < minValue then
+        num = minValue
+    elseif num > maxValue then
+        num = maxValue
+    end
+    return num
+end
+
+local function GetSpellIconBaseSize()
+    local spellIconMixin = addon and addon.SpellIconMixin
+    return tonumber(spellIconMixin and spellIconMixin.SPELL_ICON_BASE_SIZE) or 22
+end
+
+local function GetIncomingCastIndicatorIconConfig(incomingCastBarProfile, incomingCastBarDefaults)
+    local incomingCastBarIconProfile = incomingCastBarProfile and incomingCastBarProfile.icon
+    local incomingCastBarIconDefaults = incomingCastBarDefaults.icon or {}
+
+    local baseSize = GetSpellIconBaseSize()
+
+    local scale = ClampNumber(incomingCastBarIconProfile and incomingCastBarIconProfile.scale, 0.5, 3, incomingCastBarIconDefaults.scale or 1)
+
+    -- Keep the hash stable and avoid float jitter.
+    scale = math.floor((scale * 100) + 0.5) / 100
+
+    -- This is the size used for layout (wrapper frame). The visual icon frame is
+    -- kept at baseSize and scaled, so borders/overlays scale proportionally.
+    local size = baseSize * scale
+
+    local spacing = ClampNumber(incomingCastBarIconProfile and incomingCastBarIconProfile.spacing, -10, 50, incomingCastBarIconDefaults.spacing or 0)
+    spacing = math.floor(spacing + 0.5)
+
+    local showBorder = incomingCastBarIconProfile and incomingCastBarIconProfile.showBorder
+    if showBorder == nil then
+        showBorder = incomingCastBarIconDefaults.showBorder ~= false
+    else
+        showBorder = showBorder == true
+    end
+
+    local showSwipe = incomingCastBarIconProfile and incomingCastBarIconProfile.showSwipe
+    if showSwipe == nil then
+        showSwipe = incomingCastBarIconDefaults.showSwipe ~= false
+    else
+        showSwipe = showSwipe == true
+    end
+
+    local showCooldownText = incomingCastBarIconProfile and incomingCastBarIconProfile.showCooldownText
+    if showCooldownText == nil then
+        showCooldownText = incomingCastBarIconDefaults.showCooldownText ~= false
+    else
+        showCooldownText = showCooldownText == true
+    end
+
+    return {
+        baseSize = baseSize,
+        scale = scale,
+        size = size,
+        spacing = spacing,
+        showBorder = showBorder,
+        showSwipe = showSwipe,
+        showCooldownText = showCooldownText,
+    }
+end
+
+local function GetIncomingCastIndicatorConfig()
+    local profile = FF and FF.db and FF.db.profile
+    local incomingCastBarProfile = profile and profile.incomingCastBar
+    local incomingCastBarDefaults = FF and FF.DEFAULT_SETTINGS and FF.DEFAULT_SETTINGS.incomingCastBar or {}
+    local iconConfig = GetIncomingCastIndicatorIconConfig(incomingCastBarProfile, incomingCastBarDefaults)
+
+    local count = ClampNumber(incomingCastBarProfile and incomingCastBarProfile.spellCount, 1, 6, incomingCastBarDefaults.spellCount or 3)
+    count = math.floor(count + 0.5)
+
+    local position = incomingCastBarDefaults.position or "BOTTOMLEFT"
+    local configuredPosition = incomingCastBarProfile and incomingCastBarProfile.position
+    if configuredPosition ~= nil then
+        local value = configuredPosition
+        if value == "TOPLEFT" or value == "BOTTOMLEFT" or value == "TOP" or value == "BOTTOM" or value == "TOPRIGHT" or value == "BOTTOMRIGHT" then
+            position = value
+        end
+    end
+
+    local growDirection = incomingCastBarDefaults.growthDirection or "RIGHT"
+    do
+        -- Backward-friendly behavior: if the user hasn't explicitly chosen a grow direction,
+        -- keep the old behavior where right-anchored positions grow left.
+        local explicitValue = incomingCastBarProfile and rawget(incomingCastBarProfile, "growthDirection")
+
+        if explicitValue == nil then
+            if position == "TOPRIGHT" or position == "BOTTOMRIGHT" then
+                growDirection = "LEFT"
+            else
+                growDirection = incomingCastBarDefaults.growthDirection or "RIGHT"
+            end
+        else
+            if explicitValue == "RIGHT" or explicitValue == "LEFT" or explicitValue == "DOWN" or explicitValue == "UP" then
+                growDirection = explicitValue
+            end
+        end
+    end
+
+    local offsetX = incomingCastBarDefaults.offsetX or 2
+    local configuredOffsetX = incomingCastBarProfile and incomingCastBarProfile.offsetX
+    if configuredOffsetX ~= nil then
+        offsetX = ClampNumber(configuredOffsetX, -200, 200, incomingCastBarDefaults.offsetX or 2)
+    end
+    offsetX = math.floor(offsetX + 0.5)
+
+    local offsetY = incomingCastBarDefaults.offsetY or 2
+    local configuredOffsetY = incomingCastBarProfile and incomingCastBarProfile.offsetY
+    if configuredOffsetY ~= nil then
+        offsetY = ClampNumber(configuredOffsetY, -200, 200, incomingCastBarDefaults.offsetY or 2)
+    end
+    offsetY = math.floor(offsetY + 0.5)
+
+    local hash = string.format(
+        "%d:%.2f:%d:%d:%d:%d:%s",
+        count,
+        iconConfig.scale,
+        iconConfig.spacing,
+        iconConfig.showBorder and 1 or 0,
+        iconConfig.showSwipe and 1 or 0,
+        iconConfig.showCooldownText and 1 or 0,
+        growDirection
+    )
+
+    iconConfig.count = count
+    iconConfig.growDirection = growDirection
+    iconConfig.hash = hash
+
+    return {
+        icon = iconConfig,
+        position = position,
+        offsetX = offsetX,
+        offsetY = offsetY,
+    }
+end
+
+local function EnsureSpellBarForFrame(frame, config)
+    if not (frame and config and frame) then
+        return nil
+    end
+
+    if frame.ffSpellBarCreationFailed then
+        return nil
+    end
+
+    local iconConfig = type(config.icon) == "table" and config.icon or config
+    if type(iconConfig) ~= "table" then
+        return nil
+    end
+
+    local container = frame.ffSpellBar
+    if not container then
+        local CreateSpellBarFrame = addon and addon.CreateSpellBarFrame
+        if not CreateSpellBarFrame then return end
+        container = CreateSpellBarFrame(frame)
+
+        if not container then
+            frame.ffSpellBarCreationFailed = true
+            if Utils and Utils.Log then
+                Utils:Log("Failed to create frame for incoming cast indicators.")
+            end
+            return nil
+        end
+
+        frame.ffSpellBar = container
+    end
+
+    if container.ApplyContainerPosition then
+        container:ApplyContainerPosition(frame, config)
+    end
+
+    local desiredHash = iconConfig.hash or config.hash
+    if container._ffSpellBarConfigHash ~= desiredHash and container.ApplyIconContainerLayout then
+        container:ApplyIconContainerLayout(iconConfig)
+    end
+
+    return container
+end
+
+function FF:SetupIncomingCastIndicators()
+    if InCombatLockdown and InCombatLockdown() then
+        self._ffIncomingCastIndicatorsPendingSetup = true
+        if self.RegisterEvent then
+            pcall(self.RegisterEvent, self, "PLAYER_REGEN_ENABLED")
+        end
+        return
+    end
+
+    local config = GetIncomingCastIndicatorConfig()
+
+    local frames = self:GetFrames()
+    for _, frame in ipairs(frames) do
+        EnsureSpellBarForFrame(frame.healthBar, config)
+    end
+end
+
+function FF:PLAYER_REGEN_ENABLED()
+    if not self._ffIncomingCastIndicatorsPendingSetup then
+        return
+    end
+
+    self._ffIncomingCastIndicatorsPendingSetup = false
+    if self.UnregisterEvent then
+        pcall(self.UnregisterEvent, self, "PLAYER_REGEN_ENABLED")
+    end
+
+    if self.SetupIncomingCastIndicators then
+        self:SetupIncomingCastIndicators()
+    end
+    if self.UpdateIncomingCastIndicators then
+        self:UpdateIncomingCastIndicators()
+    end
+end
+
+function FF:UpdateIncomingCastIndicators()
+    if not (CompactPartyFrame and CompactPartyFrame.memberUnitFrames) then
+        return
+    end
+
+    if not self.GetIncomingCasts then return end
+
+    local config = GetIncomingCastIndicatorConfig()
+    local frames = self:GetFrames()
+    local castList = {}
+    local inCombat = InCombatLockdown and InCombatLockdown()
+
+    local castsByCaster = self:GetIncomingCasts(GetTime())
+
+    for casterUnit, cast in pairs(castsByCaster or {}) do
+        if cast then
+            table.insert(castList, {
+                casterUnit = casterUnit,
+                cast = cast,
+            })
+        end
+    end
+
+    table.sort(castList, function(a, b)
+        local aStart = (a.cast and a.cast.startTime) or 0
+        local bStart = (b.cast and b.cast.startTime) or 0
+        if aStart == bStart then
+            return (a.casterUnit or "") < (b.casterUnit or "")
+        end
+        return aStart > bStart
+    end)
+
+    for _, frame in ipairs(frames) do
+        if frame and frame.healthBar and frame.unit then
+            local container = frame.healthBar.ffSpellBar
+            local targetUnit = frame.unit
+
+            if not inCombat then
+                container = EnsureSpellBarForFrame(frame.healthBar, config) or container
+            end
+
+            if container and container.UpdateSpellBarForFrame then
+                container:UpdateSpellBarForFrame(targetUnit, castList, config)
+            end
+        end
+    end
 end
