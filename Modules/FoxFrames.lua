@@ -44,6 +44,10 @@ function FF:ShowPartyFrameTitleIfNeeded()
 end
 
 function FF:ShowBuffCountdownIfNeededForFrame(frame)
+    if not (frame and frame.buffFrames) then
+        return
+    end
+
     for _, buffFrame in ipairs(frame.buffFrames) do
         buffFrame.cooldown:SetHideCountdownNumbers(not self.db.profile.partyFrame.showBuffCountdown)
     end
@@ -54,6 +58,26 @@ function FF:ShowBuffCountdownIfNeeded()
 
     for _, frame in ipairs(CompactPartyFrame.memberUnitFrames) do
         self:ShowBuffCountdownIfNeededForFrame(frame)
+    end
+end
+
+function FF:ShowDebuffCountdownIfNeededForFrame(frame)
+    if not (frame and frame.debuffFrames) then
+        return
+    end
+
+    for _, debuffFrame in ipairs(frame.debuffFrames) do
+        if debuffFrame and debuffFrame.cooldown and debuffFrame.cooldown.SetHideCountdownNumbers then
+            debuffFrame.cooldown:SetHideCountdownNumbers(not self.db.profile.partyFrame.showDebuffCountdown)
+        end
+    end
+end
+
+function FF:ShowDebuffCountdownIfNeeded()
+    if not CompactPartyFrame then return end
+
+    for _, frame in ipairs(CompactPartyFrame.memberUnitFrames) do
+        self:ShowDebuffCountdownIfNeededForFrame(frame)
     end
 end
 
@@ -125,6 +149,7 @@ end
 function FF:SetupFrames()
     self:SetAlwaysUseTopLeftAnchor()
     self:ShowBuffCountdownIfNeeded()
+    self:ShowDebuffCountdownIfNeeded()
     self:ShowPartyFrameTitleIfNeeded()
     self:ShowPlayerFrameIfNeeded()
     self:UpdateFrames()

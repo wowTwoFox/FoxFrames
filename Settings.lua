@@ -14,6 +14,7 @@ FF.DEFAULT_SETTINGS = {
         showDPSRoleIcon = true,
         showInSolo = false,
         showBuffCountdown = false,
+        showDebuffCountdown = false,
         healthBarTexture = FF.DEFAULT_TEXTURE,
         forceTopLeftAnchor = true,
         trackIncomingCasts = false,
@@ -188,6 +189,19 @@ function FF:SetupOptions()
             self:ShowBuffCountdownIfNeeded()
         end,
         desc = "Toggle the buff countdown visibility on the frame.",
+        prefix = PARTY_FRAME_PREFIX
+    })
+
+    SettingsLib:CreateCheckbox(rootCategory, {
+        key = "ShowDebuffCountdown",
+        name = "Show Debuff Countdown",
+        default = FF.DEFAULT_SETTINGS.partyFrame.showDebuffCountdown,
+        get = function() return FF.db.profile.partyFrame.showDebuffCountdown end,
+        set = function(value)
+            FF.db.profile.partyFrame.showDebuffCountdown = value
+            self:ShowDebuffCountdownIfNeeded()
+        end,
+        desc = "Toggle the debuff countdown visibility on the frame.",
         prefix = PARTY_FRAME_PREFIX
     })
 
