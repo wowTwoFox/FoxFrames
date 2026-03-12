@@ -21,6 +21,9 @@ FF.DEFAULT_SETTINGS = {
 
         -- Incoming cast ("targeted spell") indicator icon layout
         incomingCastIconCount = 3,
+        incomingCastIconPosition = "BOTTOMLEFT",
+        incomingCastIconOffsetX = 2,
+        incomingCastIconOffsetY = 2,
         incomingCastIconScale = 1,
         incomingCastIconSpacing = 0,
         incomingCastIconBorder = true,
@@ -309,6 +312,80 @@ function FF:SetupOptions()
         clickRequiresSet = true, -- button only active when checkbox is checked
     })
 
+    SettingsLib:CreateDropdown(rootCategory, {
+        key = "IncomingCastIconPosition",
+        name = "Targeted spell position",
+        default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconPosition,
+        values = {
+            BOTTOMLEFT = "Bottom left",
+            TOPLEFT = "Top left",
+            BOTTOM = "Bottom center",
+            TOP = "Top center",
+        },
+        get = function()
+            local pos = FF.db.profile.partyFrame.incomingCastIconPosition
+            if pos ~= "TOPLEFT" and pos ~= "BOTTOMLEFT" and pos ~= "TOP" and pos ~= "BOTTOM" then
+                pos = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconPosition
+            end
+            return pos
+        end,
+        set = function(value)
+            FF.db.profile.partyFrame.incomingCastIconPosition = value
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Where to anchor targeted spell icons on the party frame.",
+        prefix = PARTY_FRAME_PREFIX,
+    })
+
+    SettingsLib:CreateSlider(rootCategory, {
+        key = "IncomingCastIconOffsetX",
+        name = "X offset",
+        default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconOffsetX,
+        min = -40,
+        max = 40,
+        step = 1,
+        formatter = function(value)
+            return string.format("%ipx", math.floor((value) + 0.5))
+        end,
+        get = function()
+            local profile = FF.db.profile.partyFrame
+            return profile.incomingCastIconOffsetX or FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconOffsetX
+        end,
+        set = function(value)
+            FF.db.profile.partyFrame.incomingCastIconOffsetX = value
+
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Horizontal offset (in pixels). Negative allows going outside the frame.",
+        prefix = PARTY_FRAME_PREFIX,
+    })
+
+    SettingsLib:CreateSlider(rootCategory, {
+        key = "IncomingCastIconOffsetY",
+        name = "Y offset",
+        default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconOffsetY,
+        min = -40,
+        max = 40,
+        step = 1,
+        formatter = function(value)
+            return string.format("%ipx", math.floor((value) + 0.5))
+        end,
+        get = function()
+            local profile = FF.db.profile.partyFrame
+            return profile.incomingCastIconOffsetY or FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconOffsetY
+        end,
+        set = function(value)
+            FF.db.profile.partyFrame.incomingCastIconOffsetY = value
+
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Vertical offset (in pixels). Negative allows going outside the frame.",
+        prefix = PARTY_FRAME_PREFIX,
+    })
+
     SettingsLib:CreateSlider(rootCategory, {
         key = "IncomingCastIconCount",
         name = "Targeted spell icon count",
@@ -374,8 +451,8 @@ function FF:SetupOptions()
         key = "IncomingCastIconSpacing",
         name = "Icon spacing",
         default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconSpacing,
-        min = 0,
-        max = 4,
+        min = -10,
+        max = 20,
         step = 1,
         formatter = function(value)
             return string.format("%i", math.floor((value) + 0.5))
@@ -388,7 +465,7 @@ function FF:SetupOptions()
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
         end,
-        desc = "Horizontal space (in pixels) between targeted spell icons.",
+        desc = "Horizontal space (in pixels) between targeted spell icons. Negative values allow overlap.",
         prefix = PARTY_FRAME_PREFIX,
     })
 
