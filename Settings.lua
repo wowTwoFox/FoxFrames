@@ -22,6 +22,7 @@ FF.DEFAULT_SETTINGS = {
         -- Incoming cast ("targeted spell") indicator icon layout
         incomingCastIconCount = 3,
         incomingCastIconPosition = "BOTTOMLEFT",
+        incomingCastIconGrowDirection = "RIGHT",
         incomingCastIconOffsetX = 2,
         incomingCastIconOffsetY = 2,
         incomingCastIconScale = 1,
@@ -307,7 +308,7 @@ function FF:SetupOptions()
 
         buttonText = "Toggle Preview",
         buttonClick = function()
-            FF:SetIncomingCastIndicatorPreviewEnabled(not self._ffIncomingCastIndicatorPreviewEnabled)
+            FF:ToggleIncomingCastIndicatorPreview()
         end,
         clickRequiresSet = true, -- button only active when checkbox is checked
     })
@@ -319,12 +320,14 @@ function FF:SetupOptions()
         values = {
             BOTTOMLEFT = "Bottom left",
             TOPLEFT = "Top left",
+            BOTTOMRIGHT = "Bottom right",
+            TOPRIGHT = "Top right",
             BOTTOM = "Bottom center",
             TOP = "Top center",
         },
         get = function()
             local pos = FF.db.profile.partyFrame.incomingCastIconPosition
-            if pos ~= "TOPLEFT" and pos ~= "BOTTOMLEFT" and pos ~= "TOP" and pos ~= "BOTTOM" then
+            if pos ~= "TOPLEFT" and pos ~= "BOTTOMLEFT" and pos ~= "TOP" and pos ~= "BOTTOM" and pos ~= "TOPRIGHT" and pos ~= "BOTTOMRIGHT" then
                 pos = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconPosition
             end
             return pos
@@ -335,6 +338,50 @@ function FF:SetupOptions()
             FF:UpdateIncomingCastIndicators()
         end,
         desc = "Where to anchor targeted spell icons on the party frame.",
+        prefix = PARTY_FRAME_PREFIX,
+    })
+
+    SettingsLib:CreateDropdown(rootCategory, {
+        key = "IncomingCastIconGrowDirection",
+        name = "Grow Direction",
+        default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconGrowDirection,
+        values = {
+            RIGHT = "Right",
+            LEFT = "Left",
+            DOWN = "Down",
+            UP = "Up",
+        },
+        get = function()
+            local profile = FF.db.profile.partyFrame
+
+            local pos = profile.incomingCastIconPosition
+            if pos ~= "TOPLEFT" and pos ~= "BOTTOMLEFT" and pos ~= "TOP" and pos ~= "BOTTOM" and pos ~= "TOPRIGHT" and pos ~= "BOTTOMRIGHT" then
+                pos = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconPosition
+            end
+
+            local explicitDir = rawget(profile, "incomingCastIconGrowDirection")
+            local dir = explicitDir
+
+            if dir == nil then
+                if pos == "TOPRIGHT" or pos == "BOTTOMRIGHT" then
+                    dir = "LEFT"
+                else
+                    dir = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconGrowDirection
+                end
+            end
+
+            if dir ~= "RIGHT" and dir ~= "LEFT" and dir ~= "DOWN" and dir ~= "UP" then
+                dir = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconGrowDirection
+            end
+
+            return dir
+        end,
+        set = function(value)
+            FF.db.profile.partyFrame.incomingCastIconGrowDirection = value
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Direction targeted spell icons grow when multiple are shown.",
         prefix = PARTY_FRAME_PREFIX,
     })
 
@@ -465,7 +512,7 @@ function FF:SetupOptions()
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
         end,
-        desc = "Horizontal space (in pixels) between targeted spell icons. Negative values allow overlap.",
+        desc = "Space (in pixels) between targeted spell icons. Negative values allow overlap.",
         prefix = PARTY_FRAME_PREFIX,
     })
 

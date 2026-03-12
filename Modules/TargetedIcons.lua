@@ -8,6 +8,7 @@ local INCOMING_CAST_ICON_BASE_SIZE = 22
 local INCOMING_CAST_ICON_DEFAULT_SCALE = 1
 local INCOMING_CAST_ICON_SPACING = 0
 local INCOMING_CAST_ICON_DEFAULT_POSITION = "BOTTOMLEFT"
+local INCOMING_CAST_ICON_DEFAULT_GROW_DIRECTION = "RIGHT"
 local INCOMING_CAST_ICON_DEFAULT_OFFSET_X = 2
 local INCOMING_CAST_ICON_DEFAULT_OFFSET_Y = 2
 local INCOMING_CAST_ICON_MASK_ATLAS = "UI-HUD-CoolDownManager-Mask"
@@ -164,8 +165,27 @@ local function GetIncomingCastIndicatorConfig()
     local position = INCOMING_CAST_ICON_DEFAULT_POSITION
     if profile and profile.incomingCastIconPosition ~= nil then
         local value = profile.incomingCastIconPosition
-        if value == "TOPLEFT" or value == "BOTTOMLEFT" or value == "TOP" or value == "BOTTOM" then
+        if value == "TOPLEFT" or value == "BOTTOMLEFT" or value == "TOP" or value == "BOTTOM" or value == "TOPRIGHT" or value == "BOTTOMRIGHT" then
             position = value
+        end
+    end
+
+    local growDirection = INCOMING_CAST_ICON_DEFAULT_GROW_DIRECTION
+    do
+        -- Backward-friendly behavior: if the user hasn't explicitly chosen a grow direction,
+        -- keep the old behavior where right-anchored positions grow left.
+        local explicitValue = profile and rawget(profile, "incomingCastIconGrowDirection")
+
+        if explicitValue == nil then
+            if position == "TOPRIGHT" or position == "BOTTOMRIGHT" then
+                growDirection = "LEFT"
+            else
+                growDirection = INCOMING_CAST_ICON_DEFAULT_GROW_DIRECTION
+            end
+        else
+            if explicitValue == "RIGHT" or explicitValue == "LEFT" or explicitValue == "DOWN" or explicitValue == "UP" then
+                growDirection = explicitValue
+            end
         end
     end
 
@@ -182,13 +202,14 @@ local function GetIncomingCastIndicatorConfig()
     offsetY = math.floor(offsetY + 0.5)
 
     local hash = string.format(
-        "%d:%.2f:%d:%d:%d:%d",
+        "%d:%.2f:%d:%d:%d:%d:%s",
         count,
         scale,
         spacing,
         showBorder and 1 or 0,
         showSwipe and 1 or 0,
-        showCooldownText and 1 or 0
+        showCooldownText and 1 or 0,
+        growDirection
     )
 
     return {
@@ -201,6 +222,7 @@ local function GetIncomingCastIndicatorConfig()
         showSwipe = showSwipe,
         showCooldownText = showCooldownText,
         position = position,
+        growDirection = growDirection,
         offsetX = offsetX,
         offsetY = offsetY,
         hash = hash,
@@ -213,7 +235,7 @@ local function ApplyIncomingCastContainerPosition(container, frame, config)
     end
 
     local position = (config and config.position) or INCOMING_CAST_ICON_DEFAULT_POSITION
-    if position ~= "TOPLEFT" and position ~= "BOTTOMLEFT" and position ~= "TOP" and position ~= "BOTTOM" then
+    if position ~= "TOPLEFT" and position ~= "BOTTOMLEFT" and position ~= "TOP" and position ~= "BOTTOM" and position ~= "TOPRIGHT" and position ~= "BOTTOMRIGHT" then
         position = INCOMING_CAST_ICON_DEFAULT_POSITION
     end
 
@@ -225,7 +247,11 @@ local function ApplyIncomingCastContainerPosition(container, frame, config)
 
     local xOffset = offsetX
     local yOffset = offsetY
-    if position == "TOPLEFT" or position == "TOP" then
+    if position == "TOPRIGHT" or position == "BOTTOMRIGHT" then
+        xOffset = -offsetX
+    end
+
+    if position == "TOPLEFT" or position == "TOP" or position == "TOPRIGHT" then
         yOffset = -offsetY
     end
 
@@ -421,16 +447,28 @@ local function ApplyIncomingCastContainerLayout(container, config)
         return
     end
 
+    local growDirection = config.growDirection or INCOMING_CAST_ICON_DEFAULT_GROW_DIRECTION
+    if growDirection ~= "RIGHT" and growDirection ~= "LEFT" and growDirection ~= "DOWN" and growDirection ~= "UP" then
+        growDirection = INCOMING_CAST_ICON_DEFAULT_GROW_DIRECTION
+    end
+
+    local isVertical = growDirection == "DOWN" or growDirection == "UP"
+
     container.isHorizontal = true
-    container.stride = config.count
+    container.stride = isVertical and 1 or config.count
     container.layoutFramesGoingRight = true
     container.layoutFramesGoingUp = false
-    container.childXPadding = config.spacing
-    container.childYPadding = 0
+    container.childXPadding = isVertical and 0 or config.spacing
+    container.childYPadding = isVertical and config.spacing or 0
     container.alwaysUpdateLayout = true
 
-    local containerWidth = (config.size * config.count) + (config.spacing * (config.count - 1))
-    container:SetSize(containerWidth, config.size)
+    if isVertical then
+        local containerHeight = (config.size * config.count) + (config.spacing * (config.count - 1))
+        container:SetSize(config.size, containerHeight)
+    else
+        local containerWidth = (config.size * config.count) + (config.spacing * (config.count - 1))
+        container:SetSize(containerWidth, config.size)
+    end
 
     container.icons = container.icons or {}
     for i = 1, config.count do
@@ -658,6 +696,11 @@ function FF:PLAYER_REGEN_ENABLED()
     end
 end
 
+function FF:ToggleIncomingCastIndicatorPreview()
+    local enabled = not self._ffIncomingCastIndicatorPreviewEnabled
+    self:SetIncomingCastIndicatorPreviewEnabled(enabled)
+end
+
 function FF:SetIncomingCastIndicatorPreviewEnabled(enabled)
     local wantEnabled = enabled == true
     if self._ffIncomingCastIndicatorPreviewEnabled == wantEnabled then
@@ -768,6 +811,14 @@ function FF:UpdateTargetedCastIconsForFrame(frame, castList, previewEnabled, con
     local inCombat = InCombatLockdown and InCombatLockdown()
     local desiredCount = config.count
 
+    local growDirection = config and config.growDirection
+    if growDirection ~= "RIGHT" and growDirection ~= "LEFT" and growDirection ~= "DOWN" and growDirection ~= "UP" then
+        growDirection = INCOMING_CAST_ICON_DEFAULT_GROW_DIRECTION
+    end
+
+    local isVertical = growDirection == "DOWN" or growDirection == "UP"
+    local reverseIcons = growDirection == "LEFT" or growDirection == "UP"
+
     if frame and frame.unit then
         local container = frame.ffIncomingCastContainer
         if not container then
@@ -787,8 +838,16 @@ function FF:UpdateTargetedCastIconsForFrame(frame, castList, previewEnabled, con
             local loopCount = math.max(desiredCount, existingCount)
 
             for i = 1, loopCount do
-                local iconFrame = container.icons[i]
-                local entry = castList[i]
+                local iconIndex = i
+                if reverseIcons and i <= desiredCount then
+                    iconIndex = desiredCount - i + 1
+                end
+
+                local iconFrame = container.icons[iconIndex]
+                local entry = nil
+                if i <= desiredCount then
+                    entry = castList[i]
+                end
 
                 if iconFrame then
                     if i > desiredCount then
@@ -814,6 +873,36 @@ function FF:UpdateTargetedCastIconsForFrame(frame, castList, previewEnabled, con
                         iconFrame:Hide()
                         iconFrame.ignoreInLayout = true
                     end
+                end
+            end
+
+            local shownCount = 0
+            for i = 1, desiredCount do
+                local iconFrame = container.icons[i]
+                if iconFrame and iconFrame.ignoreInLayout ~= true and iconFrame.IsShown and iconFrame:IsShown() then
+                    shownCount = shownCount + 1
+                end
+            end
+
+            local width = config.size
+            local height = config.size
+            if isVertical then
+                height = shownCount > 0 and ((config.size * shownCount) + (config.spacing * (shownCount - 1))) or 0
+                if height < 0 then
+                    height = 0
+                end
+            else
+                width = shownCount > 0 and ((config.size * shownCount) + (config.spacing * (shownCount - 1))) or 0
+                if width < 0 then
+                    width = 0
+                end
+            end
+
+            local sizeHash = string.format("%d:%d", math.floor(width + 0.5), math.floor(height + 0.5))
+            if container._ffIncomingCastDesiredSizeHash ~= sizeHash then
+                container._ffIncomingCastDesiredSizeHash = sizeHash
+                if container.SetSize then
+                    pcall(container.SetSize, container, width, height)
                 end
             end
 

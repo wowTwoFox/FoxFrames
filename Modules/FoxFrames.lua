@@ -101,11 +101,19 @@ function FF:UpdateRoleIcon(frame)
 end
 
 function FF:SlashCommand(input)
+    print(input)
     if not input or input:trim() == "" then
         FF:OpenSettings()
+    elseif input:trim() == "preview" then
+        FF:OpenSettings()
+        FF:ToggleIncomingCastIndicatorPreview()
     else
         self:Print("Usage: /ff - open config")
     end
+end
+
+function FF:PreviewSlashCommand(input)
+    FF:ToggleIncomingCastIndicatorPreview()
 end
 
 function FF:UpdateHealthBarTexture(healthBar)

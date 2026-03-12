@@ -63,6 +63,7 @@ function FF:OnInitialize()
     -- Register slash commands
     self:RegisterChatCommand("ff", "SlashCommand")
     self:RegisterChatCommand("foxframes", "SlashCommand")
+    self:RegisterChatCommand("ffpreview", "PreviewSlashCommand")
 
     hooksecurefunc(CompactPartyFrame, "UpdateVisibility", function()
         FF:ShowPartyFrameIfNeeded()
