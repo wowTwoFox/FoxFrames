@@ -23,6 +23,8 @@ FF.DEFAULT_SETTINGS = {
         incomingCastIconScale = 1,
         incomingCastIconSpacing = 0,
         incomingCastIconBorder = true,
+        incomingCastIconSwipe = true,
+        incomingCastIconCooldownText = true,
     }
 }
 
@@ -317,7 +319,7 @@ function FF:SetupOptions()
 
     SettingsLib:CreateSlider(rootCategory, {
         key = "IncomingCastIconScale",
-        name = "Targeted spell icon scale",
+        name = "Icon scale",
         default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconScale,
         min = 0.5,
         max = 2,
@@ -356,7 +358,7 @@ function FF:SetupOptions()
 
     SettingsLib:CreateSlider(rootCategory, {
         key = "IncomingCastIconSpacing",
-        name = "Targeted spell icon spacing",
+        name = "Icon spacing",
         default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconSpacing,
         min = 0,
         max = 4,
@@ -378,7 +380,7 @@ function FF:SetupOptions()
 
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "IncomingCastIconBorder",
-        name = "Show targeted spell icon border",
+        name = "Show icon border",
         default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconBorder,
         get = function()
             return FF.db.profile.partyFrame.incomingCastIconBorder
@@ -389,6 +391,38 @@ function FF:SetupOptions()
             FF:UpdateIncomingCastIndicators()
         end,
         desc = "Toggle the border around targeted spell icons.",
+        prefix = PARTY_FRAME_PREFIX,
+    })
+
+    SettingsLib:CreateCheckbox(rootCategory, {
+        key = "IncomingCastIconSwipe",
+        name = "Show cooldown swipe",
+        default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconSwipe,
+        get = function()
+            return FF.db.profile.partyFrame.incomingCastIconSwipe
+        end,
+        set = function(value)
+            FF.db.profile.partyFrame.incomingCastIconSwipe = value
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Toggle the cooldown swipe overlay on targeted spell icons.",
+        prefix = PARTY_FRAME_PREFIX,
+    })
+
+    SettingsLib:CreateCheckbox(rootCategory, {
+        key = "IncomingCastIconCooldownText",
+        name = "Show cooldown text",
+        default = FF.DEFAULT_SETTINGS.partyFrame.incomingCastIconCooldownText,
+        get = function()
+            return FF.db.profile.partyFrame.incomingCastIconCooldownText
+        end,
+        set = function(value)
+            FF.db.profile.partyFrame.incomingCastIconCooldownText = value
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Toggle the cooldown countdown text on targeted spell icons.",
         prefix = PARTY_FRAME_PREFIX,
     })
 end

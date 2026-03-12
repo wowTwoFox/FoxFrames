@@ -11,6 +11,8 @@ local INCOMING_CAST_ICON_INSET = 1
 
 local INCOMING_CAST_ICON_MASK_ATLAS = "UI-HUD-CoolDownManager-Mask"
 local INCOMING_CAST_ICON_OVERLAY_ATLAS = "UI-HUD-CoolDownManager-IconOverlay"
+local INCOMING_CAST_ICON_SWIPE_TEXTURE = "Interface\\HUD\\UI-HUD-CoolDownManager-Icon-Swipe"
+local INCOMING_CAST_ICON_SWIPE_ALPHA = 0.7
 
 local INCOMING_CAST_ICON_BACKDROP = {
     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -45,6 +47,72 @@ local function ClampNumber(value, minValue, maxValue, fallback)
         num = maxValue
     end
     return num
+end
+
+local function CenterCooldownText(cooldown)
+    if not (cooldown and cooldown.GetCountdownFontString) then
+        return
+    end
+
+    local fontString = cooldown:GetCountdownFontString()
+    if not fontString then
+        return
+    end
+
+    fontString:ClearAllPoints()
+    fontString:SetPoint("CENTER", cooldown, "CENTER", 0, 0)
+    if fontString.SetJustifyH then
+        fontString:SetJustifyH("CENTER")
+    end
+    if fontString.SetJustifyV then
+        fontString:SetJustifyV("MIDDLE")
+    end
+
+    -- Improve readability: enforce a thicker outline on the cooldown countdown text.
+    if fontString.GetFont and fontString.SetFont then
+        local fontFile, fontHeight, fontFlags = fontString:GetFont()
+        if fontFile and fontHeight then
+            local flags = fontFlags or ""
+            if not flags:find("THICKOUTLINE", 1, true) then
+                if flags:find("OUTLINE", 1, true) then
+                    flags = flags:gsub("OUTLINE", "THICKOUTLINE")
+                elseif flags ~= "" then
+                    flags = flags .. ",THICKOUTLINE"
+                else
+                    flags = "THICKOUTLINE"
+                end
+            end
+            pcall(fontString.SetFont, fontString, fontFile, fontHeight, flags)
+        end
+    end
+end
+
+local function ApplyIncomingCastCooldownVisualConfig(cooldown, config)
+    if not cooldown then
+        return
+    end
+
+    local showSwipe = config and config.showSwipe
+    if showSwipe == nil then
+        showSwipe = true
+    end
+
+    local showCooldownText = config and config.showCooldownText
+    if showCooldownText == nil then
+        showCooldownText = true
+    end
+
+    if cooldown.SetDrawSwipe then
+        pcall(cooldown.SetDrawSwipe, cooldown, showSwipe)
+    end
+
+    if cooldown.SetHideCountdownNumbers then
+        pcall(cooldown.SetHideCountdownNumbers, cooldown, not showCooldownText)
+    end
+
+    if showCooldownText then
+        CenterCooldownText(cooldown)
+    end
 end
 
 local function GetIncomingCastIndicatorConfig()
@@ -82,7 +150,25 @@ local function GetIncomingCastIndicatorConfig()
         showBorder = profile.incomingCastIconBorder == true
     end
 
-    local hash = string.format("%d:%.2f:%d:%d", count, scale, spacing, showBorder and 1 or 0)
+    local showSwipe = true
+    if profile and profile.incomingCastIconSwipe ~= nil then
+        showSwipe = profile.incomingCastIconSwipe == true
+    end
+
+    local showCooldownText = true
+    if profile and profile.incomingCastIconCooldownText ~= nil then
+        showCooldownText = profile.incomingCastIconCooldownText == true
+    end
+
+    local hash = string.format(
+        "%d:%.2f:%d:%d:%d:%d",
+        count,
+        scale,
+        spacing,
+        showBorder and 1 or 0,
+        showSwipe and 1 or 0,
+        showCooldownText and 1 or 0
+    )
 
     return {
         count = count,
@@ -91,6 +177,8 @@ local function GetIncomingCastIndicatorConfig()
         size = size,
         spacing = spacing,
         showBorder = showBorder,
+        showSwipe = showSwipe,
+        showCooldownText = showCooldownText,
         hash = hash,
     }
 end
@@ -161,6 +249,24 @@ local function ApplyIncomingCastIconLayout(icon, config)
         content.texture:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -0)
         content.texture:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", -0, 0)
     end
+
+    if content.cooldown then
+        ApplyIncomingCastCooldownVisualConfig(content.cooldown, config)
+    end
+end
+
+local function ResetIncomingCastCooldown(iconFrame)
+    local cooldown = iconFrame and iconFrame.icon and iconFrame.icon.cooldown
+    if not cooldown then
+        return
+    end
+
+    if cooldown.Clear then
+        pcall(cooldown.Clear, cooldown)
+    end
+    if cooldown.Hide then
+        cooldown:Hide()
+    end
 end
 
 local function CreateIncomingCastIcon(container, index, config)
@@ -180,7 +286,7 @@ local function CreateIncomingCastIcon(container, index, config)
     local border = CreateFrame("Frame", nil, icon, "BackdropTemplate")
     border:SetAllPoints()
     border:SetBackdrop(INCOMING_CAST_ICON_BACKDROP)
-    border:SetFrameLevel((icon.GetFrameLevel and icon:GetFrameLevel() or 0) + 1)
+    border:SetFrameLevel((icon.GetFrameLevel and icon:GetFrameLevel() or 0) + 2)
     border:EnableMouse(false)
     border:SetHitRectInsets(10000, 10000, 10000, 10000)
     icon.border = border
@@ -204,6 +310,44 @@ local function CreateIncomingCastIcon(container, index, config)
         icon.overlay = overlay
     else
         overlay:Hide()
+    end
+
+    local okCooldown, cooldown = pcall(CreateFrame, "Cooldown", nil, icon, "CooldownFrameTemplate")
+    if (not okCooldown) or (not cooldown) then
+        okCooldown, cooldown = pcall(CreateFrame, "Cooldown", nil, icon)
+    end
+
+    if okCooldown and cooldown then
+        cooldown:SetAllPoints()
+        cooldown:SetFrameLevel((icon.GetFrameLevel and icon:GetFrameLevel() or 0) + 1)
+        cooldown:EnableMouse(false)
+        cooldown:SetHitRectInsets(10000, 10000, 10000, 10000)
+
+        -- Match Blizzard TargetedSpells: show countdown text even for very short durations.
+        cooldown.minimumCountdownDuration = 0
+
+        if cooldown.SetCountdownFont then
+            pcall(cooldown.SetCountdownFont, cooldown, "GameFontHighlightSmallOutline")
+        end
+
+        ApplyIncomingCastCooldownVisualConfig(cooldown, config)
+        if cooldown.SetDrawEdge then
+            pcall(cooldown.SetDrawEdge, cooldown, false)
+        end
+        if cooldown.SetDrawBling then
+            pcall(cooldown.SetDrawBling, cooldown, false)
+        end
+        if cooldown.SetSwipeTexture then
+            pcall(cooldown.SetSwipeTexture, cooldown, INCOMING_CAST_ICON_SWIPE_TEXTURE)
+        end
+        if cooldown.SetSwipeColor then
+            pcall(cooldown.SetSwipeColor, cooldown, 0, 0, 0, INCOMING_CAST_ICON_SWIPE_ALPHA)
+        end
+        if cooldown.Clear then
+            pcall(cooldown.Clear, cooldown)
+        end
+
+        icon.cooldown = cooldown
     end
 
     icon.ignoreInLayout = true
@@ -250,6 +394,9 @@ local function ApplyIncomingCastContainerLayout(container, config)
             if icon.icon and icon.icon.texture then
                 icon.icon.texture:SetTexture(nil)
             end
+
+            ResetIncomingCastCooldown(icon)
+
             icon:SetAlpha(0)
             icon:Hide()
             icon.ignoreInLayout = true
@@ -301,6 +448,92 @@ local function SetShownFromBooleanSafe(frame, value)
     end
 
     return false
+end
+
+local function UpdateIncomingCastCooldown(entry, iconFrame, config)
+    local cooldown = iconFrame and iconFrame.icon and iconFrame.icon.cooldown
+    if not cooldown then
+        return
+    end
+
+    local showSwipe = config and config.showSwipe
+    if showSwipe == nil then
+        showSwipe = true
+    end
+
+    local showCooldownText = config and config.showCooldownText
+    if showCooldownText == nil then
+        showCooldownText = true
+    end
+
+    local wantCooldown = showSwipe or showCooldownText
+
+    ApplyIncomingCastCooldownVisualConfig(cooldown, config)
+
+    if not wantCooldown then
+        ResetIncomingCastCooldown(iconFrame)
+        return
+    end
+
+    if not (entry and entry.cast) then
+        ResetIncomingCastCooldown(iconFrame)
+        return
+    end
+
+    local duration = entry.cast.duration
+    if duration == nil and entry.casterUnit then
+        if UnitCastingDuration then
+            local ok, value = pcall(UnitCastingDuration, entry.casterUnit)
+            if ok then
+                duration = value
+            end
+        end
+
+        if duration == nil and UnitChannelDuration then
+            local ok, value = pcall(UnitChannelDuration, entry.casterUnit)
+            if ok then
+                duration = value
+            end
+        end
+    end
+
+    if cooldown.Show then
+        cooldown:Show()
+    end
+
+    if duration == nil then
+        ResetIncomingCastCooldown(iconFrame)
+        return
+    end
+
+    if type(duration) == "number" then
+        local startTime = (entry.cast and entry.cast.startTime) or GetTime()
+        if cooldown.SetCooldown then
+            pcall(cooldown.SetCooldown, cooldown, startTime, duration)
+            if showCooldownText then
+                CenterCooldownText(cooldown)
+            end
+        end
+        return
+    end
+
+    if cooldown.SetCooldownFromDurationObject then
+        pcall(cooldown.SetCooldownFromDurationObject, cooldown, duration)
+        if showCooldownText then
+            CenterCooldownText(cooldown)
+        end
+        return
+    end
+
+    if duration.GetRemainingDuration and cooldown.SetCooldown then
+        local ok, remaining = pcall(duration.GetRemainingDuration, duration)
+        if ok and type(remaining) == "number" then
+            pcall(cooldown.SetCooldown, cooldown, GetTime(), remaining)
+            if showCooldownText then
+                CenterCooldownText(cooldown)
+            end
+        end
+    end
 end
 
 function FF:SetupIncomingCastIndicators()
@@ -384,10 +617,33 @@ function FF:SetIncomingCastIndicatorPreviewEnabled(enabled)
     end
 end
 
-local function UpdateTargetedIcon(entry, iconFrame, previewEnabled, frame)
+local function UpdateTargetedIcon(entry, iconFrame, previewEnabled, frame, config)
     if iconFrame.icon and iconFrame.icon.texture then
         iconFrame.icon.texture:SetTexture(entry.cast.icon)
     end
+
+    local cooldown = iconFrame.icon and iconFrame.icon.cooldown
+
+    local showSwipe = config and config.showSwipe
+    if showSwipe == nil then
+        showSwipe = true
+    end
+
+    local showCooldownText = config and config.showCooldownText
+    if showCooldownText == nil then
+        showCooldownText = true
+    end
+
+    local wantCooldown = showSwipe or showCooldownText
+
+    if cooldown then
+        ApplyIncomingCastCooldownVisualConfig(cooldown, config)
+    end
+
+    if not (previewEnabled or entry.isPreview) then
+        UpdateIncomingCastCooldown(entry, iconFrame, config)
+    end
+
     iconFrame:SetAlpha(1)
 
     -- Prefer secret-safe show/hide to enable left-packing
@@ -398,10 +654,32 @@ local function UpdateTargetedIcon(entry, iconFrame, previewEnabled, frame)
     if previewEnabled or entry.isPreview then
         iconFrame:Show()
         iconFrame:SetAlpha(1)
+        if cooldown then
+            if not wantCooldown then
+                ResetIncomingCastCooldown(iconFrame)
+            else
+                if cooldown.Clear then
+                    pcall(cooldown.Clear, cooldown)
+                end
+                cooldown:Show()
+                cooldown:SetAlpha(1)
+
+                local duration = 6
+                local index = iconFrame.layoutIndex or 1
+                local offset = (index - 1) * 0.75
+                if cooldown.SetCooldown then
+                    pcall(cooldown.SetCooldown, cooldown, GetTime() - offset, duration)
+                    if showCooldownText then
+                        CenterCooldownText(cooldown)
+                    end
+                end
+            end
+        end
     elseif UnitIsUnit then
         local target = entry.casterUnit .. "target"
         local isTargeted = UnitIsUnit(target, frame.unit)
         usedShown = SetShownFromBooleanSafe(iconFrame, isTargeted)
+
         if not usedShown then
             iconFrame:Show()
             SetAlphaFromBooleanSafe(iconFrame, isTargeted)
@@ -411,8 +689,19 @@ local function UpdateTargetedIcon(entry, iconFrame, previewEnabled, frame)
             iconFrame:SetAlpha(1)
         end
     else
+        ResetIncomingCastCooldown(iconFrame)
         iconFrame:Hide()
         iconFrame:SetAlpha(0)
+    end
+
+    if cooldown then
+        if wantCooldown and iconFrame:IsShown() then
+            cooldown:SetAlpha(iconFrame:GetAlpha() or 1)
+        else
+            -- The cooldown swipe can ignore parent display state;
+            -- clearing it ensures it never lingers.
+            ResetIncomingCastCooldown(iconFrame)
+        end
     end
 
     iconFrame.ignoreInLayout = not iconFrame:IsShown()
@@ -449,15 +738,20 @@ function FF:UpdateTargetedCastIconsForFrame(frame, castList, previewEnabled, con
                         if iconFrame.icon and iconFrame.icon.texture then
                             iconFrame.icon.texture:SetTexture(nil)
                         end
+
+                        ResetIncomingCastCooldown(iconFrame)
+
                         iconFrame:SetAlpha(0)
                         iconFrame:Hide()
                         iconFrame.ignoreInLayout = true
                     elseif entry and entry.cast then
-                        UpdateTargetedIcon(entry, iconFrame, previewEnabled, frame)
+                        UpdateTargetedIcon(entry, iconFrame, previewEnabled, frame, config)
                     else
                         if iconFrame.icon and iconFrame.icon.texture then
                             iconFrame.icon.texture:SetTexture(nil)
                         end
+
+                        ResetIncomingCastCooldown(iconFrame)
 
                         iconFrame:SetAlpha(0)
                         iconFrame:Hide()

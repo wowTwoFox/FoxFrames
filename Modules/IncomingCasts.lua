@@ -145,9 +145,25 @@ function FF:_IncomingCast_Store(casterUnit, isChannel, spellIdFromEvent)
         spellName = name,
         icon = icon,
         startTime = now,
+        duration = nil,
         notInterruptible = notInterruptible,
         isChannel = isChannel,
     }
+
+    -- Prefer duration objects to avoid arithmetic on potentially restricted cast-time values.
+    if isChannel and UnitChannelDuration then
+        local ok, value = pcall(UnitChannelDuration, casterUnit)
+        if ok then
+            cast.duration = value
+        end
+    end
+
+    if cast.duration == nil and UnitCastingDuration then
+        local ok, value = pcall(UnitCastingDuration, casterUnit)
+        if ok then
+            cast.duration = value
+        end
+    end
 
     -- Midnight+ can treat cast-time values as "secret numbers".
     -- Do not compare or do arithmetic that later participates in comparisons.
