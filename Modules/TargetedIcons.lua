@@ -7,7 +7,9 @@ local INCOMING_CAST_ICON_COUNT = 3
 local INCOMING_CAST_ICON_BASE_SIZE = 22
 local INCOMING_CAST_ICON_DEFAULT_SCALE = 1
 local INCOMING_CAST_ICON_SPACING = 0
-
+local INCOMING_CAST_ICON_DEFAULT_POSITION = "BOTTOMLEFT"
+local INCOMING_CAST_ICON_DEFAULT_OFFSET_X = 2
+local INCOMING_CAST_ICON_DEFAULT_OFFSET_Y = 2
 local INCOMING_CAST_ICON_MASK_ATLAS = "UI-HUD-CoolDownManager-Mask"
 local INCOMING_CAST_ICON_OVERLAY_ATLAS = "UI-HUD-CoolDownManager-IconOverlay"
 local INCOMING_CAST_ICON_SWIPE_TEXTURE = "Interface\\HUD\\UI-HUD-CoolDownManager-Icon-Swipe"
@@ -141,7 +143,7 @@ local function GetIncomingCastIndicatorConfig()
     -- kept at baseSize and scaled, so borders/overlays scale proportionally.
     local size = baseSize * scale
 
-    local spacing = ClampNumber(profile and profile.incomingCastIconSpacing, 0, 50, INCOMING_CAST_ICON_SPACING)
+    local spacing = ClampNumber(profile and profile.incomingCastIconSpacing, -10, 50, INCOMING_CAST_ICON_SPACING)
     spacing = math.floor(spacing + 0.5)
 
     local showBorder = true
@@ -158,6 +160,26 @@ local function GetIncomingCastIndicatorConfig()
     if profile and profile.incomingCastIconCooldownText ~= nil then
         showCooldownText = profile.incomingCastIconCooldownText == true
     end
+
+    local position = INCOMING_CAST_ICON_DEFAULT_POSITION
+    if profile and profile.incomingCastIconPosition ~= nil then
+        local value = profile.incomingCastIconPosition
+        if value == "TOPLEFT" or value == "BOTTOMLEFT" or value == "TOP" or value == "BOTTOM" then
+            position = value
+        end
+    end
+
+    local offsetX = INCOMING_CAST_ICON_DEFAULT_OFFSET_X
+    if profile and profile.incomingCastIconOffsetX ~= nil then
+        offsetX = ClampNumber(profile.incomingCastIconOffsetX, -200, 200, INCOMING_CAST_ICON_DEFAULT_OFFSET_X)
+    end
+    offsetX = math.floor(offsetX + 0.5)
+
+    local offsetY = INCOMING_CAST_ICON_DEFAULT_OFFSET_Y
+    if profile and profile.incomingCastIconOffsetY ~= nil then
+        offsetY = ClampNumber(profile.incomingCastIconOffsetY, -200, 200, INCOMING_CAST_ICON_DEFAULT_OFFSET_Y)
+    end
+    offsetY = math.floor(offsetY + 0.5)
 
     local hash = string.format(
         "%d:%.2f:%d:%d:%d:%d",
@@ -178,8 +200,43 @@ local function GetIncomingCastIndicatorConfig()
         showBorder = showBorder,
         showSwipe = showSwipe,
         showCooldownText = showCooldownText,
+        position = position,
+        offsetX = offsetX,
+        offsetY = offsetY,
         hash = hash,
     }
+end
+
+local function ApplyIncomingCastContainerPosition(container, frame, config)
+    if not (container and frame) then
+        return
+    end
+
+    local position = (config and config.position) or INCOMING_CAST_ICON_DEFAULT_POSITION
+    if position ~= "TOPLEFT" and position ~= "BOTTOMLEFT" and position ~= "TOP" and position ~= "BOTTOM" then
+        position = INCOMING_CAST_ICON_DEFAULT_POSITION
+    end
+
+    local offsetX = ClampNumber(config and config.offsetX, -200, 200, INCOMING_CAST_ICON_DEFAULT_OFFSET_X)
+    offsetX = math.floor(offsetX + 0.5)
+
+    local offsetY = ClampNumber(config and config.offsetY, -200, 200, INCOMING_CAST_ICON_DEFAULT_OFFSET_Y)
+    offsetY = math.floor(offsetY + 0.5)
+
+    local xOffset = offsetX
+    local yOffset = offsetY
+    if position == "TOPLEFT" or position == "TOP" then
+        yOffset = -offsetY
+    end
+
+    local anchorHash = string.format("%s:%d:%d", position, offsetX, offsetY)
+    if container._ffIncomingCastAnchorHash == anchorHash then
+        return
+    end
+
+    container:ClearAllPoints()
+    container:SetPoint(position, frame, position, xOffset, yOffset)
+    container._ffIncomingCastAnchorHash = anchorHash
 end
 
 local function GetIncomingCastPreviewIcons(count)
@@ -569,13 +626,14 @@ function FF:_EnsureIncomingCastIndicatorForFrame(frame, config)
 
         container = newContainer
         container._ffUsesGridLayout = true
-        container:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 2, 2)
         container:SetFrameLevel((frame.GetFrameLevel and frame:GetFrameLevel() or 0) + 20)
         container:EnableMouse(false)
         container:SetHitRectInsets(10000, 10000, 10000, 10000)
 
         frame.ffIncomingCastContainer = container
     end
+
+    ApplyIncomingCastContainerPosition(container, frame, config)
 
     if container._ffIncomingCastConfigHash ~= config.hash then
         ApplyIncomingCastContainerLayout(container, config)
