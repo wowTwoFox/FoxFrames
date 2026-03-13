@@ -25,6 +25,10 @@ FF.DEFAULT_SETTINGS = {
         growthDirection = "RIGHT",
         offsetX = 2,
         offsetY = 2,
+        filter = {
+            mode = "OFF",
+            spellIds = "",
+        },
         icon = {
             scale = 1,
             spacing = 0,
@@ -32,10 +36,16 @@ FF.DEFAULT_SETTINGS = {
             showSwipe = true,
             showCooldownText = true,
         },
+    },
+    spellRules = {
+        rules = {},
     }
 }
 
-function FF:GetTextures()
+local SettingsLib = LibStub("LibEQOLSettingsMode-1.0")
+local SETTINGS_PREFIX = "FoxFrames_"
+
+function GetTextures()
     local alreadyAddedPaths = {}
 
     -- Always add built-in textures at the top in specific order
@@ -120,6 +130,43 @@ local function SanitizeGrowDirection(value, fallback)
     return fallback
 end
 
+local function SanitizeIncomingCastFilterMode(value, fallback)
+    if value == "OFF" or value == "BLACKLIST" or value == "WHITELIST" then
+        return value
+    end
+    return fallback
+end
+
+local function NormalizeSpellRuleSpellId(value)
+    local num = tonumber(value)
+    if type(num) ~= "number" then
+        return nil
+    end
+
+    num = math.floor(num + 0.5)
+    if num <= 0 then
+        return nil
+    end
+
+    return tostring(num)
+end
+
+local function NormalizeSpellRule(rule)
+    if type(rule) ~= "table" then
+        return {
+            hideIncomingCasts = false,
+            hideBuffs = false,
+            hideDebuffs = false,
+        }
+    end
+
+    return {
+        hideIncomingCasts = rule.hideIncomingCasts == true,
+        hideBuffs = rule.hideBuffs == true,
+        hideDebuffs = rule.hideDebuffs == true,
+    }
+end
+
 local function SanitizeBoolean(value, fallback)
     if value == nil then
         return fallback
@@ -139,11 +186,21 @@ function FF:MigrateAndSanitizeDB()
     if type(profile.incomingCastBar) ~= "table" then
         profile.incomingCastBar = {}
     end
+    if type(profile.spellRules) ~= "table" then
+        profile.spellRules = {}
+    end
 
     local defaults = self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.incomingCastBar or {}
+    local spellRulesDefaults = self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.spellRules or {}
+    local filterDefaults = defaults.filter or {}
     local iconDefaults = defaults.icon or {}
     local partyFrameProfile = profile.partyFrame
     local incomingCastBarProfile = profile.incomingCastBar
+    local spellRulesProfile = profile.spellRules
+
+    if type(spellRulesProfile.rules) ~= "table" then
+        spellRulesProfile.rules = spellRulesDefaults.rules or {}
+    end
 
     local position = SanitizePosition(
         incomingCastBarProfile.position,
@@ -172,6 +229,11 @@ function FF:MigrateAndSanitizeDB()
     if type(incomingCastBarProfile.icon) ~= "table" then
         incomingCastBarProfile.icon = {}
     end
+    if type(incomingCastBarProfile.filter) ~= "table" then
+        incomingCastBarProfile.filter = {}
+    end
+
+    local filterProfile = incomingCastBarProfile.filter
     local iconProfile = incomingCastBarProfile.icon
 
     local iconScale = ClampNumber(iconProfile.scale, 0.5, 3, iconDefaults.scale or 1)
@@ -184,6 +246,24 @@ function FF:MigrateAndSanitizeDB()
     local iconShowSwipe = SanitizeBoolean(iconProfile.showSwipe, iconDefaults.showSwipe ~= false)
     local iconShowCooldownText = SanitizeBoolean(iconProfile.showCooldownText, iconDefaults.showCooldownText ~= false)
 
+    local filterMode = SanitizeIncomingCastFilterMode(filterProfile.mode, filterDefaults.mode or "OFF")
+
+    local filterSpellIds = filterProfile.spellIds
+    if type(filterSpellIds) == "table" then
+        local parts = {}
+        for _, value in ipairs(filterSpellIds) do
+            local num = tonumber(value)
+            if num and num > 0 then
+                parts[#parts + 1] = tostring(math.floor(num + 0.5))
+            end
+        end
+        filterSpellIds = table.concat(parts, ",")
+    elseif type(filterSpellIds) ~= "string" then
+        filterSpellIds = filterDefaults.spellIds or ""
+    end
+
+    filterSpellIds = filterSpellIds:gsub("[\r\n]", " ")
+
     incomingCastBarProfile.spellCount = spellCount
     incomingCastBarProfile.position = position
     incomingCastBarProfile.growthDirection = growthDirection
@@ -195,6 +275,18 @@ function FF:MigrateAndSanitizeDB()
     iconProfile.showBorder = iconShowBorder
     iconProfile.showSwipe = iconShowSwipe
     iconProfile.showCooldownText = iconShowCooldownText
+
+    filterProfile.mode = filterMode
+    filterProfile.spellIds = filterSpellIds
+
+    local sanitizedRules = {}
+    for key, rule in pairs(spellRulesProfile.rules) do
+        local normalizedSpellId = NormalizeSpellRuleSpellId(key)
+        if normalizedSpellId then
+            sanitizedRules[normalizedSpellId] = NormalizeSpellRule(rule)
+        end
+    end
+    spellRulesProfile.rules = sanitizedRules
 
     partyFrameProfile.trackIncomingCasts = (partyFrameProfile.trackIncomingCasts == true)
 end
@@ -246,13 +338,34 @@ local function SetIncomingCastBarIconValue(key, value)
     incomingCastBarProfile.icon[key] = value
 end
 
-function FF:SetupOptions()
-    -- Build the options using LibEQOL
-    local SettingsLib = LibStub("LibEQOLSettingsMode-1.0")
-    local PREFIX = "FoxFrames_"
-    local PARTY_FRAME_PREFIX = PREFIX .. "PartyFrame_"
+local function SetupSpellRulesOptions(rootCategory)
+    local PREFIX = SETTINGS_PREFIX .. "PartyFrames_"
+    local spellRulesCategory = SettingsLib:CreateCategory(rootCategory, "Spell Rules")
+    SettingsLib:CreateHeader(spellRulesCategory, {
+        name = "Spell Rules",
+    })
+
+    SettingsLib:CreateText(
+        spellRulesCategory,
+        "Select a spell on the left, then edit incoming-cast, buff, and debuff filters on the right."
+    )
+
+    if Settings and Settings.CreateElementInitializer and Settings.RegisterInitializer and type(FoxFramesSpellRulesPanelMixin) == "table" then
+        local spellRulesInitializer = Settings.CreateElementInitializer("FoxFrames_SpellRulesPanelTemplate", {
+            categoryID = spellRulesCategory:GetID(),
+        })
+
+        spellRulesInitializer.GetExtent = function()
+            return 350
+        end
+
+        Settings.RegisterInitializer(spellRulesCategory, spellRulesInitializer)
+    end
+end
+
+local function SetupRootCateogry()
+    local PREFIX = SETTINGS_PREFIX .. "PartyFrames_"
     local rootCategory = SettingsLib:CreateRootCategory("Fox Frames")
-    self._rootCategory = rootCategory
 
     SettingsLib:CreateHeader(rootCategory, {
         name = "Party Frame Settings",
@@ -273,7 +386,7 @@ function FF:SetupOptions()
             FF:ShowPartyFrameIfNeeded()
         end,
         desc = "Toggle the frame visibility when solo.",
-        prefix = PARTY_FRAME_PREFIX,
+        prefix = PREFIX,
     })
 
     SettingsLib:CreateCheckbox(rootCategory, {
@@ -288,7 +401,7 @@ function FF:SetupOptions()
             FF:ShowPartyFrameTitleIfNeeded()
         end,
         desc = "Toggle the title visibility on the frame.",
-        prefix = PARTY_FRAME_PREFIX,
+        prefix = PREFIX,
     })
 
     SettingsLib:CreateCheckbox(rootCategory, {
@@ -302,7 +415,7 @@ function FF:SetupOptions()
             BlizzardSettings:SetClassColorSetting(value)
         end,
         desc = "Toggle class colors raid frames",
-        prefix = PARTY_FRAME_PREFIX,
+        prefix = PREFIX,
     })
 
     SettingsLib:CreateCheckbox(rootCategory, {
@@ -315,7 +428,7 @@ function FF:SetupOptions()
             FF:UpdateFrames()
         end,
         desc = "Toggle the Tank role icon visibility on the frame.",
-        prefix = PARTY_FRAME_PREFIX,
+        prefix = PREFIX,
     })
 
     SettingsLib:CreateCheckbox(rootCategory, {
@@ -328,7 +441,7 @@ function FF:SetupOptions()
             FF:UpdateFrames()
         end,
         desc = "Toggle the Healer role icon visibility on the frame.",
-        prefix = PARTY_FRAME_PREFIX,
+        prefix = PREFIX,
     })
 
     SettingsLib:CreateCheckbox(rootCategory, {
@@ -341,7 +454,7 @@ function FF:SetupOptions()
             FF:UpdateFrames()
         end,
         desc = "Toggle the DPS role icon visibility on the frame.",
-        prefix = PARTY_FRAME_PREFIX,
+        prefix = PREFIX,
     })
 
     SettingsLib:CreateCheckbox(rootCategory, {
@@ -351,10 +464,10 @@ function FF:SetupOptions()
         get = function() return FF.db.profile.partyFrame.showBuffCountdown end,
         set = function(value)
             FF.db.profile.partyFrame.showBuffCountdown = value
-            self:ShowBuffCountdownIfNeeded()
+            FF:ShowBuffCountdownIfNeeded()
         end,
         desc = "Toggle the buff countdown visibility on the frame.",
-        prefix = PARTY_FRAME_PREFIX
+        prefix = PREFIX
     })
 
     SettingsLib:CreateCheckbox(rootCategory, {
@@ -364,10 +477,10 @@ function FF:SetupOptions()
         get = function() return FF.db.profile.partyFrame.showDebuffCountdown end,
         set = function(value)
             FF.db.profile.partyFrame.showDebuffCountdown = value
-            self:ShowDebuffCountdownIfNeeded()
+            FF:ShowDebuffCountdownIfNeeded()
         end,
         desc = "Toggle the debuff countdown visibility on the frame.",
-        prefix = PARTY_FRAME_PREFIX
+        prefix = PREFIX
     })
 
     SettingsLib:CreateCheckbox(rootCategory, {
@@ -380,7 +493,7 @@ function FF:SetupOptions()
             FF:SetAlwaysUseTopLeftAnchor()
         end,
         desc = "By default, Blizzard's party frames will convert anchoring to top-left. This results in always top-left alignment of frames. Disabling this will allow you to use other anchor points such as center, bottom or right. You will need to re-anchor the party frames after changing this setting.",
-        prefix = PARTY_FRAME_PREFIX
+        prefix = PREFIX
     })
 
     SettingsLib:CreateText(
@@ -398,15 +511,15 @@ function FF:SetupOptions()
         end,
         set = function(value)
             FF.db.profile.playerFrame.showType = value
-            self:ShowPlayerFrameIfNeeded()
+            FF:ShowPlayerFrameIfNeeded()
         end,
         desc = "Control the visibility of the player frame. 'Always' will show the player frame regardless of group status. 'Solo' will only show the player frame when not in a party or raid. 'Never' will hide the player frame regardless of group status.",
-        prefix = PARTY_FRAME_PREFIX
+        prefix = PREFIX
     })
 
     -- Build texture list from LibSharedMedia or fallback to built-in
     local textureOrder = {}
-    local textures = self:GetTextures()
+    local textures = GetTextures()
 
     -- Go through built in textures
     for _, texture in ipairs(textures) do
@@ -439,7 +552,7 @@ function FF:SetupOptions()
             FF:UpdateFrames()
         end,
         height = 220, -- scrollable menu
-        prefix = PARTY_FRAME_PREFIX,
+        prefix = PREFIX,
         isEnabled = function() return true end,
     })
 
@@ -465,7 +578,7 @@ function FF:SetupOptions()
                 FF:SetIncomingCastIndicatorPreviewEnabled(false)
             end
         end,
-        prefix = PARTY_FRAME_PREFIX,
+        prefix = PREFIX,
 
         buttonText = "Toggle Preview",
         buttonClick = function()
@@ -502,7 +615,7 @@ function FF:SetupOptions()
             FF:UpdateIncomingCastIndicators()
         end,
         desc = "Where to anchor targeted spell icons on the party frame.",
-        prefix = PARTY_FRAME_PREFIX,
+        prefix = PREFIX,
     })
 
     SettingsLib:CreateDropdown(rootCategory, {
@@ -543,7 +656,7 @@ function FF:SetupOptions()
             FF:UpdateIncomingCastIndicators()
         end,
         desc = "Direction targeted spell icons grow when multiple are shown.",
-        prefix = PARTY_FRAME_PREFIX,
+        prefix = PREFIX,
     })
 
     SettingsLib:CreateSlider(rootCategory, {
@@ -570,7 +683,7 @@ function FF:SetupOptions()
             FF:UpdateIncomingCastIndicators()
         end,
         desc = "Horizontal offset (in pixels). Negative allows going outside the frame.",
-        prefix = PARTY_FRAME_PREFIX,
+        prefix = PREFIX,
     })
 
     SettingsLib:CreateSlider(rootCategory, {
@@ -597,7 +710,7 @@ function FF:SetupOptions()
             FF:UpdateIncomingCastIndicators()
         end,
         desc = "Vertical offset (in pixels). Negative allows going outside the frame.",
-        prefix = PARTY_FRAME_PREFIX,
+        prefix = PREFIX,
     })
 
     SettingsLib:CreateSlider(rootCategory, {
@@ -623,7 +736,7 @@ function FF:SetupOptions()
             FF:UpdateIncomingCastIndicators()
         end,
         desc = "How many targeted spell icons to show per party member.",
-        prefix = PARTY_FRAME_PREFIX,
+        prefix = PREFIX,
     })
 
     SettingsLib:CreateSlider(rootCategory, {
@@ -650,7 +763,7 @@ function FF:SetupOptions()
             FF:UpdateIncomingCastIndicators()
         end,
         desc = "Scales each targeted spell icon without distorting borders/overlays.",
-        prefix = PARTY_FRAME_PREFIX,
+        prefix = PREFIX,
     })
 
     SettingsLib:CreateSlider(rootCategory, {
@@ -676,7 +789,7 @@ function FF:SetupOptions()
             FF:UpdateIncomingCastIndicators()
         end,
         desc = "Space (in pixels) between targeted spell icons. Negative values allow overlap.",
-        prefix = PARTY_FRAME_PREFIX,
+        prefix = PREFIX,
     })
 
     SettingsLib:CreateCheckbox(rootCategory, {
@@ -696,7 +809,7 @@ function FF:SetupOptions()
             FF:UpdateIncomingCastIndicators()
         end,
         desc = "Toggle the border around targeted spell icons.",
-        prefix = PARTY_FRAME_PREFIX,
+        prefix = PREFIX,
     })
 
     SettingsLib:CreateCheckbox(rootCategory, {
@@ -716,7 +829,7 @@ function FF:SetupOptions()
             FF:UpdateIncomingCastIndicators()
         end,
         desc = "Toggle the cooldown swipe overlay on targeted spell icons.",
-        prefix = PARTY_FRAME_PREFIX,
+        prefix = PREFIX,
     })
 
     SettingsLib:CreateCheckbox(rootCategory, {
@@ -736,6 +849,17 @@ function FF:SetupOptions()
             FF:UpdateIncomingCastIndicators()
         end,
         desc = "Toggle the cooldown countdown text on targeted spell icons.",
-        prefix = PARTY_FRAME_PREFIX,
+        prefix = PREFIX,
     })
+
+    return rootCategory
+end
+
+function FF:SetupOptions()
+    local rootCategory = SetupRootCateogry()
+    self._rootCategory = rootCategory
+
+    if rootCategory then
+        SetupSpellRulesOptions(rootCategory)
+    end
 end

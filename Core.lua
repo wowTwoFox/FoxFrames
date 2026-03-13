@@ -108,6 +108,14 @@ function FF:OnEnable()
     hooksecurefunc("CompactUnitFrame_UpdateRoleIcon", function(frame)
         self:UpdateRoleIcon(frame)
     end)
+
+    if type(CompactUnitFrame_UpdateAuras) == "function" then
+        hooksecurefunc("CompactUnitFrame_UpdateAuras", function(frame)
+            if self.ApplySpellRuleFiltersForFrame then
+                self:ApplySpellRuleFiltersForFrame(frame)
+            end
+        end)
+    end
 end
 
 function FF:FOXFRAMES_INCOMING_CASTS_UPDATED(event, casterUnit, cast)

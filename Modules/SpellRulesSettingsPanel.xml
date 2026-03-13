@@ -1,0 +1,11 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <Frame name="FoxFrames_SpellRulesPanelTemplate"
+        inherits="SettingsListElementTemplate"
+        mixin="FoxFramesSpellRulesPanelMixin"
+        virtual="true">
+        <Size x="280" y="350"/>
+        <Scripts>
+            <OnLoad method="OnLoad"/>
+        </Scripts>
+    </Frame>
+</Ui>

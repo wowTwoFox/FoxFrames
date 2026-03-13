@@ -85,6 +85,131 @@ function FF:ShowDebuffCountdownIfNeeded()
     end
 end
 
+local function NormalizeSpellRuleSpellId(value)
+    local num = tonumber(value)
+    if type(num) ~= "number" then
+        return nil
+    end
+
+    num = math.floor(num + 0.5)
+    if num <= 0 then
+        return nil
+    end
+
+    return tostring(num)
+end
+
+local function GetAuraFrameSpellId(unit, auraFrame)
+    if not auraFrame then
+        return nil
+    end
+
+    local directSpellId = auraFrame.spellID or auraFrame.spellId or auraFrame.auraSpellID
+    if type(directSpellId) == "number" and directSpellId > 0 then
+        return directSpellId
+    end
+
+    local auraInstanceID = auraFrame.auraInstanceID or auraFrame.displayedAuraInstanceID or auraFrame.AuraInstanceID
+    if auraInstanceID and type(unit) == "string" and unit ~= "" and C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID then
+        local auraData = C_UnitAuras.GetAuraDataByAuraInstanceID(unit, auraInstanceID)
+        local auraSpellId = auraData and auraData.spellId
+        if type(auraSpellId) == "number" and auraSpellId > 0 then
+            return auraSpellId
+        end
+    end
+
+    return nil
+end
+
+local function ApplySpellRuleVisibilityToAuraFrame(auraFrame, shouldHide)
+    if not auraFrame then
+        return
+    end
+
+    if shouldHide then
+        auraFrame.ffSpellRuleHidden = true
+        if auraFrame.Hide then
+            auraFrame:Hide()
+        end
+        return
+    end
+
+    if auraFrame.ffSpellRuleHidden then
+        auraFrame.ffSpellRuleHidden = nil
+        if auraFrame.Show and auraFrame.icon and auraFrame.icon.GetTexture and auraFrame.icon:GetTexture() then
+            auraFrame:Show()
+        end
+    end
+end
+
+function FF:GetSpellRuleForSpellId(spellId)
+    local normalizedSpellId = NormalizeSpellRuleSpellId(spellId)
+    if not normalizedSpellId then
+        return nil
+    end
+
+    local profile = self and self.db and self.db.profile
+    local spellRulesProfile = profile and profile.spellRules
+    local rules = spellRulesProfile and spellRulesProfile.rules
+    if type(rules) ~= "table" then
+        return nil
+    end
+
+    local rule = rules[normalizedSpellId]
+    if type(rule) ~= "table" then
+        return nil
+    end
+
+    return rule
+end
+
+function FF:ShouldHideSpellForRuleType(spellId, ruleKey)
+    if type(ruleKey) ~= "string" or ruleKey == "" then
+        return false
+    end
+
+    local rule = self:GetSpellRuleForSpellId(spellId)
+    if type(rule) ~= "table" then
+        return false
+    end
+
+    return rule[ruleKey] == true
+end
+
+function FF:ApplySpellRuleFiltersForFrame(frame)
+    if not frame then
+        return
+    end
+
+    local unit = frame.displayedUnit or frame.unit
+    if type(unit) ~= "string" or unit == "" then
+        return
+    end
+
+    if frame.buffFrames then
+        for _, auraFrame in ipairs(frame.buffFrames) do
+            local spellId = GetAuraFrameSpellId(unit, auraFrame)
+            local shouldHide = spellId and self:ShouldHideSpellForRuleType(spellId, "hideBuffs") or false
+            ApplySpellRuleVisibilityToAuraFrame(auraFrame, shouldHide)
+        end
+    end
+
+    if frame.debuffFrames then
+        for _, auraFrame in ipairs(frame.debuffFrames) do
+            local spellId = GetAuraFrameSpellId(unit, auraFrame)
+            local shouldHide = spellId and self:ShouldHideSpellForRuleType(spellId, "hideDebuffs") or false
+            ApplySpellRuleVisibilityToAuraFrame(auraFrame, shouldHide)
+        end
+    end
+end
+
+function FF:RefreshSpellRuleAuraFilters()
+    local frames = self:GetFrames()
+    for _, frame in ipairs(frames) do
+        self:ApplySpellRuleFiltersForFrame(frame)
+    end
+end
+
 function FF:UpdateRoleIcon(frame)
     local role = UnitGroupRolesAssigned(frame.unit)
     if not frame.roleIcon and role then
@@ -162,6 +287,7 @@ function FF:SetupFrames()
     self:ShowPartyFrameTitleIfNeeded()
     self:ShowPlayerFrameIfNeeded()
     self:UpdateFrames()
+    self:RefreshSpellRuleAuraFilters()
 
     self:SetupIncomingCastIndicators()
     self:UpdateIncomingCastIndicators()

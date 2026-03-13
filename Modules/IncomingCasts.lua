@@ -60,6 +60,45 @@ local function ShouldTrackIncomingCasts()
     return FF.db.profile.partyFrame.trackIncomingCasts
 end
 
+local function GetSpellRulesTable()
+    local profile = FF and FF.db and FF.db.profile
+    local spellRulesProfile = profile and profile.spellRules
+    local rules = spellRulesProfile and spellRulesProfile.rules
+    if type(rules) ~= "table" then
+        return nil
+    end
+
+    return rules
+end
+
+local function GetSpellRuleForSpellId(spellId)
+    local rules = GetSpellRulesTable()
+    if not rules then
+        return nil
+    end
+
+    local spellIdNumber = tonumber(spellId)
+    if type(spellIdNumber) ~= "number" then
+        return nil
+    end
+
+    spellIdNumber = math.floor(spellIdNumber + 0.5)
+    if spellIdNumber <= 0 then
+        return nil
+    end
+
+    return rules[tostring(spellIdNumber)]
+end
+
+local function ShouldDisplayIncomingCast(cast)
+    local rule = GetSpellRuleForSpellId(cast and cast.spellId)
+    if type(rule) ~= "table" then
+        return true
+    end
+
+    return rule.hideIncomingCasts ~= true
+end
+
 function FF:InitIncomingCasts()
     if self._incomingCastsInitialized then
         return
@@ -648,7 +687,7 @@ function FF:UpdateIncomingCastIndicators()
     local castsByCaster = self:GetIncomingCasts(GetTime())
 
     for casterUnit, cast in pairs(castsByCaster or {}) do
-        if cast then
+        if cast and ShouldDisplayIncomingCast(cast) then
             table.insert(castList, {
                 casterUnit = casterUnit,
                 cast = cast,
