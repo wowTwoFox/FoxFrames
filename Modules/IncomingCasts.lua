@@ -430,6 +430,9 @@ local function GetIncomingCastIndicatorIconConfig(incomingCastBarProfile, incomi
     local spacing = Utils:ClampNumber(incomingCastBarIconProfile and incomingCastBarIconProfile.spacing, -10, 50, incomingCastBarIconDefaults.spacing or 0)
     spacing = math.floor(spacing + 0.5)
 
+    local cooldownFontSize = Utils:ClampNumber(incomingCastBarIconProfile and incomingCastBarIconProfile.cooldownFontSize, 8, 32, incomingCastBarIconDefaults.cooldownFontSize or 10)
+    cooldownFontSize = math.floor(cooldownFontSize + 0.5)
+
     local showBorder = incomingCastBarIconProfile and incomingCastBarIconProfile.showBorder
     if showBorder == nil then
         showBorder = incomingCastBarIconDefaults.showBorder ~= false
@@ -456,6 +459,7 @@ local function GetIncomingCastIndicatorIconConfig(incomingCastBarProfile, incomi
         scale = scale,
         size = size,
         spacing = spacing,
+        cooldownFontSize = cooldownFontSize,
         showBorder = showBorder,
         showSwipe = showSwipe,
         showCooldownText = showCooldownText,
@@ -514,10 +518,11 @@ local function GetIncomingCastIndicatorConfig()
     offsetY = math.floor(offsetY + 0.5)
 
     local hash = string.format(
-        "%d:%.2f:%d:%d:%d:%d:%s",
+        "%d:%.2f:%d:%d:%d:%d:%d:%s",
         count,
         iconConfig.scale,
         iconConfig.spacing,
+        iconConfig.cooldownFontSize,
         iconConfig.showBorder and 1 or 0,
         iconConfig.showSwipe and 1 or 0,
         iconConfig.showCooldownText and 1 or 0,

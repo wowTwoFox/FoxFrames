@@ -103,7 +103,7 @@ local function GetEntryCasterUnit(entry, cast)
     return nil
 end
 
-local function CenterSpellIconCooldownText(cooldown)
+local function CenterSpellIconCooldownText(cooldown, iconConfig)
     local fontString = Utils:GetCooldownCountdownFontString(cooldown)
 
     if not fontString then
@@ -122,6 +122,8 @@ local function CenterSpellIconCooldownText(cooldown)
     if fontString.GetFont and fontString.SetFont then
         local fontFile, fontHeight, fontFlags = fontString:GetFont()
         if fontFile and fontHeight then
+            local desiredFontHeight = Utils:ClampNumber(iconConfig and iconConfig.cooldownFontSize, 8, 32, fontHeight)
+            desiredFontHeight = math.floor(desiredFontHeight + 0.5)
             local flags = fontFlags or ""
             if not flags:find("THICKOUTLINE", 1, true) then
                 if flags:find("OUTLINE", 1, true) then
@@ -132,7 +134,7 @@ local function CenterSpellIconCooldownText(cooldown)
                     flags = "THICKOUTLINE"
                 end
             end
-            pcall(fontString.SetFont, fontString, fontFile, fontHeight, flags)
+            pcall(fontString.SetFont, fontString, fontFile, desiredFontHeight, flags)
         end
     end
 end
@@ -161,7 +163,7 @@ local function ApplyCooldownVisualConfigToCooldown(cooldown, iconConfig)
     Utils:SetHideCountdownNumbersSafe(cooldown, not showCooldownText)
 
     if showCooldownText then
-        CenterSpellIconCooldownText(cooldown)
+        CenterSpellIconCooldownText(cooldown, iconConfig)
     end
 end
 
@@ -294,7 +296,7 @@ local function UpdateCooldownOnSpellFrame(entry, spellFrame, iconConfig)
         if cooldown.SetCooldown then
             pcall(cooldown.SetCooldown, cooldown, startTime, duration)
             if showCooldownText then
-                CenterSpellIconCooldownText(cooldown)
+                CenterSpellIconCooldownText(cooldown, iconConfig)
             end
         end
         return
@@ -303,7 +305,7 @@ local function UpdateCooldownOnSpellFrame(entry, spellFrame, iconConfig)
     if cooldown.SetCooldownFromDurationObject then
         pcall(cooldown.SetCooldownFromDurationObject, cooldown, duration)
         if showCooldownText then
-            CenterSpellIconCooldownText(cooldown)
+            CenterSpellIconCooldownText(cooldown, iconConfig)
         end
         return
     end
@@ -313,7 +315,7 @@ local function UpdateCooldownOnSpellFrame(entry, spellFrame, iconConfig)
         if ok and type(remaining) == "number" then
             pcall(cooldown.SetCooldown, cooldown, GetTime(), remaining)
             if showCooldownText then
-                CenterSpellIconCooldownText(cooldown)
+                CenterSpellIconCooldownText(cooldown, iconConfig)
             end
         end
     end

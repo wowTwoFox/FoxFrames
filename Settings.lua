@@ -36,6 +36,7 @@ FF.DEFAULT_SETTINGS = {
             showBorder = true,
             showSwipe = true,
             showCooldownText = true,
+            cooldownFontSize = 10,
         },
     }
 }
@@ -166,6 +167,9 @@ function FF:MigrateAndSanitizeDB()
     local iconSpacing = Utils:ClampNumber(iconProfile.spacing, -10, 50, iconDefaults.spacing or 0)
     iconSpacing = math.floor(iconSpacing + 0.5)
 
+    local iconCooldownFontSize = Utils:ClampNumber(iconProfile.cooldownFontSize, 8, 32, iconDefaults.cooldownFontSize or 10)
+    iconCooldownFontSize = math.floor(iconCooldownFontSize + 0.5)
+
     local iconShowBorder = SanitizeBoolean(iconProfile.showBorder, iconDefaults.showBorder ~= false)
     local iconShowSwipe = SanitizeBoolean(iconProfile.showSwipe, iconDefaults.showSwipe ~= false)
     local iconShowCooldownText = SanitizeBoolean(iconProfile.showCooldownText, iconDefaults.showCooldownText ~= false)
@@ -178,6 +182,7 @@ function FF:MigrateAndSanitizeDB()
 
     iconProfile.scale = iconScale
     iconProfile.spacing = iconSpacing
+    iconProfile.cooldownFontSize = iconCooldownFontSize
     iconProfile.showBorder = iconShowBorder
     iconProfile.showSwipe = iconShowSwipe
     iconProfile.showCooldownText = iconShowCooldownText
@@ -751,6 +756,32 @@ function FF:SetupOptions()
             FF:UpdateIncomingCastIndicators()
         end,
         desc = "Toggle the cooldown countdown text on targeted spell icons.",
+        prefix = PARTY_FRAME_PREFIX,
+    })
+
+    SettingsLib:CreateSlider(rootCategory, {
+        key = "IncomingCastIconCooldownFontSize",
+        name = "Cooldown text size",
+        default = incomingCastBarIconDefaults.cooldownFontSize,
+        min = 8,
+        max = 32,
+        step = 1,
+        formatter = function(value)
+            return string.format("%ipt", math.floor((value) + 0.5))
+        end,
+        get = function()
+            local value = GetIncomingCastBarIconValue("cooldownFontSize")
+            if value == nil then
+                value = incomingCastBarIconDefaults.cooldownFontSize
+            end
+            return value
+        end,
+        set = function(value)
+            SetIncomingCastBarIconValue("cooldownFontSize", math.floor((value) + 0.5))
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Adjust the cooldown countdown text size on targeted spell icons.",
         prefix = PARTY_FRAME_PREFIX,
     })
 end
