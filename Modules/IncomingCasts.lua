@@ -5,7 +5,7 @@ if not FF then
     return
 end
 
-local Utils = addon and addon.Utils
+local Utils = addon.Utils
 function FF:RegisterIncomingCastUnitEvents()
     -- Midnight+ safe approach:
     -- - Track enemy casts by caster *unit token* (nameplateX)
@@ -407,25 +407,6 @@ function FF:PLAYER_FOCUS_CHANGED()
     return self:ScanAllEnemyCasts()
 end
 
-local function ClampNumber(value, minValue, maxValue, fallback)
-    local num = value
-    if type(num) ~= "number" then
-        num = tonumber(num)
-    end
-    if type(num) ~= "number" then
-        num = fallback
-    end
-    if type(num) ~= "number" then
-        num = minValue
-    end
-    if num < minValue then
-        num = minValue
-    elseif num > maxValue then
-        num = maxValue
-    end
-    return num
-end
-
 local function GetSpellIconBaseSize()
     local spellIconMixin = addon and addon.SpellIconMixin
     return tonumber(spellIconMixin and spellIconMixin.SPELL_ICON_BASE_SIZE) or 22
@@ -437,7 +418,7 @@ local function GetIncomingCastIndicatorIconConfig(incomingCastBarProfile, incomi
 
     local baseSize = GetSpellIconBaseSize()
 
-    local scale = ClampNumber(incomingCastBarIconProfile and incomingCastBarIconProfile.scale, 0.5, 3, incomingCastBarIconDefaults.scale or 1)
+    local scale = Utils:ClampNumber(incomingCastBarIconProfile and incomingCastBarIconProfile.scale, 0.5, 3, incomingCastBarIconDefaults.scale or 1)
 
     -- Keep the hash stable and avoid float jitter.
     scale = math.floor((scale * 100) + 0.5) / 100
@@ -446,7 +427,7 @@ local function GetIncomingCastIndicatorIconConfig(incomingCastBarProfile, incomi
     -- kept at baseSize and scaled, so borders/overlays scale proportionally.
     local size = baseSize * scale
 
-    local spacing = ClampNumber(incomingCastBarIconProfile and incomingCastBarIconProfile.spacing, -10, 50, incomingCastBarIconDefaults.spacing or 0)
+    local spacing = Utils:ClampNumber(incomingCastBarIconProfile and incomingCastBarIconProfile.spacing, -10, 50, incomingCastBarIconDefaults.spacing or 0)
     spacing = math.floor(spacing + 0.5)
 
     local showBorder = incomingCastBarIconProfile and incomingCastBarIconProfile.showBorder
@@ -487,7 +468,7 @@ local function GetIncomingCastIndicatorConfig()
     local incomingCastBarDefaults = FF and FF.DEFAULT_SETTINGS and FF.DEFAULT_SETTINGS.incomingCastBar or {}
     local iconConfig = GetIncomingCastIndicatorIconConfig(incomingCastBarProfile, incomingCastBarDefaults)
 
-    local count = ClampNumber(incomingCastBarProfile and incomingCastBarProfile.spellCount, 1, 6, incomingCastBarDefaults.spellCount or 3)
+    local count = Utils:ClampNumber(incomingCastBarProfile and incomingCastBarProfile.spellCount, 1, 6, incomingCastBarDefaults.spellCount or 3)
     count = math.floor(count + 0.5)
 
     local position = incomingCastBarDefaults.position or "BOTTOMLEFT"
@@ -521,14 +502,14 @@ local function GetIncomingCastIndicatorConfig()
     local offsetX = incomingCastBarDefaults.offsetX or 2
     local configuredOffsetX = incomingCastBarProfile and incomingCastBarProfile.offsetX
     if configuredOffsetX ~= nil then
-        offsetX = ClampNumber(configuredOffsetX, -200, 200, incomingCastBarDefaults.offsetX or 2)
+        offsetX = Utils:ClampNumber(configuredOffsetX, -200, 200, incomingCastBarDefaults.offsetX or 2)
     end
     offsetX = math.floor(offsetX + 0.5)
 
     local offsetY = incomingCastBarDefaults.offsetY or 2
     local configuredOffsetY = incomingCastBarProfile and incomingCastBarProfile.offsetY
     if configuredOffsetY ~= nil then
-        offsetY = ClampNumber(configuredOffsetY, -200, 200, incomingCastBarDefaults.offsetY or 2)
+        offsetY = Utils:ClampNumber(configuredOffsetY, -200, 200, incomingCastBarDefaults.offsetY or 2)
     end
     offsetY = math.floor(offsetY + 0.5)
 

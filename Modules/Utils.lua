@@ -70,6 +70,46 @@ function Object:GetRect(frame)
     }
 end
 
+function Object:ClampNumber(value, minValue, maxValue, fallback)
+    local num = value
+    if type(num) ~= "number" then
+        num = tonumber(num)
+    end
+    if type(num) ~= "number" then
+        num = fallback
+    end
+    if type(num) ~= "number" then
+        num = minValue
+    end
+    if num < minValue then
+        num = minValue
+    elseif num > maxValue then
+        num = maxValue
+    end
+    return num
+end
+
+function Object:GetCooldownCountdownFontString(cooldown)
+    if not (cooldown and cooldown.GetCountdownFontString) then
+        return nil
+    end
+
+    local fontString = cooldown:GetCountdownFontString()
+    if not (fontString and fontString.GetFont and fontString.SetFont) then
+        return nil
+    end
+
+    return fontString
+end
+
+function Object:SetHideCountdownNumbersSafe(cooldown, hideCountdownNumbers)
+    if not (cooldown and cooldown.SetHideCountdownNumbers) then
+        return false
+    end
+
+    return pcall(cooldown.SetHideCountdownNumbers, cooldown, hideCountdownNumbers)
+end
+
 local utils = Object:New()
 
 if addon then

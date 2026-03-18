@@ -2,20 +2,7 @@ local addonName, addon = ...
 
 FoxFrames = LibStub("AceAddon-3.0"):NewAddon("FoxFrames", "AceConsole-3.0", "AceEvent-3.0")
 local FF = FoxFrames
-local Utils = addon and addon.Utils
-
-local function GetAuraCountdownFontString(cooldown)
-    if not (cooldown and cooldown.GetCountdownFontString) then
-        return nil
-    end
-
-    local fontString = cooldown:GetCountdownFontString()
-    if not (fontString and fontString.GetFont and fontString.SetFont) then
-        return nil
-    end
-
-    return fontString
-end
+local Utils = addon.Utils
 
 function FF:InAllowedGroup()
     if PartyStatus:InRaidGroup() then return true end
@@ -63,26 +50,14 @@ end
 function FF:GetAuraCountdownFontSize()
     local defaultSize = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.countdownFontSize) or 12
     local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
-    local size = profile and profile.countdownFontSize
-
-    if type(size) ~= "number" then
-        size = tonumber(size)
-    end
-    if type(size) ~= "number" then
-        size = defaultSize
-    end
-
-    if size < 8 then
-        size = 8
-    elseif size > 32 then
-        size = 32
-    end
+    local size = Utils:ClampNumber(profile and profile.countdownFontSize, 8, 32, defaultSize)
 
     return math.floor(size + 0.5)
 end
 
 function FF:ApplyAuraCountdownFontSizeToCooldown(cooldown)
-    local fontString = GetAuraCountdownFontString(cooldown)
+    local fontString = Utils:GetCooldownCountdownFontString(cooldown)
+
     if not fontString then
         return
     end
@@ -135,9 +110,7 @@ function FF:ShowBuffCountdownIfNeededForFrame(frame)
     for _, buffFrame in ipairs(frame.buffFrames) do
         local cooldown = buffFrame and buffFrame.cooldown
         if cooldown then
-            if cooldown.SetHideCountdownNumbers then
-                cooldown:SetHideCountdownNumbers(not self.db.profile.partyFrame.showBuffCountdown)
-            end
+            Utils:SetHideCountdownNumbersSafe(cooldown, not self.db.profile.partyFrame.showBuffCountdown)
             self:ApplyAuraCountdownFontSizeToCooldown(cooldown)
         end
     end
@@ -159,9 +132,7 @@ function FF:ShowDebuffCountdownIfNeededForFrame(frame)
     for _, debuffFrame in ipairs(frame.debuffFrames) do
         local cooldown = debuffFrame and debuffFrame.cooldown
         if cooldown then
-            if cooldown.SetHideCountdownNumbers then
-                cooldown:SetHideCountdownNumbers(not self.db.profile.partyFrame.showDebuffCountdown)
-            end
+            Utils:SetHideCountdownNumbersSafe(cooldown, not self.db.profile.partyFrame.showDebuffCountdown)
             self:ApplyAuraCountdownFontSizeToCooldown(cooldown)
         end
     end

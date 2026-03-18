@@ -2,6 +2,7 @@
 local addonName, addon = ...
 
 local FF = FoxFrames
+local Utils = addon.Utils
 
 local function SetAlphaFromBooleanSafe(frame, value)
     if not frame then return end
@@ -103,11 +104,8 @@ local function GetEntryCasterUnit(entry, cast)
 end
 
 local function CenterSpellIconCooldownText(cooldown)
-    if not (cooldown and cooldown.GetCountdownFontString) then
-        return
-    end
+    local fontString = Utils:GetCooldownCountdownFontString(cooldown)
 
-    local fontString = cooldown:GetCountdownFontString()
     if not fontString then
         return
     end
@@ -160,9 +158,7 @@ local function ApplyCooldownVisualConfigToCooldown(cooldown, iconConfig)
         pcall(cooldown.SetDrawSwipe, cooldown, showSwipe)
     end
 
-    if cooldown.SetHideCountdownNumbers then
-        pcall(cooldown.SetHideCountdownNumbers, cooldown, not showCooldownText)
-    end
+    Utils:SetHideCountdownNumbersSafe(cooldown, not showCooldownText)
 
     if showCooldownText then
         CenterSpellIconCooldownText(cooldown)

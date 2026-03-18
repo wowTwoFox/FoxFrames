@@ -1,7 +1,7 @@
 local addonName, addon = ...
 
 local FF = FoxFrames
-local Utils = addon and addon.Utils
+local Utils = addon.Utils
 
 local function RegisterLSMTextures()
     local LSM = LibStub("LibSharedMedia-3.0", true)

@@ -1,6 +1,7 @@
 local addonName, addon = ...
 
 local FF = FoxFrames
+local Utils = addon.Utils
 
 -- Preview-specific constants
 local INCOMING_CAST_PREVIEW_STREAM_INTERVAL_SECONDS = 10
@@ -82,26 +83,6 @@ local INCOMING_CAST_PREVIEW_SPELLS = {
     },
 }
 
--- Helper function to clamp numbers
-local function ClampNumber(value, minValue, maxValue, fallback)
-    local num = value
-    if type(num) ~= "number" then
-        num = tonumber(num)
-    end
-    if type(num) ~= "number" then
-        num = fallback
-    end
-    if type(num) ~= "number" then
-        num = minValue
-    end
-    if num < minValue then
-        num = minValue
-    elseif num > maxValue then
-        num = maxValue
-    end
-    return num
-end
-
 local function GetRandomIncomingCastPreviewSpells(count)
     if count < 1 then
         return {}
@@ -114,7 +95,7 @@ local function GetRandomIncomingCastPreviewSpells(count)
         return {}
     end
 
-    count = ClampNumber(count, 1, poolSize, poolSize)
+    count = Utils:ClampNumber(count, 1, poolSize, poolSize)
     count = math.floor(count + 0.5)
 
     local availableSpells = {}
@@ -227,7 +208,7 @@ function FF:StartIncomingCastIndicatorPreviewStream()
         -- Read desired spell display count from settings
         local profile = self and self.db and self.db.profile
         local incomingCastBarProfile = profile and profile.incomingCastBar
-        local desiredCount = ClampNumber(incomingCastBarProfile and incomingCastBarProfile.spellCount, 1, 6, 3)
+        local desiredCount = Utils:ClampNumber(incomingCastBarProfile and incomingCastBarProfile.spellCount, 1, 6, 3)
         desiredCount = math.floor(desiredCount + 0.5)
 
         -- For each target unit, emit N spells (with slight variance)

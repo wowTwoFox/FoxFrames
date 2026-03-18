@@ -1,5 +1,6 @@
 local addonName, addon = ...
 local FF = FoxFrames
+local Utils = addon.Utils
 
 local SettingsLib = LibStub("LibEQOLSettingsMode-1.0")
 local SETTINGS_PREFIX = "FoxFrames_"
@@ -91,25 +92,6 @@ function FF:OpenSettings()
     Settings.OpenToCategory(self._rootCategory:GetID())
 end
 
-local function ClampNumber(value, minValue, maxValue, fallback)
-    local num = value
-    if type(num) ~= "number" then
-        num = tonumber(num)
-    end
-    if type(num) ~= "number" then
-        num = fallback
-    end
-    if type(num) ~= "number" then
-        num = minValue
-    end
-    if num < minValue then
-        num = minValue
-    elseif num > maxValue then
-        num = maxValue
-    end
-    return num
-end
-
 local function SanitizePosition(value, fallback)
     if value == "TOPLEFT" or value == "BOTTOMLEFT" or value == "TOP" or value == "BOTTOM" or value == "TOPRIGHT" or value == "BOTTOMRIGHT" then
         return value
@@ -164,13 +146,13 @@ function FF:MigrateAndSanitizeDB()
     end
     growthDirection = SanitizeGrowDirection(growthDirection, defaults.growthDirection or "RIGHT")
 
-    local spellCount = ClampNumber(incomingCastBarProfile.spellCount, 1, 6, defaults.spellCount or 3)
+    local spellCount = Utils:ClampNumber(incomingCastBarProfile.spellCount, 1, 6, defaults.spellCount or 3)
     spellCount = math.floor(spellCount + 0.5)
 
-    local offsetX = ClampNumber(incomingCastBarProfile.offsetX, -200, 200, defaults.offsetX or 2)
+    local offsetX = Utils:ClampNumber(incomingCastBarProfile.offsetX, -200, 200, defaults.offsetX or 2)
     offsetX = math.floor(offsetX + 0.5)
 
-    local offsetY = ClampNumber(incomingCastBarProfile.offsetY, -200, 200, defaults.offsetY or 2)
+    local offsetY = Utils:ClampNumber(incomingCastBarProfile.offsetY, -200, 200, defaults.offsetY or 2)
     offsetY = math.floor(offsetY + 0.5)
 
     if type(incomingCastBarProfile.icon) ~= "table" then
@@ -178,10 +160,10 @@ function FF:MigrateAndSanitizeDB()
     end
     local iconProfile = incomingCastBarProfile.icon
 
-    local iconScale = ClampNumber(iconProfile.scale, 0.5, 3, iconDefaults.scale or 1)
+    local iconScale = Utils:ClampNumber(iconProfile.scale, 0.5, 3, iconDefaults.scale or 1)
     iconScale = math.floor((iconScale * 100) + 0.5) / 100
 
-    local iconSpacing = ClampNumber(iconProfile.spacing, -10, 50, iconDefaults.spacing or 0)
+    local iconSpacing = Utils:ClampNumber(iconProfile.spacing, -10, 50, iconDefaults.spacing or 0)
     iconSpacing = math.floor(iconSpacing + 0.5)
 
     local iconShowBorder = SanitizeBoolean(iconProfile.showBorder, iconDefaults.showBorder ~= false)
@@ -201,7 +183,7 @@ function FF:MigrateAndSanitizeDB()
     iconProfile.showCooldownText = iconShowCooldownText
 
     partyFrameProfile.trackIncomingCasts = (partyFrameProfile.trackIncomingCasts == true)
-    partyFrameProfile.countdownFontSize = math.floor(ClampNumber(
+    partyFrameProfile.countdownFontSize = math.floor(Utils:ClampNumber(
         partyFrameProfile.countdownFontSize,
         8,
         32,

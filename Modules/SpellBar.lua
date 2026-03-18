@@ -1,30 +1,11 @@
 local addonName, addon = ...
 
-local Utils = addon and addon.Utils
+local Utils = addon.Utils
 
 local SPELL_BAR_DEFAULT_GROW_DIRECTION = "RIGHT"
 local SPELL_BAR_DEFAULT_POSITION = "BOTTOMLEFT"
 local SPELL_BAR_DEFAULT_OFFSET_X = 2
 local SPELL_BAR_DEFAULT_OFFSET_Y = 2
-
-local function ClampNumber(value, minValue, maxValue, fallback)
-    local num = value
-    if type(num) ~= "number" then
-        num = tonumber(num)
-    end
-    if type(num) ~= "number" then
-        num = fallback
-    end
-    if type(num) ~= "number" then
-        num = minValue
-    end
-    if num < minValue then
-        num = minValue
-    elseif num > maxValue then
-        num = maxValue
-    end
-    return num
-end
 
 local function ApplyMixinSafe(target, mixin)
     if not (target and mixin) then
@@ -103,10 +84,10 @@ function SpellBarMixin:ApplyContainerPosition(frame, config)
         position = SPELL_BAR_DEFAULT_POSITION
     end
 
-    local offsetX = ClampNumber(config and config.offsetX, -200, 200, SPELL_BAR_DEFAULT_OFFSET_X)
+    local offsetX = Utils:ClampNumber(config and config.offsetX, -200, 200, SPELL_BAR_DEFAULT_OFFSET_X)
     offsetX = math.floor(offsetX + 0.5)
 
-    local offsetY = ClampNumber(config and config.offsetY, -200, 200, SPELL_BAR_DEFAULT_OFFSET_Y)
+    local offsetY = Utils:ClampNumber(config and config.offsetY, -200, 200, SPELL_BAR_DEFAULT_OFFSET_Y)
     offsetY = math.floor(offsetY + 0.5)
 
     local xOffset = offsetX
