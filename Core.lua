@@ -78,6 +78,13 @@ function FF:OnInitialize()
         PartyFrame:UpdateSpacingAndLayout()
     end)
 
+    if type(CompactUnitFrame_UpdateAuras) == "function" then
+        hooksecurefunc("CompactUnitFrame_UpdateAuras", function(frame)
+            FF:ShowBuffCountdownIfNeededForFrame(frame)
+            FF:ShowDebuffCountdownIfNeededForFrame(frame)
+        end)
+    end
+
     Utils:Log("CompactPartyFrame", CompactPartyFrame)
     -- Utils:Log("EditModeManagerFrame", EditModeManagerFrame)
     -- Utils:Log("PartyFrame", PartyFrame)

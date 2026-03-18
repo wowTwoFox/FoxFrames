@@ -18,6 +18,7 @@ FF.DEFAULT_SETTINGS = {
         showInSolo = false,
         showBuffCountdown = false,
         showDebuffCountdown = false,
+        countdownFontSize = 12,
         healthBarTexture = FF.DEFAULT_TEXTURE,
         allowAnyAnchoring = false,
         trackIncomingCasts = false,
@@ -200,6 +201,12 @@ function FF:MigrateAndSanitizeDB()
     iconProfile.showCooldownText = iconShowCooldownText
 
     partyFrameProfile.trackIncomingCasts = (partyFrameProfile.trackIncomingCasts == true)
+    partyFrameProfile.countdownFontSize = math.floor(ClampNumber(
+        partyFrameProfile.countdownFontSize,
+        8,
+        32,
+        self.DEFAULT_SETTINGS.partyFrame.countdownFontSize or 12
+    ) + 0.5)
 end
 
 local function GetIncomingCastBarProfile()
@@ -368,6 +375,31 @@ function FF:SetupOptions()
             self:ShowDebuffCountdownIfNeeded()
         end,
         desc = "Toggle the debuff countdown visibility on the frame.",
+        prefix = PARTY_FRAME_PREFIX
+    })
+
+    SettingsLib:CreateSlider(rootCategory, {
+        key = "CountdownFontSize",
+        name = "Buff/debuff countdown text size",
+        default = FF.DEFAULT_SETTINGS.partyFrame.countdownFontSize,
+        min = 8,
+        max = 32,
+        step = 1,
+        formatter = function(value)
+            return string.format("%ipt", math.floor((value) + 0.5))
+        end,
+        get = function()
+            local value = FF.db.profile.partyFrame.countdownFontSize
+            if value == nil then
+                value = FF.DEFAULT_SETTINGS.partyFrame.countdownFontSize
+            end
+            return value
+        end,
+        set = function(value)
+            FF.db.profile.partyFrame.countdownFontSize = math.floor((value) + 0.5)
+            self:UpdateAuraCountdownFontSize()
+        end,
+        desc = "Adjust the buff/debuff countdown text size on party frames.",
         prefix = PARTY_FRAME_PREFIX
     })
 
