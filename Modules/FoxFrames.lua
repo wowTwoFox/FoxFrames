@@ -3,10 +3,11 @@ local addonName, addon = ...
 FoxFrames = LibStub("AceAddon-3.0"):NewAddon("FoxFrames", "AceConsole-3.0", "AceEvent-3.0")
 local FF = FoxFrames
 local Utils = addon.Utils
+local Blizzard = addon.Blizzard
 
 function FF:InAllowedGroup()
-    if PartyStatus:InRaidGroup() then return true end
-    return BlizzardSettings:GetUseRaidStylePartyFrames() and PartyStatus:InPartyGroup()
+    if Blizzard:InRaidGroup() then return true end
+    return BlizzardSettings:GetUseRaidStylePartyFrames() and Blizzard:InPartyGroup()
 end
 
 function FF:IsPlayerUnit(unit)
@@ -27,14 +28,14 @@ function FF:SetAllowAnyAnchoring()
 end
 
 function FF:ShowPartyFrameIfNeeded()
-    if not PartyStatus:InSoloMode() then return end
+    if not Blizzard:InSoloMode() then return end
     if not CompactPartyFrame then return end
     CompactPartyFrame:SetShown(self.db.profile.partyFrame.showInSolo)
 end
 
 function FF:ShowPlayerFrameIfNeeded()
     if self.db.profile.playerFrame.showType == FF.PLAYER_FRAME_SHOW_TYPES.Solo then
-        PlayerFrame:SetShown(PartyStatus:InSoloMode())
+        PlayerFrame:SetShown(Blizzard:InSoloMode())
     elseif self.db.profile.playerFrame.showType == FF.PLAYER_FRAME_SHOW_TYPES.Never then
         PlayerFrame:SetShown(false)
     else
@@ -95,9 +96,7 @@ function FF:ApplyAuraCountdownFontSizeForFrame(frame)
 end
 
 function FF:UpdateAuraCountdownFontSize()
-    if not CompactPartyFrame then return end
-
-    for _, frame in ipairs(CompactPartyFrame.memberUnitFrames) do
+    for _, frame in ipairs(self:GetFrames()) do
         self:ApplyAuraCountdownFontSizeForFrame(frame)
     end
 end
@@ -153,7 +152,15 @@ function FF:GetStatusTextAnchorOffsets()
     return math.floor(offsetX + 0.5), math.floor(offsetY + 0.5)
 end
 
+function FF:IsManagedPartyFrame(frame)
+    return Blizzard:IsManagedPartyFrame(frame)
+end
+
 function FF:ApplyStatusTextAnchorForFrame(frame)
+    if not self:IsManagedPartyFrame(frame) then
+        return
+    end
+
     local statusText = frame and frame.statusText
     if not (statusText and statusText.ClearAllPoints and statusText.SetPoint) then
         return
@@ -183,9 +190,7 @@ function FF:ApplyStatusTextAnchorForFrame(frame)
 end
 
 function FF:UpdateStatusTextAnchoring()
-    if not CompactPartyFrame then return end
-
-    for _, frame in ipairs(CompactPartyFrame.memberUnitFrames) do
+    for _, frame in ipairs(self:GetFrames()) do
         self:ApplyStatusTextAnchorForFrame(frame)
     end
 end
@@ -205,6 +210,10 @@ function FF:GetStatusTextColor()
 end
 
 function FF:ApplyStatusTextColorForFrame(frame)
+    if not self:IsManagedPartyFrame(frame) then
+        return
+    end
+
     local statusText = frame and frame.statusText
 
     if not (statusText and statusText.SetTextColor) then
@@ -216,9 +225,7 @@ function FF:ApplyStatusTextColorForFrame(frame)
 end
 
 function FF:UpdateStatusTextColor()
-    if not CompactPartyFrame then return end
-
-    for _, frame in ipairs(CompactPartyFrame.memberUnitFrames) do
+    for _, frame in ipairs(self:GetFrames()) do
         self:ApplyStatusTextColorForFrame(frame)
     end
 end
@@ -230,11 +237,7 @@ function FF:ApplyStatusTextSettingsForFrame(frame)
 end
 
 function FF:ApplyStatusTextSettings()
-    if not CompactPartyFrame then
-        return
-    end
-
-    for _, frame in ipairs(CompactPartyFrame.memberUnitFrames) do
+    for _, frame in ipairs(self:GetFrames()) do
         self:ApplyStatusTextSettingsForFrame(frame)
     end
 end
@@ -297,8 +300,37 @@ function FF:GetPlayerNameAnchorOffsets()
     return math.floor(offsetX + 0.5), math.floor(offsetY + 0.5)
 end
 
-function FF:ApplyPlayerNameAnchorForFrame(frame)
+function FF:GetPlayerNameFontString(frame)
+    if not self:IsManagedPartyFrame(frame) then
+        return nil
+    end
+
     local nameText = frame and frame.name
+    if not nameText then
+        return nil
+    end
+
+    if nameText.IsObjectType then
+        local ok, isFontString = pcall(nameText.IsObjectType, nameText, "FontString")
+        if ok and isFontString then
+            return nameText
+        end
+
+        return nil
+    end
+
+    if nameText.GetObjectType then
+        local ok, objectType = pcall(nameText.GetObjectType, nameText)
+        if ok and objectType == "FontString" then
+            return nameText
+        end
+    end
+
+    return nil
+end
+
+function FF:ApplyPlayerNameAnchorForFrame(frame)
+    local nameText = self:GetPlayerNameFontString(frame)
     if not (nameText and nameText.ClearAllPoints and nameText.SetPoint) then
         return
     end
@@ -322,14 +354,12 @@ function FF:ApplyPlayerNameAnchorForFrame(frame)
         yOffset = -offsetY
     end
 
-    nameText:ClearAllPoints()
+    pcall(nameText.ClearAllPoints, nameText)
     pcall(nameText.SetPoint, nameText, point, relativeTo, point, xOffset, yOffset)
 end
 
 function FF:UpdatePlayerNameAnchoring()
-    if not CompactPartyFrame then return end
-
-    for _, frame in ipairs(CompactPartyFrame.memberUnitFrames) do
+    for _, frame in ipairs(self:GetFrames()) do
         self:ApplyPlayerNameAnchorForFrame(frame)
     end
 end
@@ -349,7 +379,7 @@ function FF:GetPlayerNameColor()
 end
 
 function FF:ApplyPlayerNameColorForFrame(frame)
-    local nameText = frame and frame.name
+    local nameText = self:GetPlayerNameFontString(frame)
 
     if not (nameText and nameText.SetTextColor) then
         return
@@ -360,9 +390,7 @@ function FF:ApplyPlayerNameColorForFrame(frame)
 end
 
 function FF:UpdatePlayerNameColor()
-    if not CompactPartyFrame then return end
-
-    for _, frame in ipairs(CompactPartyFrame.memberUnitFrames) do
+    for _, frame in ipairs(self:GetFrames()) do
         self:ApplyPlayerNameColorForFrame(frame)
     end
 end
@@ -375,7 +403,7 @@ function FF:GetPlayerNameFontSize()
 end
 
 function FF:ApplyPlayerNameFontSizeForFrame(frame)
-    local nameText = frame and frame.name
+    local nameText = self:GetPlayerNameFontString(frame)
 
     if not (nameText and nameText.GetFont and nameText.SetFont) then
         return
@@ -390,9 +418,7 @@ function FF:ApplyPlayerNameFontSizeForFrame(frame)
 end
 
 function FF:UpdatePlayerNameFontSize()
-    if not CompactPartyFrame then return end
-
-    for _, frame in ipairs(CompactPartyFrame.memberUnitFrames) do
+    for _, frame in ipairs(self:GetFrames()) do
         self:ApplyPlayerNameFontSizeForFrame(frame)
     end
 end
@@ -405,6 +431,10 @@ function FF:GetHealthTextFontSize()
 end
 
 function FF:ApplyHealthTextFontSizeForFrame(frame)
+    if not self:IsManagedPartyFrame(frame) then
+        return
+    end
+
     local fontString = frame and frame.statusText
 
     if not (fontString and fontString.GetFont and fontString.SetFont) then
@@ -420,8 +450,7 @@ function FF:ApplyHealthTextFontSizeForFrame(frame)
 end
 
 function FF:UpdateHealthTextFontSize()
-    if not CompactPartyFrame then return end
-    for _, frame in ipairs(CompactPartyFrame.memberUnitFrames) do
+    for _, frame in ipairs(self:GetFrames()) do
         self:ApplyHealthTextFontSizeForFrame(frame)
     end
 end
@@ -441,9 +470,7 @@ function FF:ShowBuffCountdownIfNeededForFrame(frame)
 end
 
 function FF:ShowBuffCountdownIfNeeded()
-    if not CompactPartyFrame then return end
-
-    for _, frame in ipairs(CompactPartyFrame.memberUnitFrames) do
+    for _, frame in ipairs(self:GetFrames()) do
         self:ShowBuffCountdownIfNeededForFrame(frame)
     end
 end
@@ -463,9 +490,7 @@ function FF:ShowDebuffCountdownIfNeededForFrame(frame)
 end
 
 function FF:ShowDebuffCountdownIfNeeded()
-    if not CompactPartyFrame then return end
-
-    for _, frame in ipairs(CompactPartyFrame.memberUnitFrames) do
+    for _, frame in ipairs(self:GetFrames()) do
         self:ShowDebuffCountdownIfNeededForFrame(frame)
     end
 end
@@ -531,8 +556,7 @@ function FF:UpdateFrame(frame)
 end
 
 function FF:GetFrames()
-    if not CompactPartyFrame then return {} end
-    return CompactPartyFrame.memberUnitFrames
+    return Blizzard:GetFrames()
 end
 
 function FF:UpdateFrames()

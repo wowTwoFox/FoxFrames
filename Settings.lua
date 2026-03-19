@@ -54,9 +54,9 @@ FF.DEFAULT_SETTINGS = {
             a = 1,
         },
         playerNameAnchorTarget = "FRAME",
-        playerNameAnchorPoint = "CENTER",
+        playerNameAnchorPoint = "TOP",
         playerNameOffsetX = 0,
-        playerNameOffsetY = 0,
+        playerNameOffsetY = 6,
         healthBarTexture = FF.DEFAULT_TEXTURE,
         allowAnyAnchoring = false,
         trackIncomingCasts = false,
@@ -461,22 +461,6 @@ function FF:SetupOptions()
         "You will need to re-center the party frames on the UI to set the new anchor point."
     )
 
-    SettingsLib:CreateDropdown(rootCategory, {
-        key = "ShowPlayerFrame",
-        name = "Show Player Frame",
-        default = FF.DEFAULT_SETTINGS.playerFrame.showType,
-        values = FF.PLAYER_FRAME_SHOW_TYPES,
-        get = function()
-            return FF.db.profile.playerFrame.showType or FF.DEFAULT_SETTINGS.playerFrame.showType
-        end,
-        set = function(value)
-            FF.db.profile.playerFrame.showType = value
-            self:ShowPlayerFrameIfNeeded()
-        end,
-        desc = "Control the visibility of the player frame. 'Always' will show the player frame regardless of group status. 'Solo' will only show the player frame when not in a party or raid. 'Never' will hide the player frame regardless of group status.",
-        prefix = PARTY_FRAME_PREFIX
-    })
-
     -- Build texture list from LibSharedMedia or fallback to built-in
     local textureOrder = {}
     local textures = self:GetTextures()
@@ -520,6 +504,26 @@ function FF:SetupOptions()
     rootCategory, 
         "You need to reload the UI when setting the 'Default' texture."
     )
+
+    SettingsLib:CreateHeader(rootCategory, {
+        name = "Player Frame",
+    })
+
+    SettingsLib:CreateDropdown(rootCategory, {
+        key = "ShowPlayerFrame",
+        name = "Show Player Frame",
+        default = FF.DEFAULT_SETTINGS.playerFrame.showType,
+        values = FF.PLAYER_FRAME_SHOW_TYPES,
+        get = function()
+            return FF.db.profile.playerFrame.showType or FF.DEFAULT_SETTINGS.playerFrame.showType
+        end,
+        set = function(value)
+            FF.db.profile.playerFrame.showType = value
+            self:ShowPlayerFrameIfNeeded()
+        end,
+        desc = "Control the visibility of the player frame. 'Always' will show the player frame regardless of group status. 'Solo' will only show the player frame when not in a party or raid. 'Never' will hide the player frame regardless of group status.",
+        prefix = PARTY_FRAME_PREFIX
+    })
 
     SettingsLib:CreateHeader(rootCategory, {
         name = "Status Text",

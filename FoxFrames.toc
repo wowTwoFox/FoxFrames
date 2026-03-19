@@ -26,8 +26,8 @@ Libs\LibSharedMedia-3.0\LibSharedMedia-3.0.lua
 
 # Core
 Modules\Utils.lua
-Modules\PartyStatus.lua
 Modules\BlizzardSettings.lua
+Modules\Blizzard.lua
 Modules\FoxFrames.lua
 Modules\IncomingCasts.lua
 Modules\SpellIcon.lua
