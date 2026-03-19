@@ -272,6 +272,10 @@ function FF:SetupOptions()
         "You need to enable 'Raid Style Party Frames' in 'Edit Mode' to benefit from these settings."
     )
 
+    SettingsLib:CreateHeader(rootCategory, {
+        name = "General",
+    })
+
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "ShowInSolo",
         name = "Show in Solo",
@@ -312,96 +316,6 @@ function FF:SetupOptions()
         end,
         desc = "Toggle class colors raid frames",
         prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateCheckbox(rootCategory, {
-        key = "ShowTankRoleIcon",
-        name = "Show Tank Role Icon",
-        default = FF.DEFAULT_SETTINGS.partyFrame.showTankRoleIcon,
-        get = function() return FF.db.profile.partyFrame.showTankRoleIcon end,
-        set = function(value) 
-            FF.db.profile.partyFrame.showTankRoleIcon = value
-            FF:UpdateFrames()
-        end,
-        desc = "Toggle the Tank role icon visibility on the frame.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateCheckbox(rootCategory, {
-        key = "ShowHealerRoleIcon",
-        name = "Show Healer Role Icon",
-        default = FF.DEFAULT_SETTINGS.partyFrame.showHealerRoleIcon,
-        get = function() return FF.db.profile.partyFrame.showHealerRoleIcon end,
-        set = function(value) 
-            FF.db.profile.partyFrame.showHealerRoleIcon = value
-            FF:UpdateFrames()
-        end,
-        desc = "Toggle the Healer role icon visibility on the frame.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateCheckbox(rootCategory, {
-        key = "ShowDPSRoleIcon",
-        name = "Show DPS Role Icon",
-        default = FF.DEFAULT_SETTINGS.partyFrame.showDPSRoleIcon,
-        get = function() return FF.db.profile.partyFrame.showDPSRoleIcon end,
-        set = function(value)
-            FF.db.profile.partyFrame.showDPSRoleIcon = value
-            FF:UpdateFrames()
-        end,
-        desc = "Toggle the DPS role icon visibility on the frame.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateCheckbox(rootCategory, {
-        key = "ShowBuffCountdown",
-        name = "Show Buff Countdown",
-        default = FF.DEFAULT_SETTINGS.partyFrame.showBuffCountdown,
-        get = function() return FF.db.profile.partyFrame.showBuffCountdown end,
-        set = function(value)
-            FF.db.profile.partyFrame.showBuffCountdown = value
-            self:ShowBuffCountdownIfNeeded()
-        end,
-        desc = "Toggle the buff countdown visibility on the frame.",
-        prefix = PARTY_FRAME_PREFIX
-    })
-
-    SettingsLib:CreateCheckbox(rootCategory, {
-        key = "ShowDebuffCountdown",
-        name = "Show Debuff Countdown",
-        default = FF.DEFAULT_SETTINGS.partyFrame.showDebuffCountdown,
-        get = function() return FF.db.profile.partyFrame.showDebuffCountdown end,
-        set = function(value)
-            FF.db.profile.partyFrame.showDebuffCountdown = value
-            self:ShowDebuffCountdownIfNeeded()
-        end,
-        desc = "Toggle the debuff countdown visibility on the frame.",
-        prefix = PARTY_FRAME_PREFIX
-    })
-
-    SettingsLib:CreateSlider(rootCategory, {
-        key = "CountdownFontSize",
-        name = "Buff/debuff countdown text size",
-        default = FF.DEFAULT_SETTINGS.partyFrame.countdownFontSize,
-        min = 8,
-        max = 32,
-        step = 1,
-        formatter = function(value)
-            return string.format("%ipt", math.floor((value) + 0.5))
-        end,
-        get = function()
-            local value = FF.db.profile.partyFrame.countdownFontSize
-            if value == nil then
-                value = FF.DEFAULT_SETTINGS.partyFrame.countdownFontSize
-            end
-            return value
-        end,
-        set = function(value)
-            FF.db.profile.partyFrame.countdownFontSize = math.floor((value) + 0.5)
-            self:UpdateAuraCountdownFontSize()
-        end,
-        desc = "Adjust the buff/debuff countdown text size on party frames.",
-        prefix = PARTY_FRAME_PREFIX
     })
 
     SettingsLib:CreateCheckbox(rootCategory, {
@@ -483,10 +397,108 @@ function FF:SetupOptions()
     )
 
     SettingsLib:CreateHeader(rootCategory, {
+        name = "Role Icons",
+    })
+
+    SettingsLib:CreateCheckbox(rootCategory, {
+        key = "ShowTankRoleIcon",
+        name = "Show Tank Role Icon",
+        default = FF.DEFAULT_SETTINGS.partyFrame.showTankRoleIcon,
+        get = function() return FF.db.profile.partyFrame.showTankRoleIcon end,
+        set = function(value) 
+            FF.db.profile.partyFrame.showTankRoleIcon = value
+            FF:UpdateFrames()
+        end,
+        desc = "Toggle the Tank role icon visibility on the frame.",
+        prefix = PARTY_FRAME_PREFIX,
+    })
+
+    SettingsLib:CreateCheckbox(rootCategory, {
+        key = "ShowHealerRoleIcon",
+        name = "Show Healer Role Icon",
+        default = FF.DEFAULT_SETTINGS.partyFrame.showHealerRoleIcon,
+        get = function() return FF.db.profile.partyFrame.showHealerRoleIcon end,
+        set = function(value) 
+            FF.db.profile.partyFrame.showHealerRoleIcon = value
+            FF:UpdateFrames()
+        end,
+        desc = "Toggle the Healer role icon visibility on the frame.",
+        prefix = PARTY_FRAME_PREFIX,
+    })
+
+    SettingsLib:CreateCheckbox(rootCategory, {
+        key = "ShowDPSRoleIcon",
+        name = "Show DPS Role Icon",
+        default = FF.DEFAULT_SETTINGS.partyFrame.showDPSRoleIcon,
+        get = function() return FF.db.profile.partyFrame.showDPSRoleIcon end,
+        set = function(value)
+            FF.db.profile.partyFrame.showDPSRoleIcon = value
+            FF:UpdateFrames()
+        end,
+        desc = "Toggle the DPS role icon visibility on the frame.",
+        prefix = PARTY_FRAME_PREFIX,
+    })
+
+    SettingsLib:CreateHeader(rootCategory, {
+        name = "Buff/Debuffs",
+    })
+
+    SettingsLib:CreateCheckbox(rootCategory, {
+        key = "ShowBuffCountdown",
+        name = "Show Buff Countdown",
+        default = FF.DEFAULT_SETTINGS.partyFrame.showBuffCountdown,
+        get = function() return FF.db.profile.partyFrame.showBuffCountdown end,
+        set = function(value)
+            FF.db.profile.partyFrame.showBuffCountdown = value
+            self:ShowBuffCountdownIfNeeded()
+        end,
+        desc = "Toggle the buff countdown visibility on the frame.",
+        prefix = PARTY_FRAME_PREFIX
+    })
+
+    SettingsLib:CreateCheckbox(rootCategory, {
+        key = "ShowDebuffCountdown",
+        name = "Show Debuff Countdown",
+        default = FF.DEFAULT_SETTINGS.partyFrame.showDebuffCountdown,
+        get = function() return FF.db.profile.partyFrame.showDebuffCountdown end,
+        set = function(value)
+            FF.db.profile.partyFrame.showDebuffCountdown = value
+            self:ShowDebuffCountdownIfNeeded()
+        end,
+        desc = "Toggle the debuff countdown visibility on the frame.",
+        prefix = PARTY_FRAME_PREFIX
+    })
+
+    SettingsLib:CreateSlider(rootCategory, {
+        key = "CountdownFontSize",
+        name = "Buff/debuff countdown text size",
+        default = FF.DEFAULT_SETTINGS.partyFrame.countdownFontSize,
+        min = 8,
+        max = 32,
+        step = 1,
+        formatter = function(value)
+            return string.format("%ipt", math.floor((value) + 0.5))
+        end,
+        get = function()
+            local value = FF.db.profile.partyFrame.countdownFontSize
+            if value == nil then
+                value = FF.DEFAULT_SETTINGS.partyFrame.countdownFontSize
+            end
+            return value
+        end,
+        set = function(value)
+            FF.db.profile.partyFrame.countdownFontSize = math.floor((value) + 0.5)
+            self:UpdateAuraCountdownFontSize()
+        end,
+        desc = "Adjust the buff/debuff countdown text size on party frames.",
+        prefix = PARTY_FRAME_PREFIX
+    })
+
+    SettingsLib:CreateHeader(rootCategory, {
         name = "Incoming Casts",
     })
 
-    SettingsLib:CreateCheckboxButton(rootCategory, {
+    local trackIncomingCastsElement = SettingsLib:CreateCheckbox(rootCategory, {
         key = "TrackIncomingCasts",
         name = "Track incoming casts",
         default = FF.DEFAULT_SETTINGS.partyFrame.trackIncomingCasts,
@@ -500,12 +512,25 @@ function FF:SetupOptions()
             end
         end,
         prefix = PARTY_FRAME_PREFIX,
+        desc = "Track incoming enemy casts for party frame indicators.",
+    })
 
-        buttonText = "Toggle Preview",
-        buttonClick = function()
-            FF:ToggleIncomingCastIndicatorPreview()
+    SettingsLib:CreateCheckbox(rootCategory, {
+        key = "IncomingCastPreview",
+        name = "Preview incoming casts",
+        default = false,
+        get = function()
+            return FF._ffIncomingCastIndicatorPreviewEnabled == true
         end,
-        clickRequiresSet = true, -- button only active when checkbox is checked
+        set = function(value)
+            FF:SetIncomingCastIndicatorPreviewEnabled(value)
+        end,
+        desc = "Show preview incoming cast icons for layout tuning.",
+        prefix = PARTY_FRAME_PREFIX,
+        parent = trackIncomingCastsElement,
+        parentCheck = function()
+            return FF.db.profile.partyFrame.trackIncomingCasts == true
+        end,
     })
 
     local incomingCastBarDefaults = FF.DEFAULT_SETTINGS.incomingCastBar
@@ -777,7 +802,7 @@ function FF:SetupOptions()
         prefix = PARTY_FRAME_PREFIX,
     })
 
-    SettingsLib:CreateCheckbox(rootCategory, {
+    local incomingCastIconCooldownTextElement = SettingsLib:CreateCheckbox(rootCategory, {
         key = "IncomingCastIconCooldownText",
         name = "Show cooldown text",
         default = incomingCastBarIconDefaults.showCooldownText,
@@ -821,5 +846,13 @@ function FF:SetupOptions()
         end,
         desc = "Adjust the cooldown countdown text size on targeted spell icons.",
         prefix = PARTY_FRAME_PREFIX,
+        parent = incomingCastIconCooldownTextElement,
+        parentCheck = function()
+            local value = GetIncomingCastBarIconValue("showCooldownText")
+            if value == nil then
+                value = incomingCastBarIconDefaults.showCooldownText
+            end
+            return value == true
+        end,
     })
 end
