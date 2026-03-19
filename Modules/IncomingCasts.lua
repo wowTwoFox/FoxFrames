@@ -6,6 +6,7 @@ if not FF then
 end
 
 local Utils = addon.Utils
+local DB = addon.DB
 function FF:RegisterIncomingCastUnitEvents()
     -- Midnight+ safe approach:
     -- - Track enemy casts by caster *unit token* (nameplateX)
@@ -57,7 +58,7 @@ local function IsValidCasterUnit(unit)
 end
 
 local function ShouldTrackIncomingCasts()
-    return FF.db.profile.partyFrame.trackIncomingCasts
+    return DB:GetTrackIncomingCasts()
 end
 
 function FF:InitIncomingCasts()
@@ -476,9 +477,8 @@ local function GetIncomingCastIndicatorAnchorFrame(incomingCastBarProfile, incom
 end
 
 local function GetIncomingCastIndicatorConfig()
-    local profile = FF and FF.db and FF.db.profile
-    local incomingCastBarProfile = profile and profile.incomingCastBar
-    local incomingCastBarDefaults = FF and FF.DEFAULT_SETTINGS and FF.DEFAULT_SETTINGS.incomingCastBar or {}
+    local incomingCastBarProfile = DB:GetIncomingCastBarDB()
+    local incomingCastBarDefaults = DB.DEFAULT_SETTINGS.incomingCastBar
     local iconConfig = GetIncomingCastIndicatorIconConfig(incomingCastBarProfile, incomingCastBarDefaults)
     local anchorFrame = GetIncomingCastIndicatorAnchorFrame(incomingCastBarProfile, incomingCastBarDefaults)
 

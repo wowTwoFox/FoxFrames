@@ -1,13 +1,13 @@
 local addonName, addon = ...
 local FF = FoxFrames
 local Utils = addon.Utils
+local DB = addon.DB
 
 local SettingsLib = LibStub("LibEQOLSettingsMode-1.0")
 local SETTINGS_PREFIX = "FoxFrames_"
 local INCOMING_CASTS_PREFIX = SETTINGS_PREFIX .. "IncomingCasts_"
 
-FF.PLAYER_FRAME_SHOW_TYPES = { Always = "Always", Solo = "Solo", Never = "Never" }
-FF.STATUS_TEXT_ANCHOR_POINTS = {
+local STATUS_TEXT_ANCHOR_POINTS = {
     TOPLEFT = "Top left",
     TOP = "Top",
     TOPRIGHT = "Top right",
@@ -18,71 +18,11 @@ FF.STATUS_TEXT_ANCHOR_POINTS = {
     BOTTOM = "Bottom",
     BOTTOMRIGHT = "Bottom right",
 }
-FF.STATUS_TEXT_ANCHOR_TARGETS = {
+local STATUS_TEXT_ANCHOR_TARGETS = {
     FRAME = "Party frame",
     HEALTHBAR = "Health bar",
 }
-FF.DEFAULT_TEXTURE = "DEFAULT"
-FF.DEFAULT_SETTINGS = {
-    playerFrame = {
-        showType = FF.PLAYER_FRAME_SHOW_TYPES.Always
-    },
-    partyFrame = {
-        showTitle = true,
-        showTankRoleIcon = true,
-        showHealerRoleIcon = true,
-        showDPSRoleIcon = true,
-        showInSolo = false,
-        showBuffCountdown = false,
-        showDebuffCountdown = false,
-        countdownFontSize = 12,
-        healthTextFontSize = 10,
-        statusTextColor = {
-            r = 1,
-            g = 1,
-            b = 1,
-            a = 1,
-        },
-        statusTextOpacity = 1,
-        statusTextUseClassColors = false,
-        statusTextAnchorTarget = "FRAME",
-        statusTextAnchorPoint = "CENTER",
-        statusTextOffsetX = 0,
-        statusTextOffsetY = 0,
-        playerNameFontSize = 10,
-        playerNameColor = {
-            r = 1,
-            g = 1,
-            b = 1,
-            a = 1,
-        },
-        playerNameOpacity = 1,
-        playerNameUseClassColors = false,
-        playerNameAnchorTarget = "FRAME",
-        playerNameAnchorPoint = "TOP",
-        playerNameOffsetX = 0,
-        playerNameOffsetY = 6,
-        healthBarTexture = FF.DEFAULT_TEXTURE,
-        allowAnyAnchoring = false,
-        trackIncomingCasts = false,
-    },
-    incomingCastBar = {
-        spellCount = 3,
-        anchorFrame = "HEALTHBAR",
-        position = "BOTTOMLEFT",
-        growthDirection = "RIGHT",
-        offsetX = 2,
-        offsetY = 2,
-        icon = {
-            scale = 1,
-            spacing = 0,
-            showBorder = true,
-            showSwipe = true,
-            showCooldownText = true,
-            cooldownFontSize = 10,
-        },
-    }
-}
+FF.DEFAULT_TEXTURE = FF.DEFAULT_TEXTURE or "DEFAULT"
 
 function FF:GetTextures()
     local alreadyAddedPaths = {}
@@ -137,296 +77,51 @@ function FF:OpenSettings()
 end
 
 local function SanitizePosition(value, fallback)
-    if value == "UP" then
-        value = "TOP"
-    elseif value == "DOWN" then
-        value = "BOTTOM"
-    end
-
-    if value == "TOPLEFT" or value == "TOP" or value == "TOPRIGHT"
-        or value == "LEFT" or value == "CENTER" or value == "RIGHT"
-        or value == "BOTTOMLEFT" or value == "BOTTOM" or value == "BOTTOMRIGHT" then
-        return value
-    end
-    return fallback
-end
-
-local function SanitizeGrowDirection(value, fallback)
-    if value == "RIGHT" or value == "LEFT" or value == "DOWN" or value == "UP" then
-        return value
-    end
-    return fallback
+    return DB:SanitizeIncomingCastPosition(value, fallback)
 end
 
 local function SanitizeIncomingCastAnchorFrame(value, fallback)
-    if value == "FRAME" or value == "HEALTHBAR" then
-        return value
-    end
-    return fallback
+    return DB:SanitizeIncomingCastAnchorFrame(value, fallback)
 end
 
 local function SanitizeStatusTextAnchorPoint(value, fallback)
-    if value == "TOPLEFT" or value == "TOP" or value == "TOPRIGHT"
-        or value == "LEFT" or value == "CENTER" or value == "RIGHT"
-        or value == "BOTTOMLEFT" or value == "BOTTOM" or value == "BOTTOMRIGHT" then
-        return value
-    end
-    return fallback
+    return DB:SanitizeStatusTextAnchorPoint(value, fallback)
 end
 
 local function SanitizeStatusTextColor(value, fallback)
-    local fallbackColor = fallback
-    if type(fallbackColor) ~= "table" then
-        fallbackColor = { r = 1, g = 1, b = 1, a = 1 }
-    end
-
-    local color = value
-    if type(color) ~= "table" then
-        color = fallbackColor
-    end
-
-    return {
-        r = Utils:ClampNumber(color.r, 0, 1, fallbackColor.r or 1),
-        g = Utils:ClampNumber(color.g, 0, 1, fallbackColor.g or 1),
-        b = Utils:ClampNumber(color.b, 0, 1, fallbackColor.b or 1),
-        a = Utils:ClampNumber(color.a, 0, 1, fallbackColor.a or 1),
-    }
-end
-
-local function SanitizeBoolean(value, fallback)
-    if value == nil then
-        return fallback
-    end
-    return value == true
+    return DB:SanitizeStatusTextColor(value, fallback)
 end
 
 local function SanitizeOpacity(value, fallback)
-    local sanitizedFallback = Utils:ClampNumber(fallback, 0, 1, 1)
-    local opacity = Utils:ClampNumber(value, 0, 1, sanitizedFallback)
-    return math.floor((opacity * 100) + 0.5) / 100
+    return DB:SanitizeOpacity(value, fallback)
 end
 
-function FF:MigrateAndSanitizeDB()
-    local profile = self and self.db and self.db.profile
-    if type(profile) ~= "table" then
-        return
-    end
+local function PartyFrameProfile()
+    return DB:GetPartyFrameDB()
+end
 
-    if type(profile.partyFrame) ~= "table" then
-        profile.partyFrame = {}
-    end
-    if type(profile.incomingCastBar) ~= "table" then
-        profile.incomingCastBar = {}
-    end
-
-    local defaults = self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.incomingCastBar or {}
-    local iconDefaults = defaults.icon or {}
-    local partyFrameProfile = profile.partyFrame
-    local incomingCastBarProfile = profile.incomingCastBar
-
-    local anchorFrame = SanitizeIncomingCastAnchorFrame(
-        incomingCastBarProfile.anchorFrame,
-        defaults.anchorFrame or "HEALTHBAR"
-    )
-
-    local position = SanitizePosition(
-        incomingCastBarProfile.position,
-        defaults.position or "BOTTOMLEFT"
-    )
-
-    local growthDirection = incomingCastBarProfile.growthDirection
-    if growthDirection == nil then
-        if position == "TOPRIGHT" or position == "RIGHT" or position == "BOTTOMRIGHT" then
-            growthDirection = "LEFT"
-        else
-            growthDirection = defaults.growthDirection or "RIGHT"
-        end
-    end
-    growthDirection = SanitizeGrowDirection(growthDirection, defaults.growthDirection or "RIGHT")
-
-    local spellCount = Utils:ClampNumber(incomingCastBarProfile.spellCount, 1, 6, defaults.spellCount or 3)
-    spellCount = math.floor(spellCount + 0.5)
-
-    local offsetX = Utils:ClampNumber(incomingCastBarProfile.offsetX, -200, 200, defaults.offsetX or 2)
-    offsetX = math.floor(offsetX + 0.5)
-
-    local offsetY = Utils:ClampNumber(incomingCastBarProfile.offsetY, -200, 200, defaults.offsetY or 2)
-    offsetY = math.floor(offsetY + 0.5)
-
-    if type(incomingCastBarProfile.icon) ~= "table" then
-        incomingCastBarProfile.icon = {}
-    end
-    local iconProfile = incomingCastBarProfile.icon
-
-    local iconScale = Utils:ClampNumber(iconProfile.scale, 0.5, 3, iconDefaults.scale or 1)
-    iconScale = math.floor((iconScale * 100) + 0.5) / 100
-
-    local iconSpacing = Utils:ClampNumber(iconProfile.spacing, -10, 50, iconDefaults.spacing or 0)
-    iconSpacing = math.floor(iconSpacing + 0.5)
-
-    local iconCooldownFontSize = Utils:ClampNumber(iconProfile.cooldownFontSize, 8, 32, iconDefaults.cooldownFontSize or 10)
-    iconCooldownFontSize = math.floor(iconCooldownFontSize + 0.5)
-
-    local iconShowBorder = SanitizeBoolean(iconProfile.showBorder, iconDefaults.showBorder ~= false)
-    local iconShowSwipe = SanitizeBoolean(iconProfile.showSwipe, iconDefaults.showSwipe ~= false)
-    local iconShowCooldownText = SanitizeBoolean(iconProfile.showCooldownText, iconDefaults.showCooldownText ~= false)
-
-    incomingCastBarProfile.spellCount = spellCount
-    incomingCastBarProfile.anchorFrame = anchorFrame
-    incomingCastBarProfile.position = position
-    incomingCastBarProfile.growthDirection = growthDirection
-    incomingCastBarProfile.offsetX = offsetX
-    incomingCastBarProfile.offsetY = offsetY
-
-    iconProfile.scale = iconScale
-    iconProfile.spacing = iconSpacing
-    iconProfile.cooldownFontSize = iconCooldownFontSize
-    iconProfile.showBorder = iconShowBorder
-    iconProfile.showSwipe = iconShowSwipe
-    iconProfile.showCooldownText = iconShowCooldownText
-
-    partyFrameProfile.trackIncomingCasts = (partyFrameProfile.trackIncomingCasts == true)
-    partyFrameProfile.countdownFontSize = math.floor(Utils:ClampNumber(
-        partyFrameProfile.countdownFontSize,
-        8,
-        32,
-        self.DEFAULT_SETTINGS.partyFrame.countdownFontSize or 12
-    ) + 0.5)
-    partyFrameProfile.healthTextFontSize = math.floor(Utils:ClampNumber(
-        partyFrameProfile.healthTextFontSize,
-        8,
-        32,
-        self.DEFAULT_SETTINGS.partyFrame.healthTextFontSize or 10
-    ) + 0.5)
-    partyFrameProfile.statusTextColor = SanitizeStatusTextColor(
-        partyFrameProfile.statusTextColor,
-        self.DEFAULT_SETTINGS.partyFrame.statusTextColor
-    )
-    partyFrameProfile.statusTextOpacity = SanitizeOpacity(
-        partyFrameProfile.statusTextOpacity,
-        SanitizeOpacity(
-            partyFrameProfile.statusTextColor and partyFrameProfile.statusTextColor.a,
-            self.DEFAULT_SETTINGS.partyFrame.statusTextOpacity
-                or (self.DEFAULT_SETTINGS.partyFrame.statusTextColor and self.DEFAULT_SETTINGS.partyFrame.statusTextColor.a)
-                or 1
-        )
-    )
-    partyFrameProfile.statusTextColor.a = partyFrameProfile.statusTextOpacity
-    partyFrameProfile.statusTextUseClassColors = SanitizeBoolean(
-        partyFrameProfile.statusTextUseClassColors,
-        self.DEFAULT_SETTINGS.partyFrame.statusTextUseClassColors == true
-    )
-    partyFrameProfile.statusTextOffsetX = math.floor(Utils:ClampNumber(
-        partyFrameProfile.statusTextOffsetX,
-        -100,
-        100,
-        self.DEFAULT_SETTINGS.partyFrame.statusTextOffsetX or 0
-    ) + 0.5)
-    partyFrameProfile.statusTextOffsetY = math.floor(Utils:ClampNumber(
-        partyFrameProfile.statusTextOffsetY,
-        -100,
-        100,
-        self.DEFAULT_SETTINGS.partyFrame.statusTextOffsetY or 0
-    ) + 0.5)
-    partyFrameProfile.statusTextAnchorTarget = SanitizeIncomingCastAnchorFrame(
-        partyFrameProfile.statusTextAnchorTarget,
-        self.DEFAULT_SETTINGS.partyFrame.statusTextAnchorTarget or "FRAME"
-    )
-    partyFrameProfile.statusTextAnchorPoint = SanitizeStatusTextAnchorPoint(
-        partyFrameProfile.statusTextAnchorPoint,
-        self.DEFAULT_SETTINGS.partyFrame.statusTextAnchorPoint or "CENTER"
-    )
-    partyFrameProfile.playerNameFontSize = math.floor(Utils:ClampNumber(
-        partyFrameProfile.playerNameFontSize,
-        8,
-        32,
-        self.DEFAULT_SETTINGS.partyFrame.playerNameFontSize or 10
-    ) + 0.5)
-    partyFrameProfile.playerNameColor = SanitizeStatusTextColor(
-        partyFrameProfile.playerNameColor,
-        self.DEFAULT_SETTINGS.partyFrame.playerNameColor
-    )
-    partyFrameProfile.playerNameOpacity = SanitizeOpacity(
-        partyFrameProfile.playerNameOpacity,
-        SanitizeOpacity(
-            partyFrameProfile.playerNameColor and partyFrameProfile.playerNameColor.a,
-            self.DEFAULT_SETTINGS.partyFrame.playerNameOpacity
-                or (self.DEFAULT_SETTINGS.partyFrame.playerNameColor and self.DEFAULT_SETTINGS.partyFrame.playerNameColor.a)
-                or 1
-        )
-    )
-    partyFrameProfile.playerNameColor.a = partyFrameProfile.playerNameOpacity
-    partyFrameProfile.playerNameUseClassColors = SanitizeBoolean(
-        partyFrameProfile.playerNameUseClassColors,
-        self.DEFAULT_SETTINGS.partyFrame.playerNameUseClassColors == true
-    )
-    partyFrameProfile.playerNameOffsetX = math.floor(Utils:ClampNumber(
-        partyFrameProfile.playerNameOffsetX,
-        -100,
-        100,
-        self.DEFAULT_SETTINGS.partyFrame.playerNameOffsetX or 0
-    ) + 0.5)
-    partyFrameProfile.playerNameOffsetY = math.floor(Utils:ClampNumber(
-        partyFrameProfile.playerNameOffsetY,
-        -100,
-        100,
-        self.DEFAULT_SETTINGS.partyFrame.playerNameOffsetY or 0
-    ) + 0.5)
-    partyFrameProfile.playerNameAnchorTarget = SanitizeIncomingCastAnchorFrame(
-        partyFrameProfile.playerNameAnchorTarget,
-        self.DEFAULT_SETTINGS.partyFrame.playerNameAnchorTarget or "FRAME"
-    )
-    partyFrameProfile.playerNameAnchorPoint = SanitizeStatusTextAnchorPoint(
-        partyFrameProfile.playerNameAnchorPoint,
-        self.DEFAULT_SETTINGS.partyFrame.playerNameAnchorPoint or "TOPLEFT"
-    )
+local function PlayerFrameProfile()
+    return DB:GetPlayerFrameDB()
 end
 
 local function GetIncomingCastBarProfile()
-    local profile = FF and FF.db and FF.db.profile
-    if type(profile) ~= "table" then
-        return nil
-    end
-
-    if type(profile.incomingCastBar) ~= "table" then
-        profile.incomingCastBar = {}
-    end
-
-    return profile.incomingCastBar
+    return DB:GetIncomingCastBarProfile()
 end
 
 local function GetIncomingCastBarValue(key)
-    local incomingCastBarProfile = GetIncomingCastBarProfile()
-    return incomingCastBarProfile and incomingCastBarProfile[key]
+    return DB:GetIncomingCastBarValue(key)
 end
 
 local function SetIncomingCastBarValue(key, value)
-    local incomingCastBarProfile = GetIncomingCastBarProfile()
-    if incomingCastBarProfile then
-        incomingCastBarProfile[key] = value
-    end
+    DB:SetIncomingCastBarValue(key, value)
 end
 
 local function GetIncomingCastBarIconValue(key)
-    local incomingCastBarProfile = GetIncomingCastBarProfile()
-    local iconProfile = incomingCastBarProfile and incomingCastBarProfile.icon
-    if type(iconProfile) ~= "table" then
-        return nil
-    end
-    return iconProfile[key]
+    return DB:GetIncomingCastBarIconValue(key)
 end
 
 local function SetIncomingCastBarIconValue(key, value)
-    local incomingCastBarProfile = GetIncomingCastBarProfile()
-    if not incomingCastBarProfile then
-        return
-    end
-
-    if type(incomingCastBarProfile.icon) ~= "table" then
-        incomingCastBarProfile.icon = {}
-    end
-
-    incomingCastBarProfile.icon[key] = value
+    DB:SetIncomingCastBarIconValue(key, value)
 end
 
 local function CreateIncomingCastsSettings(rootCategory)
@@ -441,12 +136,12 @@ local function CreateIncomingCastsSettings(rootCategory)
     local trackIncomingCastsElement = SettingsLib:CreateCheckbox(incomingCastsCategory, {
         key = "TrackIncomingCasts",
         name = "Track incoming casts",
-        default = FF.DEFAULT_SETTINGS.partyFrame.trackIncomingCasts,
+        default = DB.DEFAULT_SETTINGS.partyFrame.trackIncomingCasts,
         get = function()
-            return FF.db.profile.partyFrame.trackIncomingCasts
+            return PartyFrameProfile().trackIncomingCasts
         end,
         set = function(value)
-            FF.db.profile.partyFrame.trackIncomingCasts = value
+            PartyFrameProfile().trackIncomingCasts = value
             if not value then
                 FF:SetIncomingCastIndicatorPreviewEnabled(false)
             end
@@ -469,11 +164,11 @@ local function CreateIncomingCastsSettings(rootCategory)
         prefix = incomingCastsPrefix,
         parent = trackIncomingCastsElement,
         parentCheck = function()
-            return FF.db.profile.partyFrame.trackIncomingCasts == true
+            return PartyFrameProfile().trackIncomingCasts == true
         end,
     })
 
-    local incomingCastBarDefaults = FF.DEFAULT_SETTINGS.incomingCastBar
+    local incomingCastBarDefaults = DB.DEFAULT_SETTINGS.incomingCastBar
     local incomingCastBarIconDefaults = incomingCastBarDefaults.icon or {}
 
     SettingsLib:CreateDropdown(incomingCastsCategory, {
@@ -820,10 +515,10 @@ function FF:SetupOptions()
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "ShowInSolo",
         name = "Show in Solo",
-        default = FF.DEFAULT_SETTINGS.partyFrame.showInSolo,
-        get = function() return FF.db.profile.partyFrame.showInSolo end,
+        default = DB.DEFAULT_SETTINGS.partyFrame.showInSolo,
+        get = function() return PartyFrameProfile().showInSolo end,
         set = function(value)
-            FF.db.profile.partyFrame.showInSolo = value
+            PartyFrameProfile().showInSolo = value
             FF:ShowPartyFrameIfNeeded()
         end,
         desc = "Toggle the frame visibility when solo.",
@@ -833,12 +528,12 @@ function FF:SetupOptions()
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "ShowTitle",
         name = "Show Title",
-        default = FF.DEFAULT_SETTINGS.partyFrame.showTitle,
+        default = DB.DEFAULT_SETTINGS.partyFrame.showTitle,
         get = function() 
-            return FF.db.profile.partyFrame.showTitle 
+            return PartyFrameProfile().showTitle 
         end,
         set = function(value)
-            FF.db.profile.partyFrame.showTitle = value
+            PartyFrameProfile().showTitle = value
             FF:ShowPartyFrameTitleIfNeeded()
         end,
         desc = "Toggle the title visibility on the frame.",
@@ -848,7 +543,7 @@ function FF:SetupOptions()
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "UseClassColors",
         name = "Use Class Colors",
-        default = FF.DEFAULT_SETTINGS.partyFrame.useClassColors,
+        default = DB.DEFAULT_SETTINGS.partyFrame.useClassColors,
         get = function() 
             return BlizzardSettings:GetClassColorSetting()
         end,
@@ -862,10 +557,10 @@ function FF:SetupOptions()
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "AllowAnyAnchoring",
         name = "Allow Any Anchoring",
-        default = FF.DEFAULT_SETTINGS.partyFrame.allowAnyAnchoring,
-        get = function() return FF.db.profile.partyFrame.allowAnyAnchoring end,
+        default = DB.DEFAULT_SETTINGS.partyFrame.allowAnyAnchoring,
+        get = function() return PartyFrameProfile().allowAnyAnchoring end,
         set = function(value)
-            FF.db.profile.partyFrame.allowAnyAnchoring = value
+            PartyFrameProfile().allowAnyAnchoring = value
             FF:SetAllowAnyAnchoring()
         end,
         desc = "By default, Blizzard's party frames will convert anchoring to top-left. This results in always top-left alignment of frames. Enabling this will allow you to use other anchor points such as center, bottom or right. You will need to re-anchor the party frames after changing this setting.",
@@ -900,13 +595,13 @@ function FF:SetupOptions()
         end,
         order = textureOrder,
         get = function()
-            return FF.db.profile.partyFrame.healthBarTexture or FF.DEFAULT_TEXTURE
+            return PartyFrameProfile().healthBarTexture or FF.DEFAULT_TEXTURE
         end,
         set = function(value)
             if value == FF.DEFAULT_TEXTURE then
-                FF.db.profile.partyFrame.healthBarTexture = nil
+                PartyFrameProfile().healthBarTexture = nil
             else
-                FF.db.profile.partyFrame.healthBarTexture = value
+                PartyFrameProfile().healthBarTexture = value
             end
 
             FF:UpdateFrames()
@@ -928,18 +623,18 @@ function FF:SetupOptions()
     SettingsLib:CreateDropdown(rootCategory, {
         key = "StatusTextAnchorTarget",
         name = "Anchor to",
-        default = FF.DEFAULT_SETTINGS.partyFrame.statusTextAnchorTarget,
-        values = FF.STATUS_TEXT_ANCHOR_TARGETS,
+        default = DB.DEFAULT_SETTINGS.partyFrame.statusTextAnchorTarget,
+        values = STATUS_TEXT_ANCHOR_TARGETS,
         get = function()
             return SanitizeIncomingCastAnchorFrame(
-                FF.db.profile.partyFrame.statusTextAnchorTarget,
-                FF.DEFAULT_SETTINGS.partyFrame.statusTextAnchorTarget
+                PartyFrameProfile().statusTextAnchorTarget,
+                DB.DEFAULT_SETTINGS.partyFrame.statusTextAnchorTarget
             )
         end,
         set = function(value)
-            FF.db.profile.partyFrame.statusTextAnchorTarget = SanitizeIncomingCastAnchorFrame(
+            PartyFrameProfile().statusTextAnchorTarget = SanitizeIncomingCastAnchorFrame(
                 value,
-                FF.DEFAULT_SETTINGS.partyFrame.statusTextAnchorTarget
+                DB.DEFAULT_SETTINGS.partyFrame.statusTextAnchorTarget
             )
             FF:UpdateStatusTextAnchoring()
             FF:RequestStatusTextSettingsRefresh()
@@ -951,18 +646,18 @@ function FF:SetupOptions()
     SettingsLib:CreateDropdown(rootCategory, {
         key = "StatusTextAnchorPoint",
         name = "Status text anchor",
-        default = FF.DEFAULT_SETTINGS.partyFrame.statusTextAnchorPoint,
-        values = FF.STATUS_TEXT_ANCHOR_POINTS,
+        default = DB.DEFAULT_SETTINGS.partyFrame.statusTextAnchorPoint,
+        values = STATUS_TEXT_ANCHOR_POINTS,
         get = function()
             return SanitizeStatusTextAnchorPoint(
-                FF.db.profile.partyFrame.statusTextAnchorPoint,
-                FF.DEFAULT_SETTINGS.partyFrame.statusTextAnchorPoint
+                PartyFrameProfile().statusTextAnchorPoint,
+                DB.DEFAULT_SETTINGS.partyFrame.statusTextAnchorPoint
             )
         end,
         set = function(value)
-            FF.db.profile.partyFrame.statusTextAnchorPoint = SanitizeStatusTextAnchorPoint(
+            PartyFrameProfile().statusTextAnchorPoint = SanitizeStatusTextAnchorPoint(
                 value,
-                FF.DEFAULT_SETTINGS.partyFrame.statusTextAnchorPoint
+                DB.DEFAULT_SETTINGS.partyFrame.statusTextAnchorPoint
             )
             FF:UpdateStatusTextAnchoring()
             FF:RequestStatusTextSettingsRefresh()
@@ -974,7 +669,7 @@ function FF:SetupOptions()
     SettingsLib:CreateSlider(rootCategory, {
         key = "StatusTextOffsetX",
         name = "Status text X offset",
-        default = FF.DEFAULT_SETTINGS.partyFrame.statusTextOffsetX,
+        default = DB.DEFAULT_SETTINGS.partyFrame.statusTextOffsetX,
         min = -40,
         max = 40,
         step = 1,
@@ -982,14 +677,14 @@ function FF:SetupOptions()
             return string.format("%ipx", math.floor((value) + 0.5))
         end,
         get = function()
-            local value = FF.db.profile.partyFrame.statusTextOffsetX
+            local value = PartyFrameProfile().statusTextOffsetX
             if value == nil then
-                value = FF.DEFAULT_SETTINGS.partyFrame.statusTextOffsetX
+                value = DB.DEFAULT_SETTINGS.partyFrame.statusTextOffsetX
             end
             return value
         end,
         set = function(value)
-            FF.db.profile.partyFrame.statusTextOffsetX = math.floor((value) + 0.5)
+            PartyFrameProfile().statusTextOffsetX = math.floor((value) + 0.5)
             FF:UpdateStatusTextAnchoring()
             FF:RequestStatusTextSettingsRefresh()
         end,
@@ -1000,7 +695,7 @@ function FF:SetupOptions()
     SettingsLib:CreateSlider(rootCategory, {
         key = "StatusTextOffsetY",
         name = "Status text Y offset",
-        default = FF.DEFAULT_SETTINGS.partyFrame.statusTextOffsetY,
+        default = DB.DEFAULT_SETTINGS.partyFrame.statusTextOffsetY,
         min = -40,
         max = 40,
         step = 1,
@@ -1008,14 +703,14 @@ function FF:SetupOptions()
             return string.format("%ipx", math.floor((value) + 0.5))
         end,
         get = function()
-            local value = FF.db.profile.partyFrame.statusTextOffsetY
+            local value = PartyFrameProfile().statusTextOffsetY
             if value == nil then
-                value = FF.DEFAULT_SETTINGS.partyFrame.statusTextOffsetY
+                value = DB.DEFAULT_SETTINGS.partyFrame.statusTextOffsetY
             end
             return value
         end,
         set = function(value)
-            FF.db.profile.partyFrame.statusTextOffsetY = math.floor((value) + 0.5)
+            PartyFrameProfile().statusTextOffsetY = math.floor((value) + 0.5)
             FF:UpdateStatusTextAnchoring()
             FF:RequestStatusTextSettingsRefresh()
         end,
@@ -1026,7 +721,7 @@ function FF:SetupOptions()
     SettingsLib:CreateSlider(rootCategory, {
         key = "HealthTextFontSize",
         name = "Status text size",
-        default = FF.DEFAULT_SETTINGS.partyFrame.healthTextFontSize,
+        default = DB.DEFAULT_SETTINGS.partyFrame.healthTextFontSize,
         min = 8,
         max = 32,
         step = 1,
@@ -1034,14 +729,14 @@ function FF:SetupOptions()
             return string.format("%ipt", math.floor((value) + 0.5))
         end,
         get = function()
-            local value = FF.db.profile.partyFrame.healthTextFontSize
+            local value = PartyFrameProfile().healthTextFontSize
             if value == nil then
-                value = FF.DEFAULT_SETTINGS.partyFrame.healthTextFontSize
+                value = DB.DEFAULT_SETTINGS.partyFrame.healthTextFontSize
             end
             return value
         end,
         set = function(value)
-            FF.db.profile.partyFrame.healthTextFontSize = math.floor((value) + 0.5)
+            PartyFrameProfile().healthTextFontSize = math.floor((value) + 0.5)
             FF:UpdateHealthTextFontSize()
             FF:RequestStatusTextSettingsRefresh()
         end,
@@ -1052,7 +747,7 @@ function FF:SetupOptions()
     SettingsLib:CreateSlider(rootCategory, {
         key = "StatusTextOpacity",
         name = "Status text opacity",
-        default = FF.DEFAULT_SETTINGS.partyFrame.statusTextOpacity,
+        default = DB.DEFAULT_SETTINGS.partyFrame.statusTextOpacity,
         min = 0,
         max = 1,
         step = 0.01,
@@ -1060,27 +755,27 @@ function FF:SetupOptions()
             return string.format("%d%%", math.floor((value * 100) + 0.5))
         end,
         get = function()
-            local value = FF.db.profile.partyFrame.statusTextOpacity
+            local value = PartyFrameProfile().statusTextOpacity
             if value == nil then
                 local color = SanitizeStatusTextColor(
-                    FF.db.profile.partyFrame.statusTextColor,
-                    FF.DEFAULT_SETTINGS.partyFrame.statusTextColor
+                    PartyFrameProfile().statusTextColor,
+                    DB.DEFAULT_SETTINGS.partyFrame.statusTextColor
                 )
                 value = color.a
             end
 
-            return SanitizeOpacity(value, FF.DEFAULT_SETTINGS.partyFrame.statusTextOpacity)
+            return SanitizeOpacity(value, DB.DEFAULT_SETTINGS.partyFrame.statusTextOpacity)
         end,
         set = function(value)
-            local opacity = SanitizeOpacity(value, FF.DEFAULT_SETTINGS.partyFrame.statusTextOpacity)
-            FF.db.profile.partyFrame.statusTextOpacity = opacity
+            local opacity = SanitizeOpacity(value, DB.DEFAULT_SETTINGS.partyFrame.statusTextOpacity)
+            PartyFrameProfile().statusTextOpacity = opacity
 
             local color = SanitizeStatusTextColor(
-                FF.db.profile.partyFrame.statusTextColor,
-                FF.DEFAULT_SETTINGS.partyFrame.statusTextColor
+                PartyFrameProfile().statusTextColor,
+                DB.DEFAULT_SETTINGS.partyFrame.statusTextColor
             )
             color.a = opacity
-            FF.db.profile.partyFrame.statusTextColor = color
+            PartyFrameProfile().statusTextColor = color
 
             FF:UpdateStatusTextColor()
             FF:RequestStatusTextSettingsRefresh()
@@ -1092,12 +787,12 @@ function FF:SetupOptions()
     local statusTextUseClassColorsElement = SettingsLib:CreateCheckbox(rootCategory, {
         key = "StatusTextUseClassColors",
         name = "Use class colors",
-        default = FF.DEFAULT_SETTINGS.partyFrame.statusTextUseClassColors,
+        default = DB.DEFAULT_SETTINGS.partyFrame.statusTextUseClassColors,
         get = function()
-            return FF.db.profile.partyFrame.statusTextUseClassColors == true
+            return PartyFrameProfile().statusTextUseClassColors == true
         end,
         set = function(value)
-            FF.db.profile.partyFrame.statusTextUseClassColors = (value == true)
+            PartyFrameProfile().statusTextUseClassColors = (value == true)
             FF:UpdateStatusTextColor()
             FF:RequestStatusTextSettingsRefresh()
         end,
@@ -1112,42 +807,42 @@ function FF:SetupOptions()
         },
         getColor = function()
             local color = SanitizeStatusTextColor(
-                FF.db.profile.partyFrame.statusTextColor,
-                FF.DEFAULT_SETTINGS.partyFrame.statusTextColor
+                PartyFrameProfile().statusTextColor,
+                DB.DEFAULT_SETTINGS.partyFrame.statusTextColor
             )
             return color.r, color.g, color.b
         end,
         setColor = function(_, r, g, b)
             local currentColor = SanitizeStatusTextColor(
-                FF.db.profile.partyFrame.statusTextColor,
-                FF.DEFAULT_SETTINGS.partyFrame.statusTextColor
+                PartyFrameProfile().statusTextColor,
+                DB.DEFAULT_SETTINGS.partyFrame.statusTextColor
             )
             local opacity = SanitizeOpacity(
-                FF.db.profile.partyFrame.statusTextOpacity,
+                PartyFrameProfile().statusTextOpacity,
                 currentColor.a
             )
-            FF.db.profile.partyFrame.statusTextColor = SanitizeStatusTextColor(
+            PartyFrameProfile().statusTextColor = SanitizeStatusTextColor(
                 { r = r, g = g, b = b, a = opacity },
-                FF.DEFAULT_SETTINGS.partyFrame.statusTextColor
+                DB.DEFAULT_SETTINGS.partyFrame.statusTextColor
             )
-            FF.db.profile.partyFrame.statusTextOpacity = opacity
+            PartyFrameProfile().statusTextOpacity = opacity
             FF:UpdateStatusTextColor()
             FF:RequestStatusTextSettingsRefresh()
         end,
         getDefaultColor = function()
             local color = SanitizeStatusTextColor(
-                FF.DEFAULT_SETTINGS.partyFrame.statusTextColor,
+                DB.DEFAULT_SETTINGS.partyFrame.statusTextColor,
                 { r = 1, g = 1, b = 1, a = 1 }
             )
             return color.r, color.g, color.b
         end,
         hasOpacity = false,
         isEnabled = function()
-            return FF.db.profile.partyFrame.statusTextUseClassColors ~= true
+            return PartyFrameProfile().statusTextUseClassColors ~= true
         end,
         parent = statusTextUseClassColorsElement,
         parentCheck = function()
-            return FF.db.profile.partyFrame.statusTextUseClassColors ~= true
+            return PartyFrameProfile().statusTextUseClassColors ~= true
         end,
         minHeight = 36,
     })
@@ -1159,18 +854,18 @@ function FF:SetupOptions()
     SettingsLib:CreateDropdown(rootCategory, {
         key = "PlayerNameAnchorTarget",
         name = "Anchor to",
-        default = FF.DEFAULT_SETTINGS.partyFrame.playerNameAnchorTarget,
-        values = FF.STATUS_TEXT_ANCHOR_TARGETS,
+        default = DB.DEFAULT_SETTINGS.partyFrame.playerNameAnchorTarget,
+        values = STATUS_TEXT_ANCHOR_TARGETS,
         get = function()
             return SanitizeIncomingCastAnchorFrame(
-                FF.db.profile.partyFrame.playerNameAnchorTarget,
-                FF.DEFAULT_SETTINGS.partyFrame.playerNameAnchorTarget
+                PartyFrameProfile().playerNameAnchorTarget,
+                DB.DEFAULT_SETTINGS.partyFrame.playerNameAnchorTarget
             )
         end,
         set = function(value)
-            FF.db.profile.partyFrame.playerNameAnchorTarget = SanitizeIncomingCastAnchorFrame(
+            PartyFrameProfile().playerNameAnchorTarget = SanitizeIncomingCastAnchorFrame(
                 value,
-                FF.DEFAULT_SETTINGS.partyFrame.playerNameAnchorTarget
+                DB.DEFAULT_SETTINGS.partyFrame.playerNameAnchorTarget
             )
             FF:UpdatePlayerNameAnchoring()
         end,
@@ -1181,18 +876,18 @@ function FF:SetupOptions()
     SettingsLib:CreateDropdown(rootCategory, {
         key = "PlayerNameAnchorPoint",
         name = "Player name anchor",
-        default = FF.DEFAULT_SETTINGS.partyFrame.playerNameAnchorPoint,
-        values = FF.STATUS_TEXT_ANCHOR_POINTS,
+        default = DB.DEFAULT_SETTINGS.partyFrame.playerNameAnchorPoint,
+        values = STATUS_TEXT_ANCHOR_POINTS,
         get = function()
             return SanitizeStatusTextAnchorPoint(
-                FF.db.profile.partyFrame.playerNameAnchorPoint,
-                FF.DEFAULT_SETTINGS.partyFrame.playerNameAnchorPoint
+                PartyFrameProfile().playerNameAnchorPoint,
+                DB.DEFAULT_SETTINGS.partyFrame.playerNameAnchorPoint
             )
         end,
         set = function(value)
-            FF.db.profile.partyFrame.playerNameAnchorPoint = SanitizeStatusTextAnchorPoint(
+            PartyFrameProfile().playerNameAnchorPoint = SanitizeStatusTextAnchorPoint(
                 value,
-                FF.DEFAULT_SETTINGS.partyFrame.playerNameAnchorPoint
+                DB.DEFAULT_SETTINGS.partyFrame.playerNameAnchorPoint
             )
             FF:UpdatePlayerNameAnchoring()
         end,
@@ -1203,7 +898,7 @@ function FF:SetupOptions()
     SettingsLib:CreateSlider(rootCategory, {
         key = "PlayerNameOffsetX",
         name = "Player name X offset",
-        default = FF.DEFAULT_SETTINGS.partyFrame.playerNameOffsetX,
+        default = DB.DEFAULT_SETTINGS.partyFrame.playerNameOffsetX,
         min = -40,
         max = 40,
         step = 1,
@@ -1211,14 +906,14 @@ function FF:SetupOptions()
             return string.format("%ipx", math.floor((value) + 0.5))
         end,
         get = function()
-            local value = FF.db.profile.partyFrame.playerNameOffsetX
+            local value = PartyFrameProfile().playerNameOffsetX
             if value == nil then
-                value = FF.DEFAULT_SETTINGS.partyFrame.playerNameOffsetX
+                value = DB.DEFAULT_SETTINGS.partyFrame.playerNameOffsetX
             end
             return value
         end,
         set = function(value)
-            FF.db.profile.partyFrame.playerNameOffsetX = math.floor((value) + 0.5)
+            PartyFrameProfile().playerNameOffsetX = math.floor((value) + 0.5)
             FF:UpdatePlayerNameAnchoring()
         end,
         desc = "Horizontal offset for player name anchoring.",
@@ -1228,7 +923,7 @@ function FF:SetupOptions()
     SettingsLib:CreateSlider(rootCategory, {
         key = "PlayerNameOffsetY",
         name = "Player name Y offset",
-        default = FF.DEFAULT_SETTINGS.partyFrame.playerNameOffsetY,
+        default = DB.DEFAULT_SETTINGS.partyFrame.playerNameOffsetY,
         min = -40,
         max = 40,
         step = 1,
@@ -1236,14 +931,14 @@ function FF:SetupOptions()
             return string.format("%ipx", math.floor((value) + 0.5))
         end,
         get = function()
-            local value = FF.db.profile.partyFrame.playerNameOffsetY
+            local value = PartyFrameProfile().playerNameOffsetY
             if value == nil then
-                value = FF.DEFAULT_SETTINGS.partyFrame.playerNameOffsetY
+                value = DB.DEFAULT_SETTINGS.partyFrame.playerNameOffsetY
             end
             return value
         end,
         set = function(value)
-            FF.db.profile.partyFrame.playerNameOffsetY = math.floor((value) + 0.5)
+            PartyFrameProfile().playerNameOffsetY = math.floor((value) + 0.5)
             FF:UpdatePlayerNameAnchoring()
         end,
         desc = "Vertical offset for player name anchoring.",
@@ -1253,7 +948,7 @@ function FF:SetupOptions()
     SettingsLib:CreateSlider(rootCategory, {
         key = "PlayerNameFontSize",
         name = "Player name size",
-        default = FF.DEFAULT_SETTINGS.partyFrame.playerNameFontSize,
+        default = DB.DEFAULT_SETTINGS.partyFrame.playerNameFontSize,
         min = 8,
         max = 32,
         step = 1,
@@ -1261,14 +956,14 @@ function FF:SetupOptions()
             return string.format("%ipt", math.floor((value) + 0.5))
         end,
         get = function()
-            local value = FF.db.profile.partyFrame.playerNameFontSize
+            local value = PartyFrameProfile().playerNameFontSize
             if value == nil then
-                value = FF.DEFAULT_SETTINGS.partyFrame.playerNameFontSize
+                value = DB.DEFAULT_SETTINGS.partyFrame.playerNameFontSize
             end
             return value
         end,
         set = function(value)
-            FF.db.profile.partyFrame.playerNameFontSize = math.floor((value) + 0.5)
+            PartyFrameProfile().playerNameFontSize = math.floor((value) + 0.5)
             FF:UpdatePlayerNameFontSize()
         end,
         desc = "Adjust the player name text size on party frames.",
@@ -1278,7 +973,7 @@ function FF:SetupOptions()
     SettingsLib:CreateSlider(rootCategory, {
         key = "PlayerNameOpacity",
         name = "Player name opacity",
-        default = FF.DEFAULT_SETTINGS.partyFrame.playerNameOpacity,
+        default = DB.DEFAULT_SETTINGS.partyFrame.playerNameOpacity,
         min = 0,
         max = 1,
         step = 0.01,
@@ -1286,27 +981,27 @@ function FF:SetupOptions()
             return string.format("%d%%", math.floor((value * 100) + 0.5))
         end,
         get = function()
-            local value = FF.db.profile.partyFrame.playerNameOpacity
+            local value = PartyFrameProfile().playerNameOpacity
             if value == nil then
                 local color = SanitizeStatusTextColor(
-                    FF.db.profile.partyFrame.playerNameColor,
-                    FF.DEFAULT_SETTINGS.partyFrame.playerNameColor
+                    PartyFrameProfile().playerNameColor,
+                    DB.DEFAULT_SETTINGS.partyFrame.playerNameColor
                 )
                 value = color.a
             end
 
-            return SanitizeOpacity(value, FF.DEFAULT_SETTINGS.partyFrame.playerNameOpacity)
+            return SanitizeOpacity(value, DB.DEFAULT_SETTINGS.partyFrame.playerNameOpacity)
         end,
         set = function(value)
-            local opacity = SanitizeOpacity(value, FF.DEFAULT_SETTINGS.partyFrame.playerNameOpacity)
-            FF.db.profile.partyFrame.playerNameOpacity = opacity
+            local opacity = SanitizeOpacity(value, DB.DEFAULT_SETTINGS.partyFrame.playerNameOpacity)
+            PartyFrameProfile().playerNameOpacity = opacity
 
             local color = SanitizeStatusTextColor(
-                FF.db.profile.partyFrame.playerNameColor,
-                FF.DEFAULT_SETTINGS.partyFrame.playerNameColor
+                PartyFrameProfile().playerNameColor,
+                DB.DEFAULT_SETTINGS.partyFrame.playerNameColor
             )
             color.a = opacity
-            FF.db.profile.partyFrame.playerNameColor = color
+            PartyFrameProfile().playerNameColor = color
 
             FF:UpdatePlayerNameColor()
         end,
@@ -1317,12 +1012,12 @@ function FF:SetupOptions()
     local playerNameUseClassColorsElement = SettingsLib:CreateCheckbox(rootCategory, {
         key = "PlayerNameUseClassColors",
         name = "Use class colors",
-        default = FF.DEFAULT_SETTINGS.partyFrame.playerNameUseClassColors,
+        default = DB.DEFAULT_SETTINGS.partyFrame.playerNameUseClassColors,
         get = function()
-            return FF.db.profile.partyFrame.playerNameUseClassColors == true
+            return PartyFrameProfile().playerNameUseClassColors == true
         end,
         set = function(value)
-            FF.db.profile.partyFrame.playerNameUseClassColors = (value == true)
+            PartyFrameProfile().playerNameUseClassColors = (value == true)
             FF:UpdatePlayerNameColor()
         end,
         desc = "Use class colors for player name instead of the configured static text color.",
@@ -1336,41 +1031,41 @@ function FF:SetupOptions()
         },
         getColor = function()
             local color = SanitizeStatusTextColor(
-                FF.db.profile.partyFrame.playerNameColor,
-                FF.DEFAULT_SETTINGS.partyFrame.playerNameColor
+                PartyFrameProfile().playerNameColor,
+                DB.DEFAULT_SETTINGS.partyFrame.playerNameColor
             )
             return color.r, color.g, color.b
         end,
         setColor = function(_, r, g, b)
             local currentColor = SanitizeStatusTextColor(
-                FF.db.profile.partyFrame.playerNameColor,
-                FF.DEFAULT_SETTINGS.partyFrame.playerNameColor
+                PartyFrameProfile().playerNameColor,
+                DB.DEFAULT_SETTINGS.partyFrame.playerNameColor
             )
             local opacity = SanitizeOpacity(
-                FF.db.profile.partyFrame.playerNameOpacity,
+                PartyFrameProfile().playerNameOpacity,
                 currentColor.a
             )
-            FF.db.profile.partyFrame.playerNameColor = SanitizeStatusTextColor(
+            PartyFrameProfile().playerNameColor = SanitizeStatusTextColor(
                 { r = r, g = g, b = b, a = opacity },
-                FF.DEFAULT_SETTINGS.partyFrame.playerNameColor
+                DB.DEFAULT_SETTINGS.partyFrame.playerNameColor
             )
-            FF.db.profile.partyFrame.playerNameOpacity = opacity
+            PartyFrameProfile().playerNameOpacity = opacity
             FF:UpdatePlayerNameColor()
         end,
         getDefaultColor = function()
             local color = SanitizeStatusTextColor(
-                FF.DEFAULT_SETTINGS.partyFrame.playerNameColor,
+                DB.DEFAULT_SETTINGS.partyFrame.playerNameColor,
                 { r = 1, g = 1, b = 1, a = 1 }
             )
             return color.r, color.g, color.b
         end,
         hasOpacity = false,
         isEnabled = function()
-            return FF.db.profile.partyFrame.playerNameUseClassColors ~= true
+            return PartyFrameProfile().playerNameUseClassColors ~= true
         end,
         parent = playerNameUseClassColorsElement,
         parentCheck = function()
-            return FF.db.profile.partyFrame.playerNameUseClassColors ~= true
+            return PartyFrameProfile().playerNameUseClassColors ~= true
         end,
         minHeight = 36,
     })
@@ -1382,10 +1077,10 @@ function FF:SetupOptions()
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "ShowTankRoleIcon",
         name = "Show Tank Role Icon",
-        default = FF.DEFAULT_SETTINGS.partyFrame.showTankRoleIcon,
-        get = function() return FF.db.profile.partyFrame.showTankRoleIcon end,
+        default = DB.DEFAULT_SETTINGS.partyFrame.showTankRoleIcon,
+        get = function() return PartyFrameProfile().showTankRoleIcon end,
         set = function(value) 
-            FF.db.profile.partyFrame.showTankRoleIcon = value
+            PartyFrameProfile().showTankRoleIcon = value
             FF:UpdateFrames()
         end,
         desc = "Toggle the Tank role icon visibility on the frame.",
@@ -1395,10 +1090,10 @@ function FF:SetupOptions()
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "ShowHealerRoleIcon",
         name = "Show Healer Role Icon",
-        default = FF.DEFAULT_SETTINGS.partyFrame.showHealerRoleIcon,
-        get = function() return FF.db.profile.partyFrame.showHealerRoleIcon end,
+        default = DB.DEFAULT_SETTINGS.partyFrame.showHealerRoleIcon,
+        get = function() return PartyFrameProfile().showHealerRoleIcon end,
         set = function(value) 
-            FF.db.profile.partyFrame.showHealerRoleIcon = value
+            PartyFrameProfile().showHealerRoleIcon = value
             FF:UpdateFrames()
         end,
         desc = "Toggle the Healer role icon visibility on the frame.",
@@ -1408,10 +1103,10 @@ function FF:SetupOptions()
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "ShowDPSRoleIcon",
         name = "Show DPS Role Icon",
-        default = FF.DEFAULT_SETTINGS.partyFrame.showDPSRoleIcon,
-        get = function() return FF.db.profile.partyFrame.showDPSRoleIcon end,
+        default = DB.DEFAULT_SETTINGS.partyFrame.showDPSRoleIcon,
+        get = function() return PartyFrameProfile().showDPSRoleIcon end,
         set = function(value)
-            FF.db.profile.partyFrame.showDPSRoleIcon = value
+            PartyFrameProfile().showDPSRoleIcon = value
             FF:UpdateFrames()
         end,
         desc = "Toggle the DPS role icon visibility on the frame.",
@@ -1425,10 +1120,10 @@ function FF:SetupOptions()
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "ShowBuffCountdown",
         name = "Show Buff Countdown",
-        default = FF.DEFAULT_SETTINGS.partyFrame.showBuffCountdown,
-        get = function() return FF.db.profile.partyFrame.showBuffCountdown end,
+        default = DB.DEFAULT_SETTINGS.partyFrame.showBuffCountdown,
+        get = function() return PartyFrameProfile().showBuffCountdown end,
         set = function(value)
-            FF.db.profile.partyFrame.showBuffCountdown = value
+            PartyFrameProfile().showBuffCountdown = value
             self:ShowBuffCountdownIfNeeded()
         end,
         desc = "Toggle the buff countdown visibility on the frame.",
@@ -1438,10 +1133,10 @@ function FF:SetupOptions()
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "ShowDebuffCountdown",
         name = "Show Debuff Countdown",
-        default = FF.DEFAULT_SETTINGS.partyFrame.showDebuffCountdown,
-        get = function() return FF.db.profile.partyFrame.showDebuffCountdown end,
+        default = DB.DEFAULT_SETTINGS.partyFrame.showDebuffCountdown,
+        get = function() return PartyFrameProfile().showDebuffCountdown end,
         set = function(value)
-            FF.db.profile.partyFrame.showDebuffCountdown = value
+            PartyFrameProfile().showDebuffCountdown = value
             self:ShowDebuffCountdownIfNeeded()
         end,
         desc = "Toggle the debuff countdown visibility on the frame.",
@@ -1451,7 +1146,7 @@ function FF:SetupOptions()
     SettingsLib:CreateSlider(rootCategory, {
         key = "CountdownFontSize",
         name = "Countdown Text Size",
-        default = FF.DEFAULT_SETTINGS.partyFrame.countdownFontSize,
+        default = DB.DEFAULT_SETTINGS.partyFrame.countdownFontSize,
         min = 8,
         max = 32,
         step = 1,
@@ -1459,14 +1154,14 @@ function FF:SetupOptions()
             return string.format("%ipt", math.floor((value) + 0.5))
         end,
         get = function()
-            local value = FF.db.profile.partyFrame.countdownFontSize
+            local value = PartyFrameProfile().countdownFontSize
             if value == nil then
-                value = FF.DEFAULT_SETTINGS.partyFrame.countdownFontSize
+                value = DB.DEFAULT_SETTINGS.partyFrame.countdownFontSize
             end
             return value
         end,
         set = function(value)
-            FF.db.profile.partyFrame.countdownFontSize = math.floor((value) + 0.5)
+            PartyFrameProfile().countdownFontSize = math.floor((value) + 0.5)
             self:UpdateAuraCountdownFontSize()
         end,
         desc = "Adjust the buff/debuff countdown text size on party frames.",
@@ -1480,13 +1175,13 @@ function FF:SetupOptions()
     SettingsLib:CreateDropdown(rootCategory, {
         key = "ShowPlayerFrame",
         name = "Show Player Frame",
-        default = FF.DEFAULT_SETTINGS.playerFrame.showType,
-        values = FF.PLAYER_FRAME_SHOW_TYPES,
+        default = DB.DEFAULT_SETTINGS.playerFrame.showType,
+        values = DB.PLAYER_FRAME_SHOW_TYPES,
         get = function()
-            return FF.db.profile.playerFrame.showType or FF.DEFAULT_SETTINGS.playerFrame.showType
+            return PlayerFrameProfile().showType or DB.DEFAULT_SETTINGS.playerFrame.showType
         end,
         set = function(value)
-            FF.db.profile.playerFrame.showType = value
+            PlayerFrameProfile().showType = value
             self:ShowPlayerFrameIfNeeded()
         end,
         desc = "Control the visibility of the player frame. 'Always' will show the player frame regardless of group status. 'Solo' will only show the player frame when not in a party or raid. 'Never' will hide the player frame regardless of group status.",

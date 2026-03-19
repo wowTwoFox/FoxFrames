@@ -2,6 +2,7 @@ local addonName, addon = ...
 
 local FF = FoxFrames
 local Utils = addon.Utils
+local DB = addon.DB
 
 -- PartyFrame layout updates can end up triggering Blizzard's GridLayout/Layouts while
 -- some values are "secret" (e.g. during combat / edit mode) which then throws inside
@@ -131,15 +132,8 @@ function FF:OnInitialize()
     self:RegisterEvent("ADDON_ACTION_BLOCKED")
     self:RegisterEvent("ADDON_ACTION_FORBIDDEN")
 
-    local defaults = {
-        profile = FF.DEFAULT_SETTINGS or {},
-    }
-
-    self.db = LibStub("AceDB-3.0"):New("FoxFramesDB", defaults, true)
-
-    if self.MigrateAndSanitizeDB then
-        self:MigrateAndSanitizeDB()
-    end
+    DB:InitializeDB()
+    self.DEFAULT_SETTINGS = DB.DEFAULT_SETTINGS
 
     -- Register Custom Textures with LSM if available
     RegisterLSMTextures()
@@ -194,7 +188,7 @@ function FF:OnInitialize()
         end)
     end
 
-    Utils:Log("CompactPartyFrame", CompactPartyFrame)
+    -- Utils:Log("CompactPartyFrame", CompactPartyFrame)
     -- Utils:Log("EditModeManagerFrame", EditModeManagerFrame)
     -- Utils:Log("PartyFrame", PartyFrame)
     -- Utils:Log("Player Frame", PlayerFrame)

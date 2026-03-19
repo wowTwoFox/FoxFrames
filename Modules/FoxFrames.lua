@@ -4,6 +4,7 @@ FoxFrames = LibStub("AceAddon-3.0"):NewAddon("FoxFrames", "AceConsole-3.0", "Ace
 local FF = FoxFrames
 local Utils = addon.Utils
 local Blizzard = addon.Blizzard
+local DB = addon.DB
 
 function FF:InAllowedGroup()
     if Blizzard:InRaidGroup() then return true end
@@ -24,19 +25,21 @@ end
 
 function FF:SetAllowAnyAnchoring()
     if not PartyFrame then return end
-    PartyFrame.alwaysUseTopLeftAnchor = not self.db.profile.partyFrame.allowAnyAnchoring
+    PartyFrame.alwaysUseTopLeftAnchor = not DB:GetAllowAnyAnchoring()
 end
 
 function FF:ShowPartyFrameIfNeeded()
     if not Blizzard:InSoloMode() then return end
     if not CompactPartyFrame then return end
-    CompactPartyFrame:SetShown(self.db.profile.partyFrame.showInSolo)
+    CompactPartyFrame:SetShown(DB:GetShowInSolo())
 end
 
 function FF:ShowPlayerFrameIfNeeded()
-    if self.db.profile.playerFrame.showType == FF.PLAYER_FRAME_SHOW_TYPES.Solo then
+    local showType = DB:GetPlayerFrameShowType()
+
+    if showType == DB.PLAYER_FRAME_SHOW_TYPES.Solo then
         PlayerFrame:SetShown(Blizzard:InSoloMode())
-    elseif self.db.profile.playerFrame.showType == FF.PLAYER_FRAME_SHOW_TYPES.Never then
+    elseif showType == DB.PLAYER_FRAME_SHOW_TYPES.Never then
         PlayerFrame:SetShown(false)
     else
         PlayerFrame:SetShown(true)
@@ -45,15 +48,7 @@ end
 
 function FF:ShowPartyFrameTitleIfNeeded()
     if not CompactPartyFrame then return end
-    CompactPartyFrame.title:SetShown(self.db.profile.partyFrame.showTitle)
-end
-
-function FF:GetAuraCountdownFontSize()
-    local defaultSize = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.countdownFontSize) or 12
-    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
-    local size = Utils:ClampNumber(profile and profile.countdownFontSize, 8, 32, defaultSize)
-
-    return math.floor(size + 0.5)
+    CompactPartyFrame.title:SetShown(DB:GetShowPartyFrameTitle())
 end
 
 function FF:ApplyAuraCountdownFontSizeToCooldown(cooldown)
@@ -68,7 +63,8 @@ function FF:ApplyAuraCountdownFontSizeToCooldown(cooldown)
         return
     end
 
-    pcall(fontString.SetFont, fontString, fontFile, self:GetAuraCountdownFontSize(), flags)
+    local fontSize = DB:GetAuraCountdownFontSize()
+    pcall(fontString.SetFont, fontString, fontFile, fontSize, flags)
 end
 
 function FF:ApplyAuraCountdownFontSizeForFrame(frame)
@@ -101,57 +97,6 @@ function FF:UpdateAuraCountdownFontSize()
     end
 end
 
-local statusTextAnchorPoints = {
-    TOPLEFT = true,
-    TOP = true,
-    TOPRIGHT = true,
-    LEFT = true,
-    CENTER = true,
-    RIGHT = true,
-    BOTTOMLEFT = true,
-    BOTTOM = true,
-    BOTTOMRIGHT = true,
-}
-
-local statusTextAnchorTargets = {
-    FRAME = true,
-    HEALTHBAR = true,
-}
-
-function FF:GetStatusTextAnchorTarget()
-    local defaultTarget = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.statusTextAnchorTarget) or "FRAME"
-    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
-    local target = profile and profile.statusTextAnchorTarget
-
-    if statusTextAnchorTargets[target] then
-        return target
-    end
-
-    return defaultTarget
-end
-
-function FF:GetStatusTextAnchorPoint()
-    local defaultPoint = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.statusTextAnchorPoint) or "CENTER"
-    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
-    local point = profile and profile.statusTextAnchorPoint
-
-    if statusTextAnchorPoints[point] then
-        return point
-    end
-
-    return defaultPoint
-end
-
-function FF:GetStatusTextAnchorOffsets()
-    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame) or {}
-    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
-
-    local offsetX = Utils:ClampNumber(profile and profile.statusTextOffsetX, -100, 100, defaults.statusTextOffsetX or 0)
-    local offsetY = Utils:ClampNumber(profile and profile.statusTextOffsetY, -100, 100, defaults.statusTextOffsetY or 0)
-
-    return math.floor(offsetX + 0.5), math.floor(offsetY + 0.5)
-end
-
 function FF:IsManagedPartyFrame(frame)
     return Blizzard:IsManagedPartyFrame(frame)
 end
@@ -166,13 +111,13 @@ function FF:ApplyStatusTextAnchorForFrame(frame)
         return
     end
 
-    local point = self:GetStatusTextAnchorPoint()
-    local target = self:GetStatusTextAnchorTarget()
+    local point = DB:GetStatusTextAnchorPoint()
+    local target = DB:GetStatusTextAnchorTarget()
     local relativeTo = frame
     if target == "HEALTHBAR" and frame.healthBar then
         relativeTo = frame.healthBar
     end
-    local offsetX, offsetY = self:GetStatusTextAnchorOffsets()
+    local offsetX, offsetY = DB:GetStatusTextAnchorOffsets()
 
     local xOffset = offsetX
     local yOffset = offsetY
@@ -195,34 +140,6 @@ function FF:UpdateStatusTextAnchoring()
     end
 end
 
-function FF:GetStatusTextColor()
-    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame) or {}
-    local defaultColor = defaults.statusTextColor or { r = 1, g = 1, b = 1, a = 1 }
-    local defaultOpacity = Utils:ClampNumber(defaults.statusTextOpacity, 0, 1, defaultColor.a or 1)
-    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
-    local color = profile and profile.statusTextColor
-
-    local r = Utils:ClampNumber(color and color.r, 0, 1, defaultColor.r or 1)
-    local g = Utils:ClampNumber(color and color.g, 0, 1, defaultColor.g or 1)
-    local b = Utils:ClampNumber(color and color.b, 0, 1, defaultColor.b or 1)
-    local colorOpacity = Utils:ClampNumber(color and color.a, 0, 1, defaultOpacity)
-    local a = Utils:ClampNumber(profile and profile.statusTextOpacity, 0, 1, colorOpacity)
-
-    return r, g, b, a
-end
-
-function FF:GetStatusTextUseClassColors()
-    local defaultEnabled = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.statusTextUseClassColors) == true
-    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
-    local enabled = profile and profile.statusTextUseClassColors
-
-    if enabled == nil then
-        return defaultEnabled
-    end
-
-    return enabled == true
-end
-
 function FF:ApplyStatusTextColorForFrame(frame)
     if not self:IsManagedPartyFrame(frame) then
         return
@@ -234,16 +151,16 @@ function FF:ApplyStatusTextColorForFrame(frame)
         return
     end
 
-    if self:GetStatusTextUseClassColors() then
+    if DB:GetStatusTextUseClassColors() then
         local classR, classG, classB = Blizzard:GetClassColorForUnit(frame and frame.unit)
         if classR and classG and classB then
-            local _, _, _, alpha = self:GetStatusTextColor()
+            local _, _, _, alpha = DB:GetStatusTextColor()
             pcall(statusText.SetTextColor, statusText, classR, classG, classB, alpha)
             return
         end
     end
 
-    local r, g, b, a = self:GetStatusTextColor()
+    local r, g, b, a = DB:GetStatusTextColor()
     pcall(statusText.SetTextColor, statusText, r, g, b, a)
 end
 
@@ -289,40 +206,6 @@ function FF:RequestStatusTextSettingsRefresh()
     end
 end
 
-function FF:GetPlayerNameAnchorTarget()
-    local defaultTarget = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerNameAnchorTarget) or "FRAME"
-    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
-    local target = profile and profile.playerNameAnchorTarget
-
-    if statusTextAnchorTargets[target] then
-        return target
-    end
-
-    return defaultTarget
-end
-
-function FF:GetPlayerNameAnchorPoint()
-    local defaultPoint = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerNameAnchorPoint) or "TOPLEFT"
-    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
-    local point = profile and profile.playerNameAnchorPoint
-
-    if statusTextAnchorPoints[point] then
-        return point
-    end
-
-    return defaultPoint
-end
-
-function FF:GetPlayerNameAnchorOffsets()
-    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame) or {}
-    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
-
-    local offsetX = Utils:ClampNumber(profile and profile.playerNameOffsetX, -100, 100, defaults.playerNameOffsetX or 0)
-    local offsetY = Utils:ClampNumber(profile and profile.playerNameOffsetY, -100, 100, defaults.playerNameOffsetY or 0)
-
-    return math.floor(offsetX + 0.5), math.floor(offsetY + 0.5)
-end
-
 function FF:GetPlayerNameFontString(frame)
     if not self:IsManagedPartyFrame(frame) then
         return nil
@@ -358,13 +241,13 @@ function FF:ApplyPlayerNameAnchorForFrame(frame)
         return
     end
 
-    local point = self:GetPlayerNameAnchorPoint()
-    local target = self:GetPlayerNameAnchorTarget()
+    local point = DB:GetPlayerNameAnchorPoint()
+    local target = DB:GetPlayerNameAnchorTarget()
     local relativeTo = frame
     if target == "HEALTHBAR" and frame.healthBar then
         relativeTo = frame.healthBar
     end
-    local offsetX, offsetY = self:GetPlayerNameAnchorOffsets()
+    local offsetX, offsetY = DB:GetPlayerNameAnchorOffsets()
 
     local xOffset = offsetX
     local yOffset = offsetY
@@ -387,34 +270,6 @@ function FF:UpdatePlayerNameAnchoring()
     end
 end
 
-function FF:GetPlayerNameColor()
-    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame) or {}
-    local defaultColor = defaults.playerNameColor or { r = 1, g = 1, b = 1, a = 1 }
-    local defaultOpacity = Utils:ClampNumber(defaults.playerNameOpacity, 0, 1, defaultColor.a or 1)
-    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
-    local color = profile and profile.playerNameColor
-
-    local r = Utils:ClampNumber(color and color.r, 0, 1, defaultColor.r or 1)
-    local g = Utils:ClampNumber(color and color.g, 0, 1, defaultColor.g or 1)
-    local b = Utils:ClampNumber(color and color.b, 0, 1, defaultColor.b or 1)
-    local colorOpacity = Utils:ClampNumber(color and color.a, 0, 1, defaultOpacity)
-    local a = Utils:ClampNumber(profile and profile.playerNameOpacity, 0, 1, colorOpacity)
-
-    return r, g, b, a
-end
-
-function FF:GetPlayerNameUseClassColors()
-    local defaultEnabled = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerNameUseClassColors) == true
-    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
-    local enabled = profile and profile.playerNameUseClassColors
-
-    if enabled == nil then
-        return defaultEnabled
-    end
-
-    return enabled == true
-end
-
 function FF:ApplyPlayerNameColorForFrame(frame)
     local nameText = self:GetPlayerNameFontString(frame)
 
@@ -422,16 +277,16 @@ function FF:ApplyPlayerNameColorForFrame(frame)
         return
     end
 
-    if self:GetPlayerNameUseClassColors() then
+    if DB:GetPlayerNameUseClassColors() then
         local classR, classG, classB = Blizzard:GetClassColorForUnit(frame and frame.unit)
         if classR and classG and classB then
-            local _, _, _, alpha = self:GetPlayerNameColor()
+            local _, _, _, alpha = DB:GetPlayerNameColor()
             pcall(nameText.SetTextColor, nameText, classR, classG, classB, alpha)
             return
         end
     end
 
-    local r, g, b, a = self:GetPlayerNameColor()
+    local r, g, b, a = DB:GetPlayerNameColor()
     pcall(nameText.SetTextColor, nameText, r, g, b, a)
 end
 
@@ -441,13 +296,6 @@ function FF:UpdatePlayerNameColor()
     end
 end
 
-function FF:GetPlayerNameFontSize()
-    local defaultSize = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerNameFontSize) or 10
-    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
-    local size = Utils:ClampNumber(profile and profile.playerNameFontSize, 8, 32, defaultSize)
-    return math.floor(size + 0.5)
-end
-
 function FF:ApplyPlayerNameFontSizeForFrame(frame)
     local nameText = self:GetPlayerNameFontString(frame)
 
@@ -455,7 +303,7 @@ function FF:ApplyPlayerNameFontSizeForFrame(frame)
         return
     end
 
-    local size = self:GetPlayerNameFontSize()
+    local size = DB:GetPlayerNameFontSize()
 
     local fontFile, _, flags = nameText:GetFont()
     if fontFile then
@@ -469,13 +317,6 @@ function FF:UpdatePlayerNameFontSize()
     end
 end
 
-function FF:GetHealthTextFontSize()
-    local defaultSize = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.healthTextFontSize) or 10
-    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
-    local size = Utils:ClampNumber(profile and profile.healthTextFontSize, 8, 32, defaultSize)
-    return math.floor(size + 0.5)
-end
-
 function FF:ApplyHealthTextFontSizeForFrame(frame)
     if not self:IsManagedPartyFrame(frame) then
         return
@@ -487,7 +328,7 @@ function FF:ApplyHealthTextFontSizeForFrame(frame)
         return
     end
 
-    local size = self:GetHealthTextFontSize()
+    local size = DB:GetHealthTextFontSize()
 
     local fontFile, _, flags = fontString:GetFont()
     if fontFile then
@@ -509,7 +350,7 @@ function FF:ShowBuffCountdownIfNeededForFrame(frame)
     for _, buffFrame in ipairs(frame.buffFrames) do
         local cooldown = buffFrame and buffFrame.cooldown
         if cooldown then
-            Utils:SetHideCountdownNumbersSafe(cooldown, not self.db.profile.partyFrame.showBuffCountdown)
+            Utils:SetHideCountdownNumbersSafe(cooldown, not DB:GetShowBuffCountdown())
             self:ApplyAuraCountdownFontSizeToCooldown(cooldown)
         end
     end
@@ -529,7 +370,7 @@ function FF:ShowDebuffCountdownIfNeededForFrame(frame)
     for _, debuffFrame in ipairs(frame.debuffFrames) do
         local cooldown = debuffFrame and debuffFrame.cooldown
         if cooldown then
-            Utils:SetHideCountdownNumbersSafe(cooldown, not self.db.profile.partyFrame.showDebuffCountdown)
+            Utils:SetHideCountdownNumbersSafe(cooldown, not DB:GetShowDebuffCountdown())
             self:ApplyAuraCountdownFontSizeToCooldown(cooldown)
         end
     end
@@ -547,9 +388,9 @@ function FF:UpdateRoleIcon(frame)
         return
     end
 
-    local show = (role == "TANK" and self.db.profile.partyFrame.showTankRoleIcon)
-        or (role == "HEALER" and self.db.profile.partyFrame.showHealerRoleIcon)
-        or (role == "DAMAGER" and self.db.profile.partyFrame.showDPSRoleIcon)
+    local show = (role == "TANK" and DB:GetShowTankRoleIcon())
+        or (role == "HEALER" and DB:GetShowHealerRoleIcon())
+        or (role == "DAMAGER" and DB:GetShowDPSRoleIcon())
 
     if show then
         -- print("Hiding DPS role icon for frame:", frame:GetName(), "unit:", frame.unit, "role:", role)
@@ -578,7 +419,7 @@ function FF:UpdateHealthBarTexture(healthBar)
         Utils:Log("NO HEALTH BAR")
         return
     end
-    local texture = self.db.profile.partyFrame.healthBarTexture
+    local texture = DB:GetHealthBarTexture()
     if not texture or texture == FF.DEFAULT_TEXTURE then return end
 
     Utils:Log("FF:UpdateHealthBarTexture", healthBar)

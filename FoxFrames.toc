@@ -28,6 +28,7 @@ Libs\LibSharedMedia-3.0\LibSharedMedia-3.0.lua
 Modules\Utils.lua
 Modules\BlizzardSettings.lua
 Modules\Blizzard.lua
+Modules\DB.lua
 Modules\FoxFrames.lua
 Modules\IncomingCasts.lua
 Modules\SpellIcon.lua

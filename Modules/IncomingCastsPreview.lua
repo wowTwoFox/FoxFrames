@@ -2,6 +2,7 @@ local addonName, addon = ...
 
 local FF = FoxFrames
 local Utils = addon.Utils
+local DB = addon.DB
 
 -- Preview-specific constants
 local INCOMING_CAST_PREVIEW_STREAM_INTERVAL_SECONDS = 10
@@ -206,8 +207,7 @@ function FF:StartIncomingCastIndicatorPreviewStream()
         local now = GetTime()
 
         -- Read desired spell display count from settings
-        local profile = self and self.db and self.db.profile
-        local incomingCastBarProfile = profile and profile.incomingCastBar
+        local incomingCastBarProfile = DB:GetIncomingCastBarDB()
         local desiredCount = Utils:ClampNumber(incomingCastBarProfile and incomingCastBarProfile.spellCount, 1, 6, 3)
         desiredCount = math.floor(desiredCount + 0.5)
 
