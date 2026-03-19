@@ -7,6 +7,10 @@ local SPELL_BAR_DEFAULT_POSITION = "BOTTOMLEFT"
 local SPELL_BAR_DEFAULT_OFFSET_X = 2
 local SPELL_BAR_DEFAULT_OFFSET_Y = 2
 
+local function IsSecretNumberError(err)
+    return type(err) == "string" and err:find("secret number value", 1, true) ~= nil
+end
+
 local function ApplyMixinSafe(target, mixin)
     if not (target and mixin) then
         return
@@ -67,6 +71,9 @@ local function CreateSpellBarFrame(frame)
     ApplyMixinSafe(container, SpellBarMixin)
 
     container._ffUsesGridLayout = true
+    -- Avoid automatic (OnUpdate-driven) layout passes which can run outside our pcalls.
+    -- We'll explicitly call Layout() when we update the container.
+    -- container.alwaysUpdateLayout = false
     container:SetFrameLevel((frame.GetFrameLevel and frame:GetFrameLevel() or 0) + 20)
     container:EnableMouse(false)
     container:SetHitRectInsets(10000, 10000, 10000, 10000)
@@ -159,6 +166,9 @@ function SpellBarMixin:ApplyIconContainerLayout(iconConfig)
     container.childYPadding = isVertical and iconSpacing or 0
     container.alwaysUpdateLayout = true
 
+    -- Don't rely on LayoutFrame's automatic Update loop.
+    -- container.alwaysUpdateLayout = false
+
     if isVertical then
         local containerHeight = (iconSize * iconCount) + (iconSpacing * (iconCount - 1))
         container:SetSize(iconSize, containerHeight)
@@ -188,11 +198,12 @@ function SpellBarMixin:ApplyIconContainerLayout(iconConfig)
 
     container._ffSpellBarConfigHash = iconConfig.hash
 
-    if container._ffUsesGridLayout and container.MarkDirty then
-        pcall(container.MarkDirty, container)
-    end
     if container._ffUsesGridLayout and container.Layout then
-        pcall(container.Layout, container)
+        local ok, err = pcall(container.Layout, container)
+        if (not ok) and IsSecretNumberError(err) then
+            -- Layout failed due to a secret value; keep the UI usable and stop error spam.
+            container.alwaysUpdateLayout = false
+        end
     end
 end
 
@@ -298,7 +309,7 @@ function SpellBarMixin:UpdateFromCastList(targetUnit, castList, config)
         local shownCount = 0
         for i = 1, desiredCount do
             local spellFrame = container.spells[i]
-            if spellFrame and spellFrame.ignoreInLayout ~= true and spellFrame.IsShown and spellFrame:IsShown() then
+            if spellFrame and spellFrame.ignoreInLayout ~= true then
                 shownCount = shownCount + 1
             end
         end
@@ -331,10 +342,14 @@ function SpellBarMixin:UpdateFromCastList(targetUnit, castList, config)
         end
 
         if container.MarkDirty then
-            pcall(container.MarkDirty, container)
+            -- MarkDirty schedules an OnUpdate-driven Layout() (which we can't pcall).
+            -- Avoid it and call Layout() directly.
         end
         if container.Layout then
-            pcall(container.Layout, container)
+            local ok, err = pcall(container.Layout, container)
+            if (not ok) and IsSecretNumberError(err) then
+                container.alwaysUpdateLayout = false
+            end
         end
     end
 end

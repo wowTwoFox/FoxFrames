@@ -26,6 +26,7 @@ FF.DEFAULT_SETTINGS = {
     },
     incomingCastBar = {
         spellCount = 3,
+        anchorFrame = "HEALTHBAR",
         position = "BOTTOMLEFT",
         growthDirection = "RIGHT",
         offsetX = 2,
@@ -107,6 +108,13 @@ local function SanitizeGrowDirection(value, fallback)
     return fallback
 end
 
+local function SanitizeIncomingCastAnchorFrame(value, fallback)
+    if value == "FRAME" or value == "HEALTHBAR" then
+        return value
+    end
+    return fallback
+end
+
 local function SanitizeBoolean(value, fallback)
     if value == nil then
         return fallback
@@ -131,6 +139,11 @@ function FF:MigrateAndSanitizeDB()
     local iconDefaults = defaults.icon or {}
     local partyFrameProfile = profile.partyFrame
     local incomingCastBarProfile = profile.incomingCastBar
+
+    local anchorFrame = SanitizeIncomingCastAnchorFrame(
+        incomingCastBarProfile.anchorFrame,
+        defaults.anchorFrame or "HEALTHBAR"
+    )
 
     local position = SanitizePosition(
         incomingCastBarProfile.position,
@@ -175,6 +188,7 @@ function FF:MigrateAndSanitizeDB()
     local iconShowCooldownText = SanitizeBoolean(iconProfile.showCooldownText, iconDefaults.showCooldownText ~= false)
 
     incomingCastBarProfile.spellCount = spellCount
+    incomingCastBarProfile.anchorFrame = anchorFrame
     incomingCastBarProfile.position = position
     incomingCastBarProfile.growthDirection = growthDirection
     incomingCastBarProfile.offsetX = offsetX
@@ -496,6 +510,30 @@ function FF:SetupOptions()
 
     local incomingCastBarDefaults = FF.DEFAULT_SETTINGS.incomingCastBar
     local incomingCastBarIconDefaults = incomingCastBarDefaults.icon or {}
+
+    SettingsLib:CreateDropdown(rootCategory, {
+        key = "IncomingCastAnchorFrame",
+        name = "Anchor to",
+        default = incomingCastBarDefaults.anchorFrame,
+        values = {
+            HEALTHBAR = "Health bar",
+            FRAME = "Party frame",
+        },
+        get = function()
+            local value = GetIncomingCastBarValue("anchorFrame")
+            if value ~= "HEALTHBAR" and value ~= "FRAME" then
+                value = incomingCastBarDefaults.anchorFrame
+            end
+            return value
+        end,
+        set = function(value)
+            SetIncomingCastBarValue("anchorFrame", value)
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Choose whether incoming cast icons are anchored to the party frame or to the frame health bar.",
+        prefix = PARTY_FRAME_PREFIX,
+    })
 
     SettingsLib:CreateDropdown(rootCategory, {
         key = "IncomingCastIconPosition",

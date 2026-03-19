@@ -466,11 +466,21 @@ local function GetIncomingCastIndicatorIconConfig(incomingCastBarProfile, incomi
     }
 end
 
+local function GetIncomingCastIndicatorAnchorFrame(incomingCastBarProfile, incomingCastBarDefaults)
+    local anchorFrame = incomingCastBarDefaults.anchorFrame or "HEALTHBAR"
+    local configuredAnchorFrame = incomingCastBarProfile and incomingCastBarProfile.anchorFrame
+    if configuredAnchorFrame == "HEALTHBAR" or configuredAnchorFrame == "FRAME" then
+        anchorFrame = configuredAnchorFrame
+    end
+    return anchorFrame
+end
+
 local function GetIncomingCastIndicatorConfig()
     local profile = FF and FF.db and FF.db.profile
     local incomingCastBarProfile = profile and profile.incomingCastBar
     local incomingCastBarDefaults = FF and FF.DEFAULT_SETTINGS and FF.DEFAULT_SETTINGS.incomingCastBar or {}
     local iconConfig = GetIncomingCastIndicatorIconConfig(incomingCastBarProfile, incomingCastBarDefaults)
+    local anchorFrame = GetIncomingCastIndicatorAnchorFrame(incomingCastBarProfile, incomingCastBarDefaults)
 
     local count = Utils:ClampNumber(incomingCastBarProfile and incomingCastBarProfile.spellCount, 1, 6, incomingCastBarDefaults.spellCount or 3)
     count = math.floor(count + 0.5)
@@ -518,7 +528,7 @@ local function GetIncomingCastIndicatorConfig()
     offsetY = math.floor(offsetY + 0.5)
 
     local hash = string.format(
-        "%d:%.2f:%d:%d:%d:%d:%d:%s",
+        "%d:%.2f:%d:%d:%d:%d:%d:%s:%s",
         count,
         iconConfig.scale,
         iconConfig.spacing,
@@ -526,7 +536,8 @@ local function GetIncomingCastIndicatorConfig()
         iconConfig.showBorder and 1 or 0,
         iconConfig.showSwipe and 1 or 0,
         iconConfig.showCooldownText and 1 or 0,
-        growDirection
+        growDirection,
+        anchorFrame
     )
 
     iconConfig.count = count
@@ -535,14 +546,72 @@ local function GetIncomingCastIndicatorConfig()
 
     return {
         icon = iconConfig,
+        anchorFrame = anchorFrame,
         position = position,
         offsetX = offsetX,
         offsetY = offsetY,
     }
 end
 
+local function GetIncomingCastHostFrame(unitFrame, config)
+    if not unitFrame then
+        return nil
+    end
+
+    if config and config.anchorFrame == "FRAME" then
+        return unitFrame
+    end
+
+    if unitFrame.healthBar then
+        return unitFrame.healthBar
+    end
+
+    return unitFrame
+end
+
+local function GetInactiveIncomingCastHostFrame(unitFrame, activeHostFrame)
+    if not unitFrame then
+        return nil
+    end
+
+    if activeHostFrame == unitFrame then
+        return unitFrame.healthBar
+    end
+
+    if activeHostFrame == unitFrame.healthBar then
+        return unitFrame
+    end
+
+    return nil
+end
+
+local function SetSpellBarContainerEnabled(frame, enabled)
+    if not frame then
+        return
+    end
+
+    local container = frame.ffSpellBar
+    if not container then
+        return
+    end
+
+    if enabled then
+        if container.Show then
+            container:Show()
+        end
+        if container.SetAlpha then
+            container:SetAlpha(1)
+        end
+        return
+    end
+
+    if container.Hide then
+        container:Hide()
+    end
+end
+
 local function EnsureSpellBarForFrame(frame, config)
-    if not (frame and config and frame) then
+    if not (frame and config) then
         return nil
     end
 
@@ -557,20 +626,20 @@ local function EnsureSpellBarForFrame(frame, config)
 
     local container = frame.ffSpellBar
     if not container then
-        local CreateSpellBarFrame = addon and addon.CreateSpellBarFrame
+        local CreateSpellBarFrame = addon.CreateSpellBarFrame
         if not CreateSpellBarFrame then return end
         container = CreateSpellBarFrame(frame)
 
         if not container then
             frame.ffSpellBarCreationFailed = true
-            if Utils and Utils.Log then
-                Utils:Log("Failed to create frame for incoming cast indicators.")
-            end
+            Utils:Log("Failed to create frame for incoming cast indicators.")
             return nil
         end
 
         frame.ffSpellBar = container
     end
+
+    SetSpellBarContainerEnabled(frame, true)
 
     if container.ApplyContainerPosition then
         container:ApplyContainerPosition(frame, config)
@@ -597,7 +666,12 @@ function FF:SetupIncomingCastIndicators()
 
     local frames = self:GetFrames()
     for _, frame in ipairs(frames) do
-        EnsureSpellBarForFrame(frame.healthBar, config)
+        local hostFrame = GetIncomingCastHostFrame(frame, config)
+        local container = EnsureSpellBarForFrame(hostFrame, config)
+        if container then
+            local inactiveHostFrame = GetInactiveIncomingCastHostFrame(frame, hostFrame)
+            SetSpellBarContainerEnabled(inactiveHostFrame, false)
+        end
     end
 end
 
@@ -652,15 +726,18 @@ function FF:UpdateIncomingCastIndicators()
     end)
 
     for _, frame in ipairs(frames) do
-        if frame and frame.healthBar and frame.unit then
-            local container = frame.healthBar.ffSpellBar
+        if frame and frame.unit then
+            local hostFrame = GetIncomingCastHostFrame(frame, config)
+            local container = hostFrame and hostFrame.ffSpellBar
             local targetUnit = frame.unit
 
             if not inCombat then
-                container = EnsureSpellBarForFrame(frame.healthBar, config) or container
+                container = EnsureSpellBarForFrame(hostFrame, config) or container
             end
 
             if container and container.UpdateSpellBarForFrame then
+                local inactiveHostFrame = GetInactiveIncomingCastHostFrame(frame, hostFrame)
+                SetSpellBarContainerEnabled(inactiveHostFrame, false)
                 container:UpdateSpellBarForFrame(targetUnit, castList, config)
             end
         end

@@ -3,6 +3,79 @@ local addonName, addon = ...
 local FF = FoxFrames
 local Utils = addon.Utils
 
+-- PartyFrame layout updates can end up triggering Blizzard's GridLayout/Layouts while
+-- some values are "secret" (e.g. during combat / edit mode) which then throws inside
+-- Blizzard_SharedXML. Keep this debounced and only run when it's safe.
+local partyLayoutScheduled = false
+local partyLayoutDirty = false
+local partyLayoutInProgress = false
+local lastPartyLayoutReason = nil
+
+local function IsEditModeActive()
+    return EditModeManagerFrame and EditModeManagerFrame.editModeActive
+end
+
+local function SafeUpdatePartyFrameLayout()
+    partyLayoutScheduled = false
+
+    if partyLayoutInProgress then
+        return
+    end
+
+    if not partyLayoutDirty then
+        return
+    end
+
+    if not PartyFrame or type(PartyFrame.UpdateSpacingAndLayout) ~= "function" then
+        partyLayoutDirty = false
+        return
+    end
+
+    -- Don't try to force layout in restricted states.
+    if (InCombatLockdown and InCombatLockdown()) or IsEditModeActive() then
+        return
+    end
+
+    partyLayoutDirty = false
+    partyLayoutInProgress = true
+
+    local ok, err = pcall(function()
+        if securecallfunction then
+            securecallfunction(PartyFrame.UpdateSpacingAndLayout, PartyFrame)
+        else
+            PartyFrame:UpdateSpacingAndLayout()
+        end
+    end)
+
+    partyLayoutInProgress = false
+
+    if not ok and Utils and Utils.Log then
+        Utils:Log("FoxFrames: PartyFrame layout update failed", {
+            reason = lastPartyLayoutReason,
+            error = err,
+            inCombat = InCombatLockdown and InCombatLockdown() or nil,
+            editMode = IsEditModeActive() or nil,
+        })
+    end
+end
+
+local function RequestPartyFrameLayoutUpdate(reason)
+    lastPartyLayoutReason = reason or lastPartyLayoutReason
+    partyLayoutDirty = true
+
+    if partyLayoutScheduled then
+        return
+    end
+
+    partyLayoutScheduled = true
+
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0, SafeUpdatePartyFrameLayout)
+    else
+        SafeUpdatePartyFrameLayout()
+    end
+end
+
 local function RegisterLSMTextures()
     local LSM = LibStub("LibSharedMedia-3.0", true)
     if not LSM then
@@ -43,7 +116,7 @@ function FF:UNIT_MODEL_CHANGED(event, ...)
     -- This fixes an issue with the party frames being offset
     -- Caused by the frames being laid-out when the anchor points are set to TOPLEFT
     -- We fix it by re-applying the layout after the anchor points are correctly set
-    PartyFrame:UpdateSpacingAndLayout()
+    RequestPartyFrameLayoutUpdate("UNIT_MODEL_CHANGED")
 end
 
 function FF:OnInitialize()
@@ -75,7 +148,7 @@ function FF:OnInitialize()
     hooksecurefunc(PartyFrame, "SetPoint", function(...)
         -- Utils:Log("PartyFrame:SetPoint Called", { ... })
         -- This is needed to re-align the player frames
-        PartyFrame:UpdateSpacingAndLayout()
+        RequestPartyFrameLayoutUpdate("PartyFrame:SetPoint")
     end)
 
     if type(CompactUnitFrame_UpdateAuras) == "function" then
@@ -103,6 +176,7 @@ function FF:OnEnable()
     self:RegisterEvent("PLAYER_ROLES_ASSIGNED", GroupChangeEvent)
     self:RegisterEvent("COMPACT_UNIT_FRAME_PROFILES_LOADED", GroupChangeEvent)
     self:RegisterEvent("UNIT_MODEL_CHANGED")
+    self:RegisterEvent("PLAYER_REGEN_ENABLED")
     self:RegisterIncomingCastUnitEvents()
 
     -- Register internal messages
@@ -115,6 +189,13 @@ function FF:OnEnable()
     hooksecurefunc("CompactUnitFrame_UpdateRoleIcon", function(frame)
         self:UpdateRoleIcon(frame)
     end)
+end
+
+function FF:PLAYER_REGEN_ENABLED()
+    -- If we skipped a layout update during combat, retry once combat drops.
+    if partyLayoutDirty then
+        RequestPartyFrameLayoutUpdate("PLAYER_REGEN_ENABLED")
+    end
 end
 
 function FF:FOXFRAMES_INCOMING_CASTS_UPDATED(event, casterUnit, cast)

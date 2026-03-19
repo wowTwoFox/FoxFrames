@@ -21,26 +21,6 @@ local function SetAlphaFromBooleanSafe(frame, value)
     frame:SetAlpha(0)
 end
 
-local function SetShownFromBooleanSafe(frame, value)
-    if not frame then return false end
-
-    if frame.SetShownFromBoolean then
-        frame:SetShownFromBoolean(value, true, false)
-        return true
-    end
-
-    -- Some clients may allow SetShown(secretBool) directly.
-    -- If it errors, swallow it and fall back to alpha-only behavior.
-    if frame.SetShown then
-        local ok = pcall(frame.SetShown, frame, value)
-        if ok then
-            return true
-        end
-    end
-
-    return false
-end
-
 local SPELL_ICON_BASE_SIZE = 22
 local SPELL_ICON_DEFAULT_SCALE = 1
 local SPELL_ICON_MASK_ATLAS = "UI-HUD-CoolDownManager-Mask"
@@ -351,11 +331,7 @@ local function UpdateSpellFrameFromEntry(entry, spellFrame, unit, iconConfig)
     UpdateCooldownOnSpellFrame(entry, spellFrame, iconConfig)
 
     spellFrame:SetAlpha(1)
-
-    -- Prefer secret-safe show/hide to enable left-packing
-    -- with GridLayoutFrame. Fall back to alpha-only behavior
-    -- when SetShownFromBoolean isn't available.
-    local usedShown = false
+    local showInLayout = false
 
     if UnitIsUnit and cast and type(unit) == "string" and unit ~= "" then
         local target = nil
@@ -382,19 +358,15 @@ local function UpdateSpellFrameFromEntry(entry, spellFrame, unit, iconConfig)
             isTargeted = UnitIsUnit(target, unit)
         end
 
-        usedShown = SetShownFromBooleanSafe(spellFrame, isTargeted)
-
-        if not usedShown then
-            spellFrame:Show()
-            SetAlphaFromBooleanSafe(spellFrame, isTargeted)
-        else
-            -- If we successfully used SetShownFromBoolean, keep
-            -- targeted icons fully visible when shown.
-            spellFrame:SetAlpha(1)
-        end
+        -- Keep frame visibility stable for GridLayoutFrame; changing shown state
+        -- from secret booleans can leak into size calculations.
+        spellFrame:Show()
+        SetAlphaFromBooleanSafe(spellFrame, isTargeted)
+        showInLayout = true
     elseif cast then
         spellFrame:Show()
         spellFrame:SetAlpha(1)
+        showInLayout = true
     else
         ResetCooldownOnSpellFrame(spellFrame)
         spellFrame:Hide()
@@ -402,7 +374,7 @@ local function UpdateSpellFrameFromEntry(entry, spellFrame, unit, iconConfig)
     end
 
     if cooldown then
-        if wantCooldown and spellFrame:IsShown() then
+        if wantCooldown and showInLayout then
             cooldown:SetAlpha(spellFrame:GetAlpha() or 1)
         else
             -- The cooldown swipe can ignore parent display state;
@@ -411,7 +383,7 @@ local function UpdateSpellFrameFromEntry(entry, spellFrame, unit, iconConfig)
         end
     end
 
-    spellFrame.ignoreInLayout = not spellFrame:IsShown()
+    spellFrame.ignoreInLayout = not showInLayout
 end
 
 local SpellIconMixin = {
