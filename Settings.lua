@@ -4,6 +4,7 @@ local Utils = addon.Utils
 
 local SettingsLib = LibStub("LibEQOLSettingsMode-1.0")
 local SETTINGS_PREFIX = "FoxFrames_"
+local INCOMING_CASTS_PREFIX = SETTINGS_PREFIX .. "IncomingCasts_"
 
 FF.PLAYER_FRAME_SHOW_TYPES = { Always = "Always", Solo = "Solo", Never = "Never" }
 FF.STATUS_TEXT_ANCHOR_POINTS = {
@@ -42,6 +43,7 @@ FF.DEFAULT_SETTINGS = {
             b = 1,
             a = 1,
         },
+        statusTextUseClassColors = false,
         statusTextAnchorTarget = "FRAME",
         statusTextAnchorPoint = "CENTER",
         statusTextOffsetX = 0,
@@ -53,6 +55,7 @@ FF.DEFAULT_SETTINGS = {
             b = 1,
             a = 1,
         },
+        playerNameUseClassColors = false,
         playerNameAnchorTarget = "FRAME",
         playerNameAnchorPoint = "TOP",
         playerNameOffsetX = 0,
@@ -283,6 +286,10 @@ function FF:MigrateAndSanitizeDB()
         partyFrameProfile.statusTextColor,
         self.DEFAULT_SETTINGS.partyFrame.statusTextColor
     )
+    partyFrameProfile.statusTextUseClassColors = SanitizeBoolean(
+        partyFrameProfile.statusTextUseClassColors,
+        self.DEFAULT_SETTINGS.partyFrame.statusTextUseClassColors == true
+    )
     partyFrameProfile.statusTextOffsetX = math.floor(Utils:ClampNumber(
         partyFrameProfile.statusTextOffsetX,
         -100,
@@ -312,6 +319,10 @@ function FF:MigrateAndSanitizeDB()
     partyFrameProfile.playerNameColor = SanitizeStatusTextColor(
         partyFrameProfile.playerNameColor,
         self.DEFAULT_SETTINGS.partyFrame.playerNameColor
+    )
+    partyFrameProfile.playerNameUseClassColors = SanitizeBoolean(
+        partyFrameProfile.playerNameUseClassColors,
+        self.DEFAULT_SETTINGS.partyFrame.playerNameUseClassColors == true
     )
     partyFrameProfile.playerNameOffsetX = math.floor(Utils:ClampNumber(
         partyFrameProfile.playerNameOffsetX,
@@ -382,6 +393,374 @@ local function SetIncomingCastBarIconValue(key, value)
     incomingCastBarProfile.icon[key] = value
 end
 
+local function CreateIncomingCastsSettings(rootCategory)
+    local incomingCastsCategory = SettingsLib:CreateCategory(rootCategory, "Incoming Casts")
+    local incomingCastsPrefix = INCOMING_CASTS_PREFIX
+
+    SettingsLib:CreateText(
+        incomingCastsCategory,
+        "Incoming casts are spells that are targetting you or your teamates.\nThis is not a perfect solution as it's difficult to work around Blizzard's secrets.\nSo it won't show everything."
+    )
+
+    local trackIncomingCastsElement = SettingsLib:CreateCheckbox(incomingCastsCategory, {
+        key = "TrackIncomingCasts",
+        name = "Track incoming casts",
+        default = FF.DEFAULT_SETTINGS.partyFrame.trackIncomingCasts,
+        get = function()
+            return FF.db.profile.partyFrame.trackIncomingCasts
+        end,
+        set = function(value)
+            FF.db.profile.partyFrame.trackIncomingCasts = value
+            if not value then
+                FF:SetIncomingCastIndicatorPreviewEnabled(false)
+            end
+        end,
+        prefix = incomingCastsPrefix,
+        desc = "Track incoming enemy casts for party frame indicators.",
+    })
+
+    SettingsLib:CreateCheckbox(incomingCastsCategory, {
+        key = "IncomingCastPreview",
+        name = "Preview incoming casts",
+        default = false,
+        get = function()
+            return FF._ffIncomingCastIndicatorPreviewEnabled == true
+        end,
+        set = function(value)
+            FF:SetIncomingCastIndicatorPreviewEnabled(value)
+        end,
+        desc = "Show preview incoming cast icons for layout tuning.",
+        prefix = incomingCastsPrefix,
+        parent = trackIncomingCastsElement,
+        parentCheck = function()
+            return FF.db.profile.partyFrame.trackIncomingCasts == true
+        end,
+    })
+
+    local incomingCastBarDefaults = FF.DEFAULT_SETTINGS.incomingCastBar
+    local incomingCastBarIconDefaults = incomingCastBarDefaults.icon or {}
+
+    SettingsLib:CreateDropdown(incomingCastsCategory, {
+        key = "IncomingCastAnchorFrame",
+        name = "Anchor to",
+        default = incomingCastBarDefaults.anchorFrame,
+        values = {
+            HEALTHBAR = "Health bar",
+            FRAME = "Party frame",
+        },
+        get = function()
+            local value = GetIncomingCastBarValue("anchorFrame")
+            if value ~= "HEALTHBAR" and value ~= "FRAME" then
+                value = incomingCastBarDefaults.anchorFrame
+            end
+            return value
+        end,
+        set = function(value)
+            SetIncomingCastBarValue("anchorFrame", value)
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Choose whether incoming cast icons are anchored to the party frame or to the frame health bar.",
+        prefix = incomingCastsPrefix,
+    })
+
+    SettingsLib:CreateDropdown(incomingCastsCategory, {
+        key = "IncomingCastIconPosition",
+        name = "Targeted spell position",
+        default = incomingCastBarDefaults.position,
+        values = {
+            BOTTOMLEFT = "Bottom left",
+            TOPLEFT = "Top left",
+            BOTTOMRIGHT = "Bottom right",
+            TOPRIGHT = "Top right",
+            BOTTOM = "Bottom center",
+            TOP = "Top center",
+        },
+        get = function()
+            local pos = GetIncomingCastBarValue("position")
+            if pos ~= "TOPLEFT" and pos ~= "BOTTOMLEFT" and pos ~= "TOP" and pos ~= "BOTTOM" and pos ~= "TOPRIGHT" and pos ~= "BOTTOMRIGHT" then
+                pos = incomingCastBarDefaults.position
+            end
+            return pos
+        end,
+        set = function(value)
+            SetIncomingCastBarValue("position", value)
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Where to anchor targeted spell icons on the party frame.",
+        prefix = incomingCastsPrefix,
+    })
+
+    SettingsLib:CreateDropdown(incomingCastsCategory, {
+        key = "IncomingCastIconGrowDirection",
+        name = "Grow Direction",
+        default = incomingCastBarDefaults.growthDirection,
+        values = {
+            RIGHT = "Right",
+            LEFT = "Left",
+            DOWN = "Down",
+            UP = "Up",
+        },
+        get = function()
+            local pos = GetIncomingCastBarValue("position")
+            if pos ~= "TOPLEFT" and pos ~= "BOTTOMLEFT" and pos ~= "TOP" and pos ~= "BOTTOM" and pos ~= "TOPRIGHT" and pos ~= "BOTTOMRIGHT" then
+                pos = incomingCastBarDefaults.position
+            end
+
+            local dir = GetIncomingCastBarValue("growthDirection")
+
+            if dir == nil then
+                if pos == "TOPRIGHT" or pos == "BOTTOMRIGHT" then
+                    dir = "LEFT"
+                else
+                    dir = incomingCastBarDefaults.growthDirection
+                end
+            end
+
+            if dir ~= "RIGHT" and dir ~= "LEFT" and dir ~= "DOWN" and dir ~= "UP" then
+                dir = incomingCastBarDefaults.growthDirection
+            end
+
+            return dir
+        end,
+        set = function(value)
+            SetIncomingCastBarValue("growthDirection", value)
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Direction targeted spell icons grow when multiple are shown.",
+        prefix = incomingCastsPrefix,
+    })
+
+    SettingsLib:CreateSlider(incomingCastsCategory, {
+        key = "IncomingCastIconOffsetX",
+        name = "X offset",
+        default = incomingCastBarDefaults.offsetX,
+        min = -40,
+        max = 40,
+        step = 1,
+        formatter = function(value)
+            return string.format("%ipx", math.floor((value) + 0.5))
+        end,
+        get = function()
+            local value = GetIncomingCastBarValue("offsetX")
+            if value == nil then
+                value = incomingCastBarDefaults.offsetX
+            end
+            return value
+        end,
+        set = function(value)
+            SetIncomingCastBarValue("offsetX", value)
+
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Horizontal offset (in pixels). Negative allows going outside the frame.",
+        prefix = incomingCastsPrefix,
+    })
+
+    SettingsLib:CreateSlider(incomingCastsCategory, {
+        key = "IncomingCastIconOffsetY",
+        name = "Y offset",
+        default = incomingCastBarDefaults.offsetY,
+        min = -40,
+        max = 40,
+        step = 1,
+        formatter = function(value)
+            return string.format("%ipx", math.floor((value) + 0.5))
+        end,
+        get = function()
+            local value = GetIncomingCastBarValue("offsetY")
+            if value == nil then
+                value = incomingCastBarDefaults.offsetY
+            end
+            return value
+        end,
+        set = function(value)
+            SetIncomingCastBarValue("offsetY", value)
+
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Vertical offset (in pixels). Negative allows going outside the frame.",
+        prefix = incomingCastsPrefix,
+    })
+
+    SettingsLib:CreateSlider(incomingCastsCategory, {
+        key = "IncomingCastIconCount",
+        name = "Targeted spell icon count",
+        default = incomingCastBarDefaults.spellCount,
+        min = 1,
+        max = 6,
+        step = 1,
+        formatter = function(value)
+            return string.format("%i", math.floor((value) + 0.5))
+        end,
+        get = function()
+            local value = GetIncomingCastBarValue("spellCount")
+            if value == nil then
+                value = incomingCastBarDefaults.spellCount
+            end
+            return value
+        end,
+        set = function(value)
+            SetIncomingCastBarValue("spellCount", value)
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "How many targeted spell icons to show per party member.",
+        prefix = incomingCastsPrefix,
+    })
+
+    SettingsLib:CreateSlider(incomingCastsCategory, {
+        key = "IncomingCastIconScale",
+        name = "Icon scale",
+        default = incomingCastBarIconDefaults.scale,
+        min = 0.5,
+        max = 2,
+        step = 0.10,
+        formatter = function(value)
+            return string.format("%d%%", math.floor((value * 100) + 0.5))
+        end,
+        get = function()
+            local value = GetIncomingCastBarIconValue("scale")
+            if value ~= nil then
+                return value
+            end
+
+            return incomingCastBarIconDefaults.scale
+        end,
+        set = function(value)
+            SetIncomingCastBarIconValue("scale", value)
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Scales each targeted spell icon without distorting borders/overlays.",
+        prefix = incomingCastsPrefix,
+    })
+
+    SettingsLib:CreateSlider(incomingCastsCategory, {
+        key = "IncomingCastIconSpacing",
+        name = "Icon spacing",
+        default = incomingCastBarIconDefaults.spacing,
+        min = -10,
+        max = 20,
+        step = 1,
+        formatter = function(value)
+            return string.format("%i", math.floor((value) + 0.5))
+        end,
+        get = function()
+            local value = GetIncomingCastBarIconValue("spacing")
+            if value == nil then
+                value = incomingCastBarIconDefaults.spacing
+            end
+            return value
+        end,
+        set = function(value)
+            SetIncomingCastBarIconValue("spacing", value)
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Space (in pixels) between targeted spell icons. Negative values allow overlap.",
+        prefix = incomingCastsPrefix,
+    })
+
+    SettingsLib:CreateCheckbox(incomingCastsCategory, {
+        key = "IncomingCastIconBorder",
+        name = "Show icon border",
+        default = incomingCastBarIconDefaults.showBorder,
+        get = function()
+            local value = GetIncomingCastBarIconValue("showBorder")
+            if value == nil then
+                value = incomingCastBarIconDefaults.showBorder
+            end
+            return value
+        end,
+        set = function(value)
+            SetIncomingCastBarIconValue("showBorder", value)
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Toggle the border around targeted spell icons.",
+        prefix = incomingCastsPrefix,
+    })
+
+    SettingsLib:CreateCheckbox(incomingCastsCategory, {
+        key = "IncomingCastIconSwipe",
+        name = "Show cooldown swipe",
+        default = incomingCastBarIconDefaults.showSwipe,
+        get = function()
+            local value = GetIncomingCastBarIconValue("showSwipe")
+            if value == nil then
+                value = incomingCastBarIconDefaults.showSwipe
+            end
+            return value
+        end,
+        set = function(value)
+            SetIncomingCastBarIconValue("showSwipe", value)
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Toggle the cooldown swipe overlay on targeted spell icons.",
+        prefix = incomingCastsPrefix,
+    })
+
+    local incomingCastIconCooldownTextElement = SettingsLib:CreateCheckbox(incomingCastsCategory, {
+        key = "IncomingCastIconCooldownText",
+        name = "Show cooldown text",
+        default = incomingCastBarIconDefaults.showCooldownText,
+        get = function()
+            local value = GetIncomingCastBarIconValue("showCooldownText")
+            if value == nil then
+                value = incomingCastBarIconDefaults.showCooldownText
+            end
+            return value
+        end,
+        set = function(value)
+            SetIncomingCastBarIconValue("showCooldownText", value)
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Toggle the cooldown countdown text on targeted spell icons.",
+        prefix = incomingCastsPrefix,
+    })
+
+    SettingsLib:CreateSlider(incomingCastsCategory, {
+        key = "IncomingCastIconCooldownFontSize",
+        name = "Cooldown text size",
+        default = incomingCastBarIconDefaults.cooldownFontSize,
+        min = 8,
+        max = 32,
+        step = 1,
+        formatter = function(value)
+            return string.format("%ipt", math.floor((value) + 0.5))
+        end,
+        get = function()
+            local value = GetIncomingCastBarIconValue("cooldownFontSize")
+            if value == nil then
+                value = incomingCastBarIconDefaults.cooldownFontSize
+            end
+            return value
+        end,
+        set = function(value)
+            SetIncomingCastBarIconValue("cooldownFontSize", math.floor((value) + 0.5))
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Adjust the cooldown countdown text size on targeted spell icons.",
+        prefix = incomingCastsPrefix,
+        parent = incomingCastIconCooldownTextElement,
+        parentCheck = function()
+            local value = GetIncomingCastBarIconValue("showCooldownText")
+            if value == nil then
+                value = incomingCastBarIconDefaults.showCooldownText
+            end
+            return value == true
+        end,
+    })
+end
+
 function FF:SetupOptions()
     -- Build the options using LibEQOL
     local PARTY_FRAME_PREFIX = SETTINGS_PREFIX .. "PartyFrame_"
@@ -396,10 +775,6 @@ function FF:SetupOptions()
         rootCategory, 
         "You need to enable 'Raid Style Party Frames' in 'Edit Mode' to benefit from these settings."
     )
-
-    SettingsLib:CreateHeader(rootCategory, {
-        name = "General",
-    })
 
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "ShowInSolo",
@@ -504,26 +879,6 @@ function FF:SetupOptions()
     rootCategory, 
         "You need to reload the UI when setting the 'Default' texture."
     )
-
-    SettingsLib:CreateHeader(rootCategory, {
-        name = "Player Frame",
-    })
-
-    SettingsLib:CreateDropdown(rootCategory, {
-        key = "ShowPlayerFrame",
-        name = "Show Player Frame",
-        default = FF.DEFAULT_SETTINGS.playerFrame.showType,
-        values = FF.PLAYER_FRAME_SHOW_TYPES,
-        get = function()
-            return FF.db.profile.playerFrame.showType or FF.DEFAULT_SETTINGS.playerFrame.showType
-        end,
-        set = function(value)
-            FF.db.profile.playerFrame.showType = value
-            self:ShowPlayerFrameIfNeeded()
-        end,
-        desc = "Control the visibility of the player frame. 'Always' will show the player frame regardless of group status. 'Solo' will only show the player frame when not in a party or raid. 'Never' will hide the player frame regardless of group status.",
-        prefix = PARTY_FRAME_PREFIX
-    })
 
     SettingsLib:CreateHeader(rootCategory, {
         name = "Status Text",
@@ -650,6 +1005,22 @@ function FF:SetupOptions()
             FF:RequestStatusTextSettingsRefresh()
         end,
         desc = "Adjust the status text size on party frames.",
+        prefix = PARTY_FRAME_PREFIX,
+    })
+
+    SettingsLib:CreateCheckbox(rootCategory, {
+        key = "StatusTextUseClassColors",
+        name = "Use class colors",
+        default = FF.DEFAULT_SETTINGS.partyFrame.statusTextUseClassColors,
+        get = function()
+            return FF.db.profile.partyFrame.statusTextUseClassColors == true
+        end,
+        set = function(value)
+            FF.db.profile.partyFrame.statusTextUseClassColors = (value == true)
+            FF:UpdateStatusTextColor()
+            FF:RequestStatusTextSettingsRefresh()
+        end,
+        desc = "Use class colors for status text instead of the configured static text color.",
         prefix = PARTY_FRAME_PREFIX,
     })
 
@@ -806,6 +1177,21 @@ function FF:SetupOptions()
         prefix = PARTY_FRAME_PREFIX,
     })
 
+    SettingsLib:CreateCheckbox(rootCategory, {
+        key = "PlayerNameUseClassColors",
+        name = "Use class colors",
+        default = FF.DEFAULT_SETTINGS.partyFrame.playerNameUseClassColors,
+        get = function()
+            return FF.db.profile.partyFrame.playerNameUseClassColors == true
+        end,
+        set = function(value)
+            FF.db.profile.partyFrame.playerNameUseClassColors = (value == true)
+            FF:UpdatePlayerNameColor()
+        end,
+        desc = "Use class colors for player name instead of the configured static text color.",
+        prefix = PARTY_FRAME_PREFIX,
+    })
+
     SettingsLib:CreateColorOverrides(rootCategory, {
         key = "PlayerNameColor",
         entries = {
@@ -911,7 +1297,7 @@ function FF:SetupOptions()
 
     SettingsLib:CreateSlider(rootCategory, {
         key = "CountdownFontSize",
-        name = "Buff/debuff countdown text size",
+        name = "Countdown Text Size",
         default = FF.DEFAULT_SETTINGS.partyFrame.countdownFontSize,
         min = 8,
         max = 32,
@@ -935,364 +1321,24 @@ function FF:SetupOptions()
     })
 
     SettingsLib:CreateHeader(rootCategory, {
-        name = "Incoming Casts",
-    })
-
-    local trackIncomingCastsElement = SettingsLib:CreateCheckbox(rootCategory, {
-        key = "TrackIncomingCasts",
-        name = "Track incoming casts",
-        default = FF.DEFAULT_SETTINGS.partyFrame.trackIncomingCasts,
-        get = function()
-            return FF.db.profile.partyFrame.trackIncomingCasts
-        end,
-        set = function(value)
-            FF.db.profile.partyFrame.trackIncomingCasts = value
-            if not value then
-                FF:SetIncomingCastIndicatorPreviewEnabled(false)
-            end
-        end,
-        prefix = PARTY_FRAME_PREFIX,
-        desc = "Track incoming enemy casts for party frame indicators.",
-    })
-
-    SettingsLib:CreateCheckbox(rootCategory, {
-        key = "IncomingCastPreview",
-        name = "Preview incoming casts",
-        default = false,
-        get = function()
-            return FF._ffIncomingCastIndicatorPreviewEnabled == true
-        end,
-        set = function(value)
-            FF:SetIncomingCastIndicatorPreviewEnabled(value)
-        end,
-        desc = "Show preview incoming cast icons for layout tuning.",
-        prefix = PARTY_FRAME_PREFIX,
-        parent = trackIncomingCastsElement,
-        parentCheck = function()
-            return FF.db.profile.partyFrame.trackIncomingCasts == true
-        end,
-    })
-
-    local incomingCastBarDefaults = FF.DEFAULT_SETTINGS.incomingCastBar
-    local incomingCastBarIconDefaults = incomingCastBarDefaults.icon or {}
-
-    SettingsLib:CreateDropdown(rootCategory, {
-        key = "IncomingCastAnchorFrame",
-        name = "Anchor to",
-        default = incomingCastBarDefaults.anchorFrame,
-        values = {
-            HEALTHBAR = "Health bar",
-            FRAME = "Party frame",
-        },
-        get = function()
-            local value = GetIncomingCastBarValue("anchorFrame")
-            if value ~= "HEALTHBAR" and value ~= "FRAME" then
-                value = incomingCastBarDefaults.anchorFrame
-            end
-            return value
-        end,
-        set = function(value)
-            SetIncomingCastBarValue("anchorFrame", value)
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "Choose whether incoming cast icons are anchored to the party frame or to the frame health bar.",
-        prefix = PARTY_FRAME_PREFIX,
+        name = "Frames",
     })
 
     SettingsLib:CreateDropdown(rootCategory, {
-        key = "IncomingCastIconPosition",
-        name = "Targeted spell position",
-        default = incomingCastBarDefaults.position,
-        values = {
-            BOTTOMLEFT = "Bottom left",
-            TOPLEFT = "Top left",
-            BOTTOMRIGHT = "Bottom right",
-            TOPRIGHT = "Top right",
-            BOTTOM = "Bottom center",
-            TOP = "Top center",
-        },
+        key = "ShowPlayerFrame",
+        name = "Show Player Frame",
+        default = FF.DEFAULT_SETTINGS.playerFrame.showType,
+        values = FF.PLAYER_FRAME_SHOW_TYPES,
         get = function()
-            local pos = GetIncomingCastBarValue("position")
-            if pos ~= "TOPLEFT" and pos ~= "BOTTOMLEFT" and pos ~= "TOP" and pos ~= "BOTTOM" and pos ~= "TOPRIGHT" and pos ~= "BOTTOMRIGHT" then
-                pos = incomingCastBarDefaults.position
-            end
-            return pos
+            return FF.db.profile.playerFrame.showType or FF.DEFAULT_SETTINGS.playerFrame.showType
         end,
         set = function(value)
-            SetIncomingCastBarValue("position", value)
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
+            FF.db.profile.playerFrame.showType = value
+            self:ShowPlayerFrameIfNeeded()
         end,
-        desc = "Where to anchor targeted spell icons on the party frame.",
-        prefix = PARTY_FRAME_PREFIX,
+        desc = "Control the visibility of the player frame. 'Always' will show the player frame regardless of group status. 'Solo' will only show the player frame when not in a party or raid. 'Never' will hide the player frame regardless of group status.",
+        prefix = PARTY_FRAME_PREFIX
     })
 
-    SettingsLib:CreateDropdown(rootCategory, {
-        key = "IncomingCastIconGrowDirection",
-        name = "Grow Direction",
-        default = incomingCastBarDefaults.growthDirection,
-        values = {
-            RIGHT = "Right",
-            LEFT = "Left",
-            DOWN = "Down",
-            UP = "Up",
-        },
-        get = function()
-            local pos = GetIncomingCastBarValue("position")
-            if pos ~= "TOPLEFT" and pos ~= "BOTTOMLEFT" and pos ~= "TOP" and pos ~= "BOTTOM" and pos ~= "TOPRIGHT" and pos ~= "BOTTOMRIGHT" then
-                pos = incomingCastBarDefaults.position
-            end
-
-            local dir = GetIncomingCastBarValue("growthDirection")
-
-            if dir == nil then
-                if pos == "TOPRIGHT" or pos == "BOTTOMRIGHT" then
-                    dir = "LEFT"
-                else
-                    dir = incomingCastBarDefaults.growthDirection
-                end
-            end
-
-            if dir ~= "RIGHT" and dir ~= "LEFT" and dir ~= "DOWN" and dir ~= "UP" then
-                dir = incomingCastBarDefaults.growthDirection
-            end
-
-            return dir
-        end,
-        set = function(value)
-            SetIncomingCastBarValue("growthDirection", value)
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "Direction targeted spell icons grow when multiple are shown.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateSlider(rootCategory, {
-        key = "IncomingCastIconOffsetX",
-        name = "X offset",
-        default = incomingCastBarDefaults.offsetX,
-        min = -40,
-        max = 40,
-        step = 1,
-        formatter = function(value)
-            return string.format("%ipx", math.floor((value) + 0.5))
-        end,
-        get = function()
-            local value = GetIncomingCastBarValue("offsetX")
-            if value == nil then
-                value = incomingCastBarDefaults.offsetX
-            end
-            return value
-        end,
-        set = function(value)
-            SetIncomingCastBarValue("offsetX", value)
-
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "Horizontal offset (in pixels). Negative allows going outside the frame.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateSlider(rootCategory, {
-        key = "IncomingCastIconOffsetY",
-        name = "Y offset",
-        default = incomingCastBarDefaults.offsetY,
-        min = -40,
-        max = 40,
-        step = 1,
-        formatter = function(value)
-            return string.format("%ipx", math.floor((value) + 0.5))
-        end,
-        get = function()
-            local value = GetIncomingCastBarValue("offsetY")
-            if value == nil then
-                value = incomingCastBarDefaults.offsetY
-            end
-            return value
-        end,
-        set = function(value)
-            SetIncomingCastBarValue("offsetY", value)
-
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "Vertical offset (in pixels). Negative allows going outside the frame.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateSlider(rootCategory, {
-        key = "IncomingCastIconCount",
-        name = "Targeted spell icon count",
-        default = incomingCastBarDefaults.spellCount,
-        min = 1,
-        max = 6,
-        step = 1,
-        formatter = function(value)
-            return string.format("%i", math.floor((value) + 0.5))
-        end,
-        get = function()
-            local value = GetIncomingCastBarValue("spellCount")
-            if value == nil then
-                value = incomingCastBarDefaults.spellCount
-            end
-            return value
-        end,
-        set = function(value)
-            SetIncomingCastBarValue("spellCount", value)
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "How many targeted spell icons to show per party member.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateSlider(rootCategory, {
-        key = "IncomingCastIconScale",
-        name = "Icon scale",
-        default = incomingCastBarIconDefaults.scale,
-        min = 0.5,
-        max = 2,
-        step = 0.10,
-        formatter = function(value)
-            return string.format("%d%%", math.floor((value * 100) + 0.5))
-        end,
-        get = function()
-            local value = GetIncomingCastBarIconValue("scale")
-            if value ~= nil then
-                return value
-            end
-
-            return incomingCastBarIconDefaults.scale
-        end,
-        set = function(value)
-            SetIncomingCastBarIconValue("scale", value)
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "Scales each targeted spell icon without distorting borders/overlays.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateSlider(rootCategory, {
-        key = "IncomingCastIconSpacing",
-        name = "Icon spacing",
-        default = incomingCastBarIconDefaults.spacing,
-        min = -10,
-        max = 20,
-        step = 1,
-        formatter = function(value)
-            return string.format("%i", math.floor((value) + 0.5))
-        end,
-        get = function()
-            local value = GetIncomingCastBarIconValue("spacing")
-            if value == nil then
-                value = incomingCastBarIconDefaults.spacing
-            end
-            return value
-        end,
-        set = function(value)
-            SetIncomingCastBarIconValue("spacing", value)
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "Space (in pixels) between targeted spell icons. Negative values allow overlap.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateCheckbox(rootCategory, {
-        key = "IncomingCastIconBorder",
-        name = "Show icon border",
-        default = incomingCastBarIconDefaults.showBorder,
-        get = function()
-            local value = GetIncomingCastBarIconValue("showBorder")
-            if value == nil then
-                value = incomingCastBarIconDefaults.showBorder
-            end
-            return value
-        end,
-        set = function(value)
-            SetIncomingCastBarIconValue("showBorder", value)
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "Toggle the border around targeted spell icons.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateCheckbox(rootCategory, {
-        key = "IncomingCastIconSwipe",
-        name = "Show cooldown swipe",
-        default = incomingCastBarIconDefaults.showSwipe,
-        get = function()
-            local value = GetIncomingCastBarIconValue("showSwipe")
-            if value == nil then
-                value = incomingCastBarIconDefaults.showSwipe
-            end
-            return value
-        end,
-        set = function(value)
-            SetIncomingCastBarIconValue("showSwipe", value)
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "Toggle the cooldown swipe overlay on targeted spell icons.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    local incomingCastIconCooldownTextElement = SettingsLib:CreateCheckbox(rootCategory, {
-        key = "IncomingCastIconCooldownText",
-        name = "Show cooldown text",
-        default = incomingCastBarIconDefaults.showCooldownText,
-        get = function()
-            local value = GetIncomingCastBarIconValue("showCooldownText")
-            if value == nil then
-                value = incomingCastBarIconDefaults.showCooldownText
-            end
-            return value
-        end,
-        set = function(value)
-            SetIncomingCastBarIconValue("showCooldownText", value)
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "Toggle the cooldown countdown text on targeted spell icons.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateSlider(rootCategory, {
-        key = "IncomingCastIconCooldownFontSize",
-        name = "Cooldown text size",
-        default = incomingCastBarIconDefaults.cooldownFontSize,
-        min = 8,
-        max = 32,
-        step = 1,
-        formatter = function(value)
-            return string.format("%ipt", math.floor((value) + 0.5))
-        end,
-        get = function()
-            local value = GetIncomingCastBarIconValue("cooldownFontSize")
-            if value == nil then
-                value = incomingCastBarIconDefaults.cooldownFontSize
-            end
-            return value
-        end,
-        set = function(value)
-            SetIncomingCastBarIconValue("cooldownFontSize", math.floor((value) + 0.5))
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "Adjust the cooldown countdown text size on targeted spell icons.",
-        prefix = PARTY_FRAME_PREFIX,
-        parent = incomingCastIconCooldownTextElement,
-        parentCheck = function()
-            local value = GetIncomingCastBarIconValue("showCooldownText")
-            if value == nil then
-                value = incomingCastBarIconDefaults.showCooldownText
-            end
-            return value == true
-        end,
-    })
+    CreateIncomingCastsSettings(rootCategory)
 end

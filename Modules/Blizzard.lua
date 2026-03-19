@@ -50,4 +50,33 @@ function Object:IsManagedPartyFrame(frame)
     return false
 end
 
+function Object:GetClassColorForUnit(unit)
+    if type(unit) ~= "string" or unit == "" then
+        return nil
+    end
+
+    if type(UnitClass) ~= "function" then
+        return nil
+    end
+
+    local _, classToken = UnitClass(unit)
+    if not classToken then
+        return nil
+    end
+
+    if C_ClassColor and C_ClassColor.GetClassColor then
+        local color = C_ClassColor.GetClassColor(classToken)
+        if color then
+            return color.r, color.g, color.b
+        end
+    end
+
+    if RAID_CLASS_COLORS and RAID_CLASS_COLORS[classToken] then
+        local color = RAID_CLASS_COLORS[classToken]
+        return color.r, color.g, color.b
+    end
+
+    return nil
+end
+
 addon.Blizzard = Object:New()

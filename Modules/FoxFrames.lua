@@ -209,6 +209,18 @@ function FF:GetStatusTextColor()
     return r, g, b, a
 end
 
+function FF:GetStatusTextUseClassColors()
+    local defaultEnabled = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.statusTextUseClassColors) == true
+    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
+    local enabled = profile and profile.statusTextUseClassColors
+
+    if enabled == nil then
+        return defaultEnabled
+    end
+
+    return enabled == true
+end
+
 function FF:ApplyStatusTextColorForFrame(frame)
     if not self:IsManagedPartyFrame(frame) then
         return
@@ -218,6 +230,15 @@ function FF:ApplyStatusTextColorForFrame(frame)
 
     if not (statusText and statusText.SetTextColor) then
         return
+    end
+
+    if self:GetStatusTextUseClassColors() then
+        local classR, classG, classB = Blizzard:GetClassColorForUnit(frame and frame.unit)
+        if classR and classG and classB then
+            local _, _, _, alpha = self:GetStatusTextColor()
+            pcall(statusText.SetTextColor, statusText, classR, classG, classB, alpha)
+            return
+        end
     end
 
     local r, g, b, a = self:GetStatusTextColor()
@@ -378,11 +399,32 @@ function FF:GetPlayerNameColor()
     return r, g, b, a
 end
 
+function FF:GetPlayerNameUseClassColors()
+    local defaultEnabled = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerNameUseClassColors) == true
+    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
+    local enabled = profile and profile.playerNameUseClassColors
+
+    if enabled == nil then
+        return defaultEnabled
+    end
+
+    return enabled == true
+end
+
 function FF:ApplyPlayerNameColorForFrame(frame)
     local nameText = self:GetPlayerNameFontString(frame)
 
     if not (nameText and nameText.SetTextColor) then
         return
+    end
+
+    if self:GetPlayerNameUseClassColors() then
+        local classR, classG, classB = Blizzard:GetClassColorForUnit(frame and frame.unit)
+        if classR and classG and classB then
+            local _, _, _, alpha = self:GetPlayerNameColor()
+            pcall(nameText.SetTextColor, nameText, classR, classG, classB, alpha)
+            return
+        end
     end
 
     local r, g, b, a = self:GetPlayerNameColor()
