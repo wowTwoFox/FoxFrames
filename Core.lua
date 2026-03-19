@@ -89,6 +89,8 @@ local function GroupChangeEvent(event, ...)
         FF:RebuildIncomingCastUnitMap()
     end
 
+    FF:ShowPlayerFrameIfNeeded()
+
     if not FF:InAllowedGroup() then
         return
     end
