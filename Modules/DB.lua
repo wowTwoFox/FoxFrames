@@ -14,32 +14,41 @@ function Object:New()
     return instance
 end
 
-local statusTextAnchorPoints = {
-    TOPLEFT = true,
-    TOP = true,
-    TOPRIGHT = true,
-    LEFT = true,
-    CENTER = true,
-    RIGHT = true,
-    BOTTOMLEFT = true,
-    BOTTOM = true,
-    BOTTOMRIGHT = true,
+local anchorPoints = {
+    TOPLEFT = "TOPLEFT",
+    TOP = "TOP",
+    TOPRIGHT = "TOPRIGHT",
+    LEFT = "LEFT",
+    CENTER = "CENTER",
+    RIGHT = "RIGHT",
+    BOTTOMLEFT = "BOTTOMLEFT",
+    BOTTOM = "BOTTOM",
+    BOTTOMRIGHT = "BOTTOMRIGHT",
 }
 
-local statusTextAnchorTargets = {
-    FRAME = true,
-    HEALTHBAR = true,
+local frameAnchorTargets = {
+    FRAME = "FRAME",
+    HEALTHBAR = "HEALTHBAR",
 }
 
 local playerFrameShowTypes = {
-    Always = "Always",
-    Solo = "Solo",
-    Never = "Never",
+    ALWAYS = "ALWAYS",
+    SOLO = "SOLO",
+    NEVER = "NEVER",
 }
+
+local growthDirections = {
+    UP = "UP",
+    DOWN = "DOWN",
+    LEFT = "LEFT",
+    RIGHT = "RIGHT",
+}
+
+local defaultTexture = "DEFAULT"
 
 local defaultSettings = {
     playerFrame = {
-        showType = playerFrameShowTypes.Always,
+        showType = playerFrameShowTypes.ALWAYS,
     },
     partyFrame = {
         showTitle = true,
@@ -59,8 +68,8 @@ local defaultSettings = {
         },
         statusTextOpacity = 1,
         statusTextUseClassColors = false,
-        statusTextAnchorTarget = "FRAME",
-        statusTextAnchorPoint = "CENTER",
+        statusTextAnchorTarget = frameAnchorTargets.FRAME,
+        statusTextAnchorPoint = anchorPoints.CENTER,
         statusTextOffsetX = 0,
         statusTextOffsetY = 0,
         playerNameFontSize = 10,
@@ -72,19 +81,19 @@ local defaultSettings = {
         },
         playerNameOpacity = 1,
         playerNameUseClassColors = false,
-        playerNameAnchorTarget = "FRAME",
-        playerNameAnchorPoint = "TOP",
+        playerNameAnchorTarget = frameAnchorTargets.FRAME,
+        playerNameAnchorPoint = anchorPoints.TOP,
         playerNameOffsetX = 0,
         playerNameOffsetY = 6,
-        healthBarTexture = "DEFAULT",
+        healthBarTexture = defaultTexture,
         allowAnyAnchoring = false,
         trackIncomingCasts = false,
     },
     incomingCastBar = {
         spellCount = 3,
-        anchorFrame = "HEALTHBAR",
-        position = "BOTTOMLEFT",
-        growthDirection = "RIGHT",
+        anchorFrame = frameAnchorTargets.HEALTHBAR,
+        position = anchorPoints.BOTTOMLEFT,
+        growthDirection = growthDirections.RIGHT,
         offsetX = 2,
         offsetY = 2,
         icon = {
@@ -188,15 +197,7 @@ function Object:SetIncomingCastBarIconValue(key, value)
 end
 
 function Object:SanitizeIncomingCastPosition(value, fallback)
-    if value == "UP" then
-        value = "TOP"
-    elseif value == "DOWN" then
-        value = "BOTTOM"
-    end
-
-    if value == "TOPLEFT" or value == "TOP" or value == "TOPRIGHT"
-        or value == "LEFT" or value == "CENTER" or value == "RIGHT"
-        or value == "BOTTOMLEFT" or value == "BOTTOM" or value == "BOTTOMRIGHT" then
+    if anchorPoints[value] then
         return value
     end
 
@@ -204,23 +205,21 @@ function Object:SanitizeIncomingCastPosition(value, fallback)
 end
 
 function Object:SanitizeIncomingCastGrowDirection(value, fallback)
-    if value == "RIGHT" or value == "LEFT" or value == "DOWN" or value == "UP" then
+    if growthDirections[value] then
         return value
     end
     return fallback
 end
 
 function Object:SanitizeIncomingCastAnchorFrame(value, fallback)
-    if value == "FRAME" or value == "HEALTHBAR" then
+    if frameAnchorTargets[value] then
         return value
     end
     return fallback
 end
 
 function Object:SanitizeStatusTextAnchorPoint(value, fallback)
-    if value == "TOPLEFT" or value == "TOP" or value == "TOPRIGHT"
-        or value == "LEFT" or value == "CENTER" or value == "RIGHT"
-        or value == "BOTTOMLEFT" or value == "BOTTOM" or value == "BOTTOMRIGHT" then
+    if anchorPoints[value] then
         return value
     end
     return fallback
@@ -267,11 +266,12 @@ function Object:GetAuraCountdownFontSize()
 end
 
 function Object:GetStatusTextAnchorTarget()
-    local defaultTarget = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.statusTextAnchorTarget) or "FRAME"
+    local defaultTarget = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.statusTextAnchorTarget)
+        or frameAnchorTargets.FRAME
     local profile = self:GetPartyFrameDB()
     local target = profile and profile.statusTextAnchorTarget
 
-    if statusTextAnchorTargets[target] then
+    if frameAnchorTargets[target] then
         return target
     end
 
@@ -279,11 +279,12 @@ function Object:GetStatusTextAnchorTarget()
 end
 
 function Object:GetStatusTextAnchorPoint()
-    local defaultPoint = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.statusTextAnchorPoint) or "CENTER"
+    local defaultPoint = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.statusTextAnchorPoint)
+        or anchorPoints.CENTER
     local profile = self:GetPartyFrameDB()
     local point = profile and profile.statusTextAnchorPoint
 
-    if statusTextAnchorPoints[point] then
+    if anchorPoints[point] then
         return point
     end
 
@@ -329,11 +330,12 @@ function Object:GetStatusTextUseClassColors()
 end
 
 function Object:GetPlayerNameAnchorTarget()
-    local defaultTarget = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerNameAnchorTarget) or "FRAME"
+    local defaultTarget = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerNameAnchorTarget)
+        or frameAnchorTargets.FRAME
     local profile = self:GetPartyFrameDB()
     local target = profile and profile.playerNameAnchorTarget
 
-    if statusTextAnchorTargets[target] then
+    if frameAnchorTargets[target] then
         return target
     end
 
@@ -341,11 +343,12 @@ function Object:GetPlayerNameAnchorTarget()
 end
 
 function Object:GetPlayerNameAnchorPoint()
-    local defaultPoint = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerNameAnchorPoint) or "TOPLEFT"
+    local defaultPoint = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerNameAnchorPoint)
+        or anchorPoints.TOPLEFT
     local profile = self:GetPartyFrameDB()
     local point = profile and profile.playerNameAnchorPoint
 
-    if statusTextAnchorPoints[point] then
+    if anchorPoints[point] then
         return point
     end
 
@@ -431,14 +434,14 @@ end
 function Object:GetPlayerFrameShowType()
     local configuredTypes = self.PLAYER_FRAME_SHOW_TYPES or playerFrameShowTypes
     local defaultValue = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.playerFrame and self.DEFAULT_SETTINGS.playerFrame.showType)
-        or configuredTypes.Always
+        or configuredTypes.ALWAYS
 
     local profile = self:GetPlayerFrameDB()
     local value = profile and profile.showType
 
-    if value == configuredTypes.Always
-        or value == configuredTypes.Solo
-        or value == configuredTypes.Never then
+    if value == configuredTypes.ALWAYS
+        or value == configuredTypes.SOLO
+        or value == configuredTypes.NEVER then
         return value
     end
 
@@ -481,34 +484,21 @@ function Object:GetShowDebuffCountdown()
     return value == true
 end
 
-function Object:GetShowTankRoleIcon()
-    local defaultValue = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.showTankRoleIcon) ~= false
-    local profile = self:GetPartyFrameDB()
-    local value = profile and profile.showTankRoleIcon
+function Object:GetShowRoleIcon(role)
+    local keyMap = {
+        TANK = "showTankRoleIcon",
+        HEALER = "showHealerRoleIcon",
+        DAMAGER = "showDPSRoleIcon",
+    }
 
-    if value == nil then
-        return defaultValue
+    local key = keyMap[role]
+    if not key then
+        return false
     end
 
-    return value == true
-end
-
-function Object:GetShowHealerRoleIcon()
-    local defaultValue = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.showHealerRoleIcon) ~= false
+    local defaultValue = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame[key]) ~= false
     local profile = self:GetPartyFrameDB()
-    local value = profile and profile.showHealerRoleIcon
-
-    if value == nil then
-        return defaultValue
-    end
-
-    return value == true
-end
-
-function Object:GetShowDPSRoleIcon()
-    local defaultValue = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.showDPSRoleIcon) ~= false
-    local profile = self:GetPartyFrameDB()
-    local value = profile and profile.showDPSRoleIcon
+    local value = profile and profile[key]
 
     if value == nil then
         return defaultValue
@@ -519,7 +509,14 @@ end
 
 function Object:GetHealthBarTexture()
     local profile = self:GetPartyFrameDB()
-    return profile and profile.healthBarTexture
+    local texture = profile and profile.healthBarTexture
+    local defaultValue = self.DEFAULT_TEXTURE or defaultTexture
+
+    if type(texture) ~= "string" or texture == "" or texture == defaultValue then
+        return nil
+    end
+
+    return texture
 end
 
 function Object:GetTrackIncomingCasts()
@@ -534,200 +531,39 @@ function Object:GetTrackIncomingCasts()
     return value == true
 end
 
+function Object:MigrateAndSanitizeDB()
+    local profile = self:GetPlayerFrameDB()
+    if not profile then
+        return
+    end
+
+    -- Migrate old playerFrameShowTypes from lowercase to uppercase
+    local showType = profile.showType
+    if showType == "Always" then
+        profile.showType = playerFrameShowTypes.ALWAYS
+    elseif showType == "Solo" then
+        profile.showType = playerFrameShowTypes.SOLO
+    elseif showType == "Never" then
+        profile.showType = playerFrameShowTypes.NEVER
+    end
+end
+
 function Object:InitializeDB()
     local defaults = {
         profile = self.DEFAULT_SETTINGS or {},
     }
 
     self.db = LibStub("AceDB-3.0"):New("FoxFramesDB", defaults, true)
-
     self:MigrateAndSanitizeDB()
-end
-
-function Object:MigrateAndSanitizeDB()
-    local profile = self:GetDBProfile()
-    if not profile then
-        return
-    end
-
-    if type(profile.playerFrame) ~= "table" then
-        profile.playerFrame = {}
-    end
-    if type(profile.partyFrame) ~= "table" then
-        profile.partyFrame = {}
-    end
-    if type(profile.incomingCastBar) ~= "table" then
-        profile.incomingCastBar = {}
-    end
-
-    local incomingCastBarDefaults = self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.incomingCastBar or {}
-    local incomingCastBarIconDefaults = incomingCastBarDefaults.icon or {}
-    local partyFrameDefaults = self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame or {}
-
-    local partyFrameProfile = profile.partyFrame
-    local incomingCastBarProfile = profile.incomingCastBar
-
-    local anchorFrame = self:SanitizeIncomingCastAnchorFrame(
-        incomingCastBarProfile.anchorFrame,
-        incomingCastBarDefaults.anchorFrame or "HEALTHBAR"
-    )
-
-    local position = self:SanitizeIncomingCastPosition(
-        incomingCastBarProfile.position,
-        incomingCastBarDefaults.position or "BOTTOMLEFT"
-    )
-
-    local growthDirection = incomingCastBarProfile.growthDirection
-    if growthDirection == nil then
-        if position == "TOPRIGHT" or position == "RIGHT" or position == "BOTTOMRIGHT" then
-            growthDirection = "LEFT"
-        else
-            growthDirection = incomingCastBarDefaults.growthDirection or "RIGHT"
-        end
-    end
-    growthDirection = self:SanitizeIncomingCastGrowDirection(growthDirection, incomingCastBarDefaults.growthDirection or "RIGHT")
-
-    local spellCount = Utils:ClampNumber(incomingCastBarProfile.spellCount, 1, 6, incomingCastBarDefaults.spellCount or 3)
-    spellCount = math.floor(spellCount + 0.5)
-
-    local offsetX = Utils:ClampNumber(incomingCastBarProfile.offsetX, -200, 200, incomingCastBarDefaults.offsetX or 2)
-    offsetX = math.floor(offsetX + 0.5)
-
-    local offsetY = Utils:ClampNumber(incomingCastBarProfile.offsetY, -200, 200, incomingCastBarDefaults.offsetY or 2)
-    offsetY = math.floor(offsetY + 0.5)
-
-    if type(incomingCastBarProfile.icon) ~= "table" then
-        incomingCastBarProfile.icon = {}
-    end
-    local iconProfile = incomingCastBarProfile.icon
-
-    local iconScale = Utils:ClampNumber(iconProfile.scale, 0.5, 3, incomingCastBarIconDefaults.scale or 1)
-    iconScale = math.floor((iconScale * 100) + 0.5) / 100
-
-    local iconSpacing = Utils:ClampNumber(iconProfile.spacing, -10, 50, incomingCastBarIconDefaults.spacing or 0)
-    iconSpacing = math.floor(iconSpacing + 0.5)
-
-    local iconCooldownFontSize = Utils:ClampNumber(iconProfile.cooldownFontSize, 8, 32, incomingCastBarIconDefaults.cooldownFontSize or 10)
-    iconCooldownFontSize = math.floor(iconCooldownFontSize + 0.5)
-
-    local iconShowBorder = self:SanitizeBoolean(iconProfile.showBorder, incomingCastBarIconDefaults.showBorder ~= false)
-    local iconShowSwipe = self:SanitizeBoolean(iconProfile.showSwipe, incomingCastBarIconDefaults.showSwipe ~= false)
-    local iconShowCooldownText = self:SanitizeBoolean(iconProfile.showCooldownText, incomingCastBarIconDefaults.showCooldownText ~= false)
-
-    incomingCastBarProfile.spellCount = spellCount
-    incomingCastBarProfile.anchorFrame = anchorFrame
-    incomingCastBarProfile.position = position
-    incomingCastBarProfile.growthDirection = growthDirection
-    incomingCastBarProfile.offsetX = offsetX
-    incomingCastBarProfile.offsetY = offsetY
-
-    iconProfile.scale = iconScale
-    iconProfile.spacing = iconSpacing
-    iconProfile.cooldownFontSize = iconCooldownFontSize
-    iconProfile.showBorder = iconShowBorder
-    iconProfile.showSwipe = iconShowSwipe
-    iconProfile.showCooldownText = iconShowCooldownText
-
-    partyFrameProfile.trackIncomingCasts = (partyFrameProfile.trackIncomingCasts == true)
-    partyFrameProfile.countdownFontSize = math.floor(Utils:ClampNumber(
-        partyFrameProfile.countdownFontSize,
-        8,
-        32,
-        partyFrameDefaults.countdownFontSize or 12
-    ) + 0.5)
-    partyFrameProfile.healthTextFontSize = math.floor(Utils:ClampNumber(
-        partyFrameProfile.healthTextFontSize,
-        8,
-        32,
-        partyFrameDefaults.healthTextFontSize or 10
-    ) + 0.5)
-    partyFrameProfile.statusTextColor = self:SanitizeStatusTextColor(
-        partyFrameProfile.statusTextColor,
-        partyFrameDefaults.statusTextColor
-    )
-    partyFrameProfile.statusTextOpacity = self:SanitizeOpacity(
-        partyFrameProfile.statusTextOpacity,
-        self:SanitizeOpacity(
-            partyFrameProfile.statusTextColor and partyFrameProfile.statusTextColor.a,
-            partyFrameDefaults.statusTextOpacity
-                or (partyFrameDefaults.statusTextColor and partyFrameDefaults.statusTextColor.a)
-                or 1
-        )
-    )
-    partyFrameProfile.statusTextColor.a = partyFrameProfile.statusTextOpacity
-    partyFrameProfile.statusTextUseClassColors = self:SanitizeBoolean(
-        partyFrameProfile.statusTextUseClassColors,
-        partyFrameDefaults.statusTextUseClassColors == true
-    )
-    partyFrameProfile.statusTextOffsetX = math.floor(Utils:ClampNumber(
-        partyFrameProfile.statusTextOffsetX,
-        -100,
-        100,
-        partyFrameDefaults.statusTextOffsetX or 0
-    ) + 0.5)
-    partyFrameProfile.statusTextOffsetY = math.floor(Utils:ClampNumber(
-        partyFrameProfile.statusTextOffsetY,
-        -100,
-        100,
-        partyFrameDefaults.statusTextOffsetY or 0
-    ) + 0.5)
-    partyFrameProfile.statusTextAnchorTarget = self:SanitizeIncomingCastAnchorFrame(
-        partyFrameProfile.statusTextAnchorTarget,
-        partyFrameDefaults.statusTextAnchorTarget or "FRAME"
-    )
-    partyFrameProfile.statusTextAnchorPoint = self:SanitizeStatusTextAnchorPoint(
-        partyFrameProfile.statusTextAnchorPoint,
-        partyFrameDefaults.statusTextAnchorPoint or "CENTER"
-    )
-    partyFrameProfile.playerNameFontSize = math.floor(Utils:ClampNumber(
-        partyFrameProfile.playerNameFontSize,
-        8,
-        32,
-        partyFrameDefaults.playerNameFontSize or 10
-    ) + 0.5)
-    partyFrameProfile.playerNameColor = self:SanitizeStatusTextColor(
-        partyFrameProfile.playerNameColor,
-        partyFrameDefaults.playerNameColor
-    )
-    partyFrameProfile.playerNameOpacity = self:SanitizeOpacity(
-        partyFrameProfile.playerNameOpacity,
-        self:SanitizeOpacity(
-            partyFrameProfile.playerNameColor and partyFrameProfile.playerNameColor.a,
-            partyFrameDefaults.playerNameOpacity
-                or (partyFrameDefaults.playerNameColor and partyFrameDefaults.playerNameColor.a)
-                or 1
-        )
-    )
-    partyFrameProfile.playerNameColor.a = partyFrameProfile.playerNameOpacity
-    partyFrameProfile.playerNameUseClassColors = self:SanitizeBoolean(
-        partyFrameProfile.playerNameUseClassColors,
-        partyFrameDefaults.playerNameUseClassColors == true
-    )
-    partyFrameProfile.playerNameOffsetX = math.floor(Utils:ClampNumber(
-        partyFrameProfile.playerNameOffsetX,
-        -100,
-        100,
-        partyFrameDefaults.playerNameOffsetX or 0
-    ) + 0.5)
-    partyFrameProfile.playerNameOffsetY = math.floor(Utils:ClampNumber(
-        partyFrameProfile.playerNameOffsetY,
-        -100,
-        100,
-        partyFrameDefaults.playerNameOffsetY or 0
-    ) + 0.5)
-    partyFrameProfile.playerNameAnchorTarget = self:SanitizeIncomingCastAnchorFrame(
-        partyFrameProfile.playerNameAnchorTarget,
-        partyFrameDefaults.playerNameAnchorTarget or "FRAME"
-    )
-    partyFrameProfile.playerNameAnchorPoint = self:SanitizeStatusTextAnchorPoint(
-        partyFrameProfile.playerNameAnchorPoint,
-        partyFrameDefaults.playerNameAnchorPoint or "TOPLEFT"
-    )
 end
 
 local db = Object:New()
 db.DEFAULT_SETTINGS = defaultSettings
+db.DEFAULT_TEXTURE = defaultTexture
+db.ANCHOR_POINTS = anchorPoints
+db.FRAME_ANCHOR_TARGETS = frameAnchorTargets
 db.PLAYER_FRAME_SHOW_TYPES = playerFrameShowTypes
+db.GROWTH_DIRECTIONS = growthDirections
 
 if addon then
     addon.DB = db

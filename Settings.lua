@@ -5,31 +5,35 @@ local DB = addon.DB
 
 local SettingsLib = LibStub("LibEQOLSettingsMode-1.0")
 local SETTINGS_PREFIX = "FoxFrames_"
-local INCOMING_CASTS_PREFIX = SETTINGS_PREFIX .. "IncomingCasts_"
 
-local STATUS_TEXT_ANCHOR_POINTS = {
-    TOPLEFT = "Top left",
-    TOP = "Top",
-    TOPRIGHT = "Top right",
-    LEFT = "Left",
-    CENTER = "Center",
-    RIGHT = "Right",
-    BOTTOMLEFT = "Bottom left",
-    BOTTOM = "Bottom",
-    BOTTOMRIGHT = "Bottom right",
+local ANCHOR_POINTS = {
+    [DB.ANCHOR_POINTS.TOPLEFT] = "Top Left",
+    [DB.ANCHOR_POINTS.TOP] = "Top",
+    [DB.ANCHOR_POINTS.TOPRIGHT] = "Top Right",
+    [DB.ANCHOR_POINTS.LEFT] = "Left",
+    [DB.ANCHOR_POINTS.CENTER] = "Center",
+    [DB.ANCHOR_POINTS.RIGHT] = "Right",
+    [DB.ANCHOR_POINTS.BOTTOMLEFT] = "Bottom Left",
+    [DB.ANCHOR_POINTS.BOTTOM] = "Bottom",
+    [DB.ANCHOR_POINTS.BOTTOMRIGHT] = "Bottom Right",
 }
-local STATUS_TEXT_ANCHOR_TARGETS = {
-    FRAME = "Party frame",
-    HEALTHBAR = "Health bar",
+local FRAME_ANCHOR_TARGETS = {
+    [DB.FRAME_ANCHOR_TARGETS.FRAME] = "Party Frame",
+    [DB.FRAME_ANCHOR_TARGETS.HEALTHBAR] = "Health Bar",
 }
-FF.DEFAULT_TEXTURE = FF.DEFAULT_TEXTURE or "DEFAULT"
+local PLAYER_FRAME_SHOW_TYPE_LABELS = {
+    [DB.PLAYER_FRAME_SHOW_TYPES.ALWAYS] = "Always",
+    [DB.PLAYER_FRAME_SHOW_TYPES.SOLO] = "Solo",
+    [DB.PLAYER_FRAME_SHOW_TYPES.NEVER] = "Never",
+}
+local DEFAULT_TEXTURE = DB.DEFAULT_TEXTURE
 
 function FF:GetTextures()
     local alreadyAddedPaths = {}
 
     -- Always add built-in textures at the top in specific order
     local textures = {{
-        path = FF.DEFAULT_TEXTURE,
+        path = DEFAULT_TEXTURE,
         name = "Default"
     }, {
         path = "Interface\\RaidFrame\\Raid-Bar-Hp-Fill",
@@ -104,10 +108,6 @@ local function PlayerFrameProfile()
     return DB:GetPlayerFrameDB()
 end
 
-local function GetIncomingCastBarProfile()
-    return DB:GetIncomingCastBarProfile()
-end
-
 local function GetIncomingCastBarValue(key)
     return DB:GetIncomingCastBarValue(key)
 end
@@ -125,8 +125,8 @@ local function SetIncomingCastBarIconValue(key, value)
 end
 
 local function CreateIncomingCastsSettings(rootCategory)
+    local incomingCastsPrefix = SETTINGS_PREFIX .. "IncomingCasts_"
     local incomingCastsCategory = SettingsLib:CreateCategory(rootCategory, "Incoming Casts")
-    local incomingCastsPrefix = INCOMING_CASTS_PREFIX
 
     SettingsLib:CreateText(
         incomingCastsCategory,
@@ -233,10 +233,10 @@ local function CreateIncomingCastsSettings(rootCategory)
         name = "Grow Direction",
         default = incomingCastBarDefaults.growthDirection,
         values = {
-            RIGHT = "Right",
-            LEFT = "Left",
-            DOWN = "Down",
-            UP = "Up",
+            [DB.GROWTH_DIRECTIONS.RIGHT] = "Right",
+            [DB.GROWTH_DIRECTIONS.LEFT] = "Left",
+            [DB.GROWTH_DIRECTIONS.DOWN] = "Down",
+            [DB.GROWTH_DIRECTIONS.UP] = "Up",
         },
         get = function()
             local pos = SanitizePosition(
@@ -248,13 +248,13 @@ local function CreateIncomingCastsSettings(rootCategory)
 
             if dir == nil then
                 if pos == "TOPRIGHT" or pos == "RIGHT" or pos == "BOTTOMRIGHT" then
-                    dir = "LEFT"
+                    dir = DB.GROWTH_DIRECTIONS.LEFT
                 else
                     dir = incomingCastBarDefaults.growthDirection
                 end
             end
 
-            if dir ~= "RIGHT" and dir ~= "LEFT" and dir ~= "DOWN" and dir ~= "UP" then
+            if not DB.GROWTH_DIRECTIONS[dir] then
                 dir = incomingCastBarDefaults.growthDirection
             end
 
@@ -530,7 +530,7 @@ function FF:SetupOptions()
         name = "Show Title",
         default = DB.DEFAULT_SETTINGS.partyFrame.showTitle,
         get = function() 
-            return PartyFrameProfile().showTitle 
+            return PartyFrameProfile().showTitle
         end,
         set = function(value)
             PartyFrameProfile().showTitle = value
@@ -584,7 +584,7 @@ function FF:SetupOptions()
     SettingsLib:CreateScrollDropdown(rootCategory, {
         key = "HealthBarTexture",
         name = "Health Bar Texture",
-        default = FF.DEFAULT_TEXTURE,
+        default = DEFAULT_TEXTURE,
         optionfunc = function()
             -- Return values in the order they were added
             local orderedValues = {}
@@ -595,10 +595,10 @@ function FF:SetupOptions()
         end,
         order = textureOrder,
         get = function()
-            return PartyFrameProfile().healthBarTexture or FF.DEFAULT_TEXTURE
+            return PartyFrameProfile().healthBarTexture or DEFAULT_TEXTURE
         end,
         set = function(value)
-            if value == FF.DEFAULT_TEXTURE then
+            if value == DEFAULT_TEXTURE then
                 PartyFrameProfile().healthBarTexture = nil
             else
                 PartyFrameProfile().healthBarTexture = value
@@ -624,7 +624,7 @@ function FF:SetupOptions()
         key = "StatusTextAnchorTarget",
         name = "Anchor to",
         default = DB.DEFAULT_SETTINGS.partyFrame.statusTextAnchorTarget,
-        values = STATUS_TEXT_ANCHOR_TARGETS,
+        values = FRAME_ANCHOR_TARGETS,
         get = function()
             return SanitizeIncomingCastAnchorFrame(
                 PartyFrameProfile().statusTextAnchorTarget,
@@ -647,7 +647,7 @@ function FF:SetupOptions()
         key = "StatusTextAnchorPoint",
         name = "Status text anchor",
         default = DB.DEFAULT_SETTINGS.partyFrame.statusTextAnchorPoint,
-        values = STATUS_TEXT_ANCHOR_POINTS,
+        values = ANCHOR_POINTS,
         get = function()
             return SanitizeStatusTextAnchorPoint(
                 PartyFrameProfile().statusTextAnchorPoint,
@@ -855,7 +855,7 @@ function FF:SetupOptions()
         key = "PlayerNameAnchorTarget",
         name = "Anchor to",
         default = DB.DEFAULT_SETTINGS.partyFrame.playerNameAnchorTarget,
-        values = STATUS_TEXT_ANCHOR_TARGETS,
+        values = FRAME_ANCHOR_TARGETS,
         get = function()
             return SanitizeIncomingCastAnchorFrame(
                 PartyFrameProfile().playerNameAnchorTarget,
@@ -877,7 +877,7 @@ function FF:SetupOptions()
         key = "PlayerNameAnchorPoint",
         name = "Player name anchor",
         default = DB.DEFAULT_SETTINGS.partyFrame.playerNameAnchorPoint,
-        values = STATUS_TEXT_ANCHOR_POINTS,
+        values = ANCHOR_POINTS,
         get = function()
             return SanitizeStatusTextAnchorPoint(
                 PartyFrameProfile().playerNameAnchorPoint,
@@ -1176,7 +1176,7 @@ function FF:SetupOptions()
         key = "ShowPlayerFrame",
         name = "Show Player Frame",
         default = DB.DEFAULT_SETTINGS.playerFrame.showType,
-        values = DB.PLAYER_FRAME_SHOW_TYPES,
+        values = PLAYER_FRAME_SHOW_TYPE_LABELS,
         get = function()
             return PlayerFrameProfile().showType or DB.DEFAULT_SETTINGS.playerFrame.showType
         end,

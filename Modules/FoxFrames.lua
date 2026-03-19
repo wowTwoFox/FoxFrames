@@ -37,9 +37,9 @@ end
 function FF:ShowPlayerFrameIfNeeded()
     local showType = DB:GetPlayerFrameShowType()
 
-    if showType == DB.PLAYER_FRAME_SHOW_TYPES.Solo then
+    if showType == DB.PLAYER_FRAME_SHOW_TYPES.SOLO then
         PlayerFrame:SetShown(Blizzard:InSoloMode())
-    elseif showType == DB.PLAYER_FRAME_SHOW_TYPES.Never then
+    elseif showType == DB.PLAYER_FRAME_SHOW_TYPES.NEVER then
         PlayerFrame:SetShown(false)
     else
         PlayerFrame:SetShown(true)
@@ -114,7 +114,7 @@ function FF:ApplyStatusTextAnchorForFrame(frame)
     local point = DB:GetStatusTextAnchorPoint()
     local target = DB:GetStatusTextAnchorTarget()
     local relativeTo = frame
-    if target == "HEALTHBAR" and frame.healthBar then
+    if target == DB.FRAME_ANCHOR_TARGETS.HEALTHBAR and frame.healthBar then
         relativeTo = frame.healthBar
     end
     local offsetX, offsetY = DB:GetStatusTextAnchorOffsets()
@@ -122,11 +122,11 @@ function FF:ApplyStatusTextAnchorForFrame(frame)
     local xOffset = offsetX
     local yOffset = offsetY
 
-    if point == "TOPLEFT" or point == "LEFT" or point == "BOTTOMLEFT" then
+    if point == DB.ANCHOR_POINTS.TOPLEFT or point == DB.ANCHOR_POINTS.LEFT or point == DB.ANCHOR_POINTS.BOTTOMLEFT then
         xOffset = -offsetX
     end
 
-    if point == "TOPLEFT" or point == "TOP" or point == "TOPRIGHT" then
+    if point == DB.ANCHOR_POINTS.TOPLEFT or point == DB.ANCHOR_POINTS.TOP or point == DB.ANCHOR_POINTS.TOPRIGHT then
         yOffset = -offsetY
     end
 
@@ -244,7 +244,7 @@ function FF:ApplyPlayerNameAnchorForFrame(frame)
     local point = DB:GetPlayerNameAnchorPoint()
     local target = DB:GetPlayerNameAnchorTarget()
     local relativeTo = frame
-    if target == "HEALTHBAR" and frame.healthBar then
+    if target == DB.FRAME_ANCHOR_TARGETS.HEALTHBAR and frame.healthBar then
         relativeTo = frame.healthBar
     end
     local offsetX, offsetY = DB:GetPlayerNameAnchorOffsets()
@@ -252,11 +252,11 @@ function FF:ApplyPlayerNameAnchorForFrame(frame)
     local xOffset = offsetX
     local yOffset = offsetY
 
-    if point == "TOPLEFT" or point == "LEFT" or point == "BOTTOMLEFT" then
+    if point == DB.ANCHOR_POINTS.TOPLEFT or point == DB.ANCHOR_POINTS.LEFT or point == DB.ANCHOR_POINTS.BOTTOMLEFT then
         xOffset = -offsetX
     end
 
-    if point == "TOPLEFT" or point == "TOP" or point == "TOPRIGHT" then
+    if point == DB.ANCHOR_POINTS.TOPLEFT or point == DB.ANCHOR_POINTS.TOP or point == DB.ANCHOR_POINTS.TOPRIGHT then
         yOffset = -offsetY
     end
 
@@ -388,11 +388,7 @@ function FF:UpdateRoleIcon(frame)
         return
     end
 
-    local show = (role == "TANK" and DB:GetShowTankRoleIcon())
-        or (role == "HEALER" and DB:GetShowHealerRoleIcon())
-        or (role == "DAMAGER" and DB:GetShowDPSRoleIcon())
-
-    if show then
+    if DB:GetShowRoleIcon(role) then
         -- print("Hiding DPS role icon for frame:", frame:GetName(), "unit:", frame.unit, "role:", role)
         frame.roleIcon:Show()
     else
@@ -420,7 +416,7 @@ function FF:UpdateHealthBarTexture(healthBar)
         return
     end
     local texture = DB:GetHealthBarTexture()
-    if not texture or texture == FF.DEFAULT_TEXTURE then return end
+    if not texture then return end
 
     Utils:Log("FF:UpdateHealthBarTexture", healthBar)
     healthBar:SetStatusBarTexture(texture)

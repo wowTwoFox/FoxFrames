@@ -502,7 +502,7 @@ local function GetIncomingCastIndicatorConfig()
         end
     end
 
-    local growDirection = incomingCastBarDefaults.growthDirection or "RIGHT"
+    local growDirection = incomingCastBarDefaults.growthDirection or DB.GROWTH_DIRECTIONS.RIGHT
     do
         -- Backward-friendly behavior: if the user hasn't explicitly chosen a grow direction,
         -- keep the old behavior where right-anchored positions grow left.
@@ -510,12 +510,12 @@ local function GetIncomingCastIndicatorConfig()
 
         if explicitValue == nil then
             if position == "TOPRIGHT" or position == "RIGHT" or position == "BOTTOMRIGHT" then
-                growDirection = "LEFT"
+                growDirection = DB.GROWTH_DIRECTIONS.LEFT
             else
-                growDirection = incomingCastBarDefaults.growthDirection or "RIGHT"
+                growDirection = incomingCastBarDefaults.growthDirection or DB.GROWTH_DIRECTIONS.RIGHT
             end
         else
-            if explicitValue == "RIGHT" or explicitValue == "LEFT" or explicitValue == "DOWN" or explicitValue == "UP" then
+            if DB.GROWTH_DIRECTIONS[explicitValue] then
                 growDirection = explicitValue
             end
         end
