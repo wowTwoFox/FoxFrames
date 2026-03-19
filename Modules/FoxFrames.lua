@@ -102,6 +102,330 @@ function FF:UpdateAuraCountdownFontSize()
     end
 end
 
+local statusTextAnchorPoints = {
+    TOPLEFT = true,
+    TOP = true,
+    TOPRIGHT = true,
+    LEFT = true,
+    CENTER = true,
+    RIGHT = true,
+    BOTTOMLEFT = true,
+    BOTTOM = true,
+    BOTTOMRIGHT = true,
+}
+
+local statusTextAnchorTargets = {
+    FRAME = true,
+    HEALTHBAR = true,
+}
+
+function FF:GetStatusTextAnchorTarget()
+    local defaultTarget = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.statusTextAnchorTarget) or "FRAME"
+    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
+    local target = profile and profile.statusTextAnchorTarget
+
+    if statusTextAnchorTargets[target] then
+        return target
+    end
+
+    return defaultTarget
+end
+
+function FF:GetStatusTextAnchorPoint()
+    local defaultPoint = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.statusTextAnchorPoint) or "CENTER"
+    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
+    local point = profile and profile.statusTextAnchorPoint
+
+    if statusTextAnchorPoints[point] then
+        return point
+    end
+
+    return defaultPoint
+end
+
+function FF:GetStatusTextAnchorOffsets()
+    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame) or {}
+    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
+
+    local offsetX = Utils:ClampNumber(profile and profile.statusTextOffsetX, -100, 100, defaults.statusTextOffsetX or 0)
+    local offsetY = Utils:ClampNumber(profile and profile.statusTextOffsetY, -100, 100, defaults.statusTextOffsetY or 0)
+
+    return math.floor(offsetX + 0.5), math.floor(offsetY + 0.5)
+end
+
+function FF:ApplyStatusTextAnchorForFrame(frame)
+    local statusText = frame and frame.statusText
+    if not (statusText and statusText.ClearAllPoints and statusText.SetPoint) then
+        return
+    end
+
+    local point = self:GetStatusTextAnchorPoint()
+    local target = self:GetStatusTextAnchorTarget()
+    local relativeTo = frame
+    if target == "HEALTHBAR" and frame.healthBar then
+        relativeTo = frame.healthBar
+    end
+    local offsetX, offsetY = self:GetStatusTextAnchorOffsets()
+
+    local xOffset = offsetX
+    local yOffset = offsetY
+
+    if point == "TOPLEFT" or point == "LEFT" or point == "BOTTOMLEFT" then
+        xOffset = -offsetX
+    end
+
+    if point == "TOPLEFT" or point == "TOP" or point == "TOPRIGHT" then
+        yOffset = -offsetY
+    end
+
+    statusText:ClearAllPoints()
+    pcall(statusText.SetPoint, statusText, point, relativeTo, point, xOffset, yOffset)
+end
+
+function FF:UpdateStatusTextAnchoring()
+    if not CompactPartyFrame then return end
+
+    for _, frame in ipairs(CompactPartyFrame.memberUnitFrames) do
+        self:ApplyStatusTextAnchorForFrame(frame)
+    end
+end
+
+function FF:GetStatusTextColor()
+    local defaultColor = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.statusTextColor)
+        or { r = 1, g = 1, b = 1, a = 1 }
+    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
+    local color = profile and profile.statusTextColor
+
+    local r = Utils:ClampNumber(color and color.r, 0, 1, defaultColor.r or 1)
+    local g = Utils:ClampNumber(color and color.g, 0, 1, defaultColor.g or 1)
+    local b = Utils:ClampNumber(color and color.b, 0, 1, defaultColor.b or 1)
+    local a = Utils:ClampNumber(color and color.a, 0, 1, defaultColor.a or 1)
+
+    return r, g, b, a
+end
+
+function FF:ApplyStatusTextColorForFrame(frame)
+    local statusText = frame and frame.statusText
+
+    if not (statusText and statusText.SetTextColor) then
+        return
+    end
+
+    local r, g, b, a = self:GetStatusTextColor()
+    pcall(statusText.SetTextColor, statusText, r, g, b, a)
+end
+
+function FF:UpdateStatusTextColor()
+    if not CompactPartyFrame then return end
+
+    for _, frame in ipairs(CompactPartyFrame.memberUnitFrames) do
+        self:ApplyStatusTextColorForFrame(frame)
+    end
+end
+
+function FF:ApplyStatusTextSettingsForFrame(frame)
+    self:ApplyStatusTextAnchorForFrame(frame)
+    self:ApplyStatusTextColorForFrame(frame)
+    self:ApplyHealthTextFontSizeForFrame(frame)
+end
+
+function FF:ApplyStatusTextSettings()
+    if not CompactPartyFrame then
+        return
+    end
+
+    for _, frame in ipairs(CompactPartyFrame.memberUnitFrames) do
+        self:ApplyStatusTextSettingsForFrame(frame)
+    end
+end
+
+function FF:RequestStatusTextSettingsRefresh()
+    if self._ffStatusTextSettingsRefreshQueued then
+        return
+    end
+
+    self._ffStatusTextSettingsRefreshQueued = true
+
+    local function ApplyNow()
+        self._ffStatusTextSettingsRefreshQueued = false
+        self:ApplyStatusTextSettings()
+    end
+
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0, ApplyNow)
+
+        -- Second pass wins races when Blizzard applies its own defaults later.
+        C_Timer.After(0.15, function()
+            self:ApplyStatusTextSettings()
+        end)
+    else
+        ApplyNow()
+    end
+end
+
+function FF:GetPlayerNameAnchorTarget()
+    local defaultTarget = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerNameAnchorTarget) or "FRAME"
+    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
+    local target = profile and profile.playerNameAnchorTarget
+
+    if statusTextAnchorTargets[target] then
+        return target
+    end
+
+    return defaultTarget
+end
+
+function FF:GetPlayerNameAnchorPoint()
+    local defaultPoint = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerNameAnchorPoint) or "TOPLEFT"
+    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
+    local point = profile and profile.playerNameAnchorPoint
+
+    if statusTextAnchorPoints[point] then
+        return point
+    end
+
+    return defaultPoint
+end
+
+function FF:GetPlayerNameAnchorOffsets()
+    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame) or {}
+    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
+
+    local offsetX = Utils:ClampNumber(profile and profile.playerNameOffsetX, -100, 100, defaults.playerNameOffsetX or 0)
+    local offsetY = Utils:ClampNumber(profile and profile.playerNameOffsetY, -100, 100, defaults.playerNameOffsetY or 0)
+
+    return math.floor(offsetX + 0.5), math.floor(offsetY + 0.5)
+end
+
+function FF:ApplyPlayerNameAnchorForFrame(frame)
+    local nameText = frame and frame.name
+    if not (nameText and nameText.ClearAllPoints and nameText.SetPoint) then
+        return
+    end
+
+    local point = self:GetPlayerNameAnchorPoint()
+    local target = self:GetPlayerNameAnchorTarget()
+    local relativeTo = frame
+    if target == "HEALTHBAR" and frame.healthBar then
+        relativeTo = frame.healthBar
+    end
+    local offsetX, offsetY = self:GetPlayerNameAnchorOffsets()
+
+    local xOffset = offsetX
+    local yOffset = offsetY
+
+    if point == "TOPLEFT" or point == "LEFT" or point == "BOTTOMLEFT" then
+        xOffset = -offsetX
+    end
+
+    if point == "TOPLEFT" or point == "TOP" or point == "TOPRIGHT" then
+        yOffset = -offsetY
+    end
+
+    nameText:ClearAllPoints()
+    pcall(nameText.SetPoint, nameText, point, relativeTo, point, xOffset, yOffset)
+end
+
+function FF:UpdatePlayerNameAnchoring()
+    if not CompactPartyFrame then return end
+
+    for _, frame in ipairs(CompactPartyFrame.memberUnitFrames) do
+        self:ApplyPlayerNameAnchorForFrame(frame)
+    end
+end
+
+function FF:GetPlayerNameColor()
+    local defaultColor = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerNameColor)
+        or { r = 1, g = 1, b = 1, a = 1 }
+    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
+    local color = profile and profile.playerNameColor
+
+    local r = Utils:ClampNumber(color and color.r, 0, 1, defaultColor.r or 1)
+    local g = Utils:ClampNumber(color and color.g, 0, 1, defaultColor.g or 1)
+    local b = Utils:ClampNumber(color and color.b, 0, 1, defaultColor.b or 1)
+    local a = Utils:ClampNumber(color and color.a, 0, 1, defaultColor.a or 1)
+
+    return r, g, b, a
+end
+
+function FF:ApplyPlayerNameColorForFrame(frame)
+    local nameText = frame and frame.name
+
+    if not (nameText and nameText.SetTextColor) then
+        return
+    end
+
+    local r, g, b, a = self:GetPlayerNameColor()
+    pcall(nameText.SetTextColor, nameText, r, g, b, a)
+end
+
+function FF:UpdatePlayerNameColor()
+    if not CompactPartyFrame then return end
+
+    for _, frame in ipairs(CompactPartyFrame.memberUnitFrames) do
+        self:ApplyPlayerNameColorForFrame(frame)
+    end
+end
+
+function FF:GetPlayerNameFontSize()
+    local defaultSize = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerNameFontSize) or 10
+    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
+    local size = Utils:ClampNumber(profile and profile.playerNameFontSize, 8, 32, defaultSize)
+    return math.floor(size + 0.5)
+end
+
+function FF:ApplyPlayerNameFontSizeForFrame(frame)
+    local nameText = frame and frame.name
+
+    if not (nameText and nameText.GetFont and nameText.SetFont) then
+        return
+    end
+
+    local size = self:GetPlayerNameFontSize()
+
+    local fontFile, _, flags = nameText:GetFont()
+    if fontFile then
+        pcall(nameText.SetFont, nameText, fontFile, size, flags)
+    end
+end
+
+function FF:UpdatePlayerNameFontSize()
+    if not CompactPartyFrame then return end
+
+    for _, frame in ipairs(CompactPartyFrame.memberUnitFrames) do
+        self:ApplyPlayerNameFontSizeForFrame(frame)
+    end
+end
+
+function FF:GetHealthTextFontSize()
+    local defaultSize = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.healthTextFontSize) or 10
+    local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
+    local size = Utils:ClampNumber(profile and profile.healthTextFontSize, 8, 32, defaultSize)
+    return math.floor(size + 0.5)
+end
+
+function FF:ApplyHealthTextFontSizeForFrame(frame)
+    local fontString = frame and frame.statusText
+
+    if not (fontString and fontString.GetFont and fontString.SetFont) then
+        return
+    end
+
+    local size = self:GetHealthTextFontSize()
+
+    local fontFile, _, flags = fontString:GetFont()
+    if fontFile then
+        pcall(fontString.SetFont, fontString, fontFile, size, flags)
+    end
+end
+
+function FF:UpdateHealthTextFontSize()
+    if not CompactPartyFrame then return end
+    for _, frame in ipairs(CompactPartyFrame.memberUnitFrames) do
+        self:ApplyHealthTextFontSizeForFrame(frame)
+    end
+end
+
 function FF:ShowBuffCountdownIfNeededForFrame(frame)
     if not (frame and frame.buffFrames) then
         return
@@ -199,6 +523,10 @@ function FF:UpdateFrame(frame)
         self:UpdateRoleIcon(frame)
     end
 
+    self:ApplyPlayerNameAnchorForFrame(frame)
+    self:ApplyPlayerNameColorForFrame(frame)
+    self:ApplyPlayerNameFontSizeForFrame(frame)
+    self:ApplyStatusTextSettingsForFrame(frame)
     self:UpdateTextures(frame)
 end
 
@@ -221,6 +549,11 @@ function FF:SetupFrames()
     self:ShowBuffCountdownIfNeeded()
     self:ShowDebuffCountdownIfNeeded()
     self:UpdateAuraCountdownFontSize()
+    self:UpdatePlayerNameAnchoring()
+    self:UpdatePlayerNameColor()
+    self:UpdatePlayerNameFontSize()
+    self:ApplyStatusTextSettings()
+    self:RequestStatusTextSettingsRefresh()
     self:ShowPartyFrameTitleIfNeeded()
     self:ShowPlayerFrameIfNeeded()
     self:UpdateFrames()

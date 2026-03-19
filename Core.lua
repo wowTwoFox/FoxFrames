@@ -97,6 +97,11 @@ local function GroupChangeEvent(event, ...)
 
     -- Utils:Log("GROUP_CHANGE_EVENT", event)
     FF:UpdateFrames()
+    if FF.RequestStatusTextSettingsRefresh then
+        FF:RequestStatusTextSettingsRefresh()
+    elseif FF.UpdateHealthTextFontSize then
+        FF:UpdateHealthTextFontSize()
+    end
 
     if FF.SetupIncomingCastIndicators then
         FF:SetupIncomingCastIndicators()
@@ -160,6 +165,35 @@ function FF:OnInitialize()
         end)
     end
 
+    if type(_G["CompactUnitFrame_UpdateHealthText"]) == "function" then
+        hooksecurefunc("CompactUnitFrame_UpdateHealthText", function(frame)
+            FF:ApplyStatusTextSettingsForFrame(frame)
+            FF:RequestStatusTextSettingsRefresh()
+        end)
+    end
+
+    if type(_G["CompactUnitFrame_UpdateStatusText"]) == "function" then
+        hooksecurefunc("CompactUnitFrame_UpdateStatusText", function(frame)
+            FF:ApplyStatusTextSettingsForFrame(frame)
+            FF:RequestStatusTextSettingsRefresh()
+        end)
+    end
+
+    if type(_G["CompactUnitFrame_UpdateAll"]) == "function" then
+        hooksecurefunc("CompactUnitFrame_UpdateAll", function(frame)
+            FF:ApplyStatusTextSettingsForFrame(frame)
+            FF:RequestStatusTextSettingsRefresh()
+        end)
+    end
+
+    if type(_G["CompactUnitFrame_UpdateName"]) == "function" then
+        hooksecurefunc("CompactUnitFrame_UpdateName", function(frame)
+            FF:ApplyPlayerNameAnchorForFrame(frame)
+            FF:ApplyPlayerNameColorForFrame(frame)
+            FF:ApplyPlayerNameFontSizeForFrame(frame)
+        end)
+    end
+
     Utils:Log("CompactPartyFrame", CompactPartyFrame)
     -- Utils:Log("EditModeManagerFrame", EditModeManagerFrame)
     -- Utils:Log("PartyFrame", PartyFrame)
@@ -191,6 +225,23 @@ function FF:OnEnable()
     hooksecurefunc("CompactUnitFrame_UpdateRoleIcon", function(frame)
         self:UpdateRoleIcon(frame)
     end)
+
+    -- Apply once after startup so status text exists before sizing it.
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0, function()
+            self:UpdatePlayerNameAnchoring()
+            self:UpdatePlayerNameColor()
+            self:UpdatePlayerNameFontSize()
+            self:ApplyStatusTextSettings()
+            self:RequestStatusTextSettingsRefresh()
+        end)
+    else
+        self:UpdatePlayerNameAnchoring()
+        self:UpdatePlayerNameColor()
+        self:UpdatePlayerNameFontSize()
+        self:ApplyStatusTextSettings()
+        self:RequestStatusTextSettingsRefresh()
+    end
 end
 
 function FF:PLAYER_REGEN_ENABLED()
