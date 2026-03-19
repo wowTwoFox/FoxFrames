@@ -196,15 +196,17 @@ function FF:UpdateStatusTextAnchoring()
 end
 
 function FF:GetStatusTextColor()
-    local defaultColor = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.statusTextColor)
-        or { r = 1, g = 1, b = 1, a = 1 }
+    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame) or {}
+    local defaultColor = defaults.statusTextColor or { r = 1, g = 1, b = 1, a = 1 }
+    local defaultOpacity = Utils:ClampNumber(defaults.statusTextOpacity, 0, 1, defaultColor.a or 1)
     local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
     local color = profile and profile.statusTextColor
 
     local r = Utils:ClampNumber(color and color.r, 0, 1, defaultColor.r or 1)
     local g = Utils:ClampNumber(color and color.g, 0, 1, defaultColor.g or 1)
     local b = Utils:ClampNumber(color and color.b, 0, 1, defaultColor.b or 1)
-    local a = Utils:ClampNumber(color and color.a, 0, 1, defaultColor.a or 1)
+    local colorOpacity = Utils:ClampNumber(color and color.a, 0, 1, defaultOpacity)
+    local a = Utils:ClampNumber(profile and profile.statusTextOpacity, 0, 1, colorOpacity)
 
     return r, g, b, a
 end
@@ -386,15 +388,17 @@ function FF:UpdatePlayerNameAnchoring()
 end
 
 function FF:GetPlayerNameColor()
-    local defaultColor = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerNameColor)
-        or { r = 1, g = 1, b = 1, a = 1 }
+    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame) or {}
+    local defaultColor = defaults.playerNameColor or { r = 1, g = 1, b = 1, a = 1 }
+    local defaultOpacity = Utils:ClampNumber(defaults.playerNameOpacity, 0, 1, defaultColor.a or 1)
     local profile = self and self.db and self.db.profile and self.db.profile.partyFrame
     local color = profile and profile.playerNameColor
 
     local r = Utils:ClampNumber(color and color.r, 0, 1, defaultColor.r or 1)
     local g = Utils:ClampNumber(color and color.g, 0, 1, defaultColor.g or 1)
     local b = Utils:ClampNumber(color and color.b, 0, 1, defaultColor.b or 1)
-    local a = Utils:ClampNumber(color and color.a, 0, 1, defaultColor.a or 1)
+    local colorOpacity = Utils:ClampNumber(color and color.a, 0, 1, defaultOpacity)
+    local a = Utils:ClampNumber(profile and profile.playerNameOpacity, 0, 1, colorOpacity)
 
     return r, g, b, a
 end

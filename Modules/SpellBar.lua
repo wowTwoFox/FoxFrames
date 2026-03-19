@@ -87,7 +87,15 @@ function SpellBarMixin:ApplyContainerPosition(frame, config)
     end
 
     local position = (config and config.position) or SPELL_BAR_DEFAULT_POSITION
-    if position ~= "TOPLEFT" and position ~= "BOTTOMLEFT" and position ~= "TOP" and position ~= "BOTTOM" and position ~= "TOPRIGHT" and position ~= "BOTTOMRIGHT" then
+    if position == "UP" then
+        position = "TOP"
+    elseif position == "DOWN" then
+        position = "BOTTOM"
+    end
+
+    if position ~= "TOPLEFT" and position ~= "TOP" and position ~= "TOPRIGHT"
+        and position ~= "LEFT" and position ~= "CENTER" and position ~= "RIGHT"
+        and position ~= "BOTTOMLEFT" and position ~= "BOTTOM" and position ~= "BOTTOMRIGHT" then
         position = SPELL_BAR_DEFAULT_POSITION
     end
 
@@ -99,7 +107,7 @@ function SpellBarMixin:ApplyContainerPosition(frame, config)
 
     local xOffset = offsetX
     local yOffset = offsetY
-    if position == "TOPRIGHT" or position == "BOTTOMRIGHT" then
+    if position == "TOPRIGHT" or position == "RIGHT" or position == "BOTTOMRIGHT" then
         xOffset = -offsetX
     end
 

@@ -489,7 +489,15 @@ local function GetIncomingCastIndicatorConfig()
     local configuredPosition = incomingCastBarProfile and incomingCastBarProfile.position
     if configuredPosition ~= nil then
         local value = configuredPosition
-        if value == "TOPLEFT" or value == "BOTTOMLEFT" or value == "TOP" or value == "BOTTOM" or value == "TOPRIGHT" or value == "BOTTOMRIGHT" then
+        if value == "UP" then
+            value = "TOP"
+        elseif value == "DOWN" then
+            value = "BOTTOM"
+        end
+
+        if value == "TOPLEFT" or value == "TOP" or value == "TOPRIGHT"
+            or value == "LEFT" or value == "CENTER" or value == "RIGHT"
+            or value == "BOTTOMLEFT" or value == "BOTTOM" or value == "BOTTOMRIGHT" then
             position = value
         end
     end
@@ -501,7 +509,7 @@ local function GetIncomingCastIndicatorConfig()
         local explicitValue = incomingCastBarProfile and rawget(incomingCastBarProfile, "growthDirection")
 
         if explicitValue == nil then
-            if position == "TOPRIGHT" or position == "BOTTOMRIGHT" then
+            if position == "TOPRIGHT" or position == "RIGHT" or position == "BOTTOMRIGHT" then
                 growDirection = "LEFT"
             else
                 growDirection = incomingCastBarDefaults.growthDirection or "RIGHT"

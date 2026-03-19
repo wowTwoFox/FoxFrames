@@ -43,6 +43,7 @@ FF.DEFAULT_SETTINGS = {
             b = 1,
             a = 1,
         },
+        statusTextOpacity = 1,
         statusTextUseClassColors = false,
         statusTextAnchorTarget = "FRAME",
         statusTextAnchorPoint = "CENTER",
@@ -55,6 +56,7 @@ FF.DEFAULT_SETTINGS = {
             b = 1,
             a = 1,
         },
+        playerNameOpacity = 1,
         playerNameUseClassColors = false,
         playerNameAnchorTarget = "FRAME",
         playerNameAnchorPoint = "TOP",
@@ -135,7 +137,15 @@ function FF:OpenSettings()
 end
 
 local function SanitizePosition(value, fallback)
-    if value == "TOPLEFT" or value == "BOTTOMLEFT" or value == "TOP" or value == "BOTTOM" or value == "TOPRIGHT" or value == "BOTTOMRIGHT" then
+    if value == "UP" then
+        value = "TOP"
+    elseif value == "DOWN" then
+        value = "BOTTOM"
+    end
+
+    if value == "TOPLEFT" or value == "TOP" or value == "TOPRIGHT"
+        or value == "LEFT" or value == "CENTER" or value == "RIGHT"
+        or value == "BOTTOMLEFT" or value == "BOTTOM" or value == "BOTTOMRIGHT" then
         return value
     end
     return fallback
@@ -190,6 +200,12 @@ local function SanitizeBoolean(value, fallback)
     return value == true
 end
 
+local function SanitizeOpacity(value, fallback)
+    local sanitizedFallback = Utils:ClampNumber(fallback, 0, 1, 1)
+    local opacity = Utils:ClampNumber(value, 0, 1, sanitizedFallback)
+    return math.floor((opacity * 100) + 0.5) / 100
+end
+
 function FF:MigrateAndSanitizeDB()
     local profile = self and self.db and self.db.profile
     if type(profile) ~= "table" then
@@ -220,7 +236,7 @@ function FF:MigrateAndSanitizeDB()
 
     local growthDirection = incomingCastBarProfile.growthDirection
     if growthDirection == nil then
-        if position == "TOPRIGHT" or position == "BOTTOMRIGHT" then
+        if position == "TOPRIGHT" or position == "RIGHT" or position == "BOTTOMRIGHT" then
             growthDirection = "LEFT"
         else
             growthDirection = defaults.growthDirection or "RIGHT"
@@ -286,6 +302,16 @@ function FF:MigrateAndSanitizeDB()
         partyFrameProfile.statusTextColor,
         self.DEFAULT_SETTINGS.partyFrame.statusTextColor
     )
+    partyFrameProfile.statusTextOpacity = SanitizeOpacity(
+        partyFrameProfile.statusTextOpacity,
+        SanitizeOpacity(
+            partyFrameProfile.statusTextColor and partyFrameProfile.statusTextColor.a,
+            self.DEFAULT_SETTINGS.partyFrame.statusTextOpacity
+                or (self.DEFAULT_SETTINGS.partyFrame.statusTextColor and self.DEFAULT_SETTINGS.partyFrame.statusTextColor.a)
+                or 1
+        )
+    )
+    partyFrameProfile.statusTextColor.a = partyFrameProfile.statusTextOpacity
     partyFrameProfile.statusTextUseClassColors = SanitizeBoolean(
         partyFrameProfile.statusTextUseClassColors,
         self.DEFAULT_SETTINGS.partyFrame.statusTextUseClassColors == true
@@ -320,6 +346,16 @@ function FF:MigrateAndSanitizeDB()
         partyFrameProfile.playerNameColor,
         self.DEFAULT_SETTINGS.partyFrame.playerNameColor
     )
+    partyFrameProfile.playerNameOpacity = SanitizeOpacity(
+        partyFrameProfile.playerNameOpacity,
+        SanitizeOpacity(
+            partyFrameProfile.playerNameColor and partyFrameProfile.playerNameColor.a,
+            self.DEFAULT_SETTINGS.partyFrame.playerNameOpacity
+                or (self.DEFAULT_SETTINGS.partyFrame.playerNameColor and self.DEFAULT_SETTINGS.partyFrame.playerNameColor.a)
+                or 1
+        )
+    )
+    partyFrameProfile.playerNameColor.a = partyFrameProfile.playerNameOpacity
     partyFrameProfile.playerNameUseClassColors = SanitizeBoolean(
         partyFrameProfile.playerNameUseClassColors,
         self.DEFAULT_SETTINGS.partyFrame.playerNameUseClassColors == true
@@ -469,22 +505,27 @@ local function CreateIncomingCastsSettings(rootCategory)
         name = "Targeted spell position",
         default = incomingCastBarDefaults.position,
         values = {
-            BOTTOMLEFT = "Bottom left",
             TOPLEFT = "Top left",
-            BOTTOMRIGHT = "Bottom right",
+            TOP = "Up",
             TOPRIGHT = "Top right",
-            BOTTOM = "Bottom center",
-            TOP = "Top center",
+            LEFT = "Left",
+            CENTER = "Center",
+            RIGHT = "Right",
+            BOTTOMLEFT = "Bottom left",
+            BOTTOM = "Down",
+            BOTTOMRIGHT = "Bottom right",
         },
         get = function()
-            local pos = GetIncomingCastBarValue("position")
-            if pos ~= "TOPLEFT" and pos ~= "BOTTOMLEFT" and pos ~= "TOP" and pos ~= "BOTTOM" and pos ~= "TOPRIGHT" and pos ~= "BOTTOMRIGHT" then
-                pos = incomingCastBarDefaults.position
-            end
-            return pos
+            return SanitizePosition(
+                GetIncomingCastBarValue("position"),
+                incomingCastBarDefaults.position
+            )
         end,
         set = function(value)
-            SetIncomingCastBarValue("position", value)
+            SetIncomingCastBarValue(
+                "position",
+                SanitizePosition(value, incomingCastBarDefaults.position)
+            )
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
         end,
@@ -503,15 +544,15 @@ local function CreateIncomingCastsSettings(rootCategory)
             UP = "Up",
         },
         get = function()
-            local pos = GetIncomingCastBarValue("position")
-            if pos ~= "TOPLEFT" and pos ~= "BOTTOMLEFT" and pos ~= "TOP" and pos ~= "BOTTOM" and pos ~= "TOPRIGHT" and pos ~= "BOTTOMRIGHT" then
-                pos = incomingCastBarDefaults.position
-            end
+            local pos = SanitizePosition(
+                GetIncomingCastBarValue("position"),
+                incomingCastBarDefaults.position
+            )
 
             local dir = GetIncomingCastBarValue("growthDirection")
 
             if dir == nil then
-                if pos == "TOPRIGHT" or pos == "BOTTOMRIGHT" then
+                if pos == "TOPRIGHT" or pos == "RIGHT" or pos == "BOTTOMRIGHT" then
                     dir = "LEFT"
                 else
                     dir = incomingCastBarDefaults.growthDirection
@@ -1008,7 +1049,47 @@ function FF:SetupOptions()
         prefix = PARTY_FRAME_PREFIX,
     })
 
-    SettingsLib:CreateCheckbox(rootCategory, {
+    SettingsLib:CreateSlider(rootCategory, {
+        key = "StatusTextOpacity",
+        name = "Status text opacity",
+        default = FF.DEFAULT_SETTINGS.partyFrame.statusTextOpacity,
+        min = 0,
+        max = 1,
+        step = 0.01,
+        formatter = function(value)
+            return string.format("%d%%", math.floor((value * 100) + 0.5))
+        end,
+        get = function()
+            local value = FF.db.profile.partyFrame.statusTextOpacity
+            if value == nil then
+                local color = SanitizeStatusTextColor(
+                    FF.db.profile.partyFrame.statusTextColor,
+                    FF.DEFAULT_SETTINGS.partyFrame.statusTextColor
+                )
+                value = color.a
+            end
+
+            return SanitizeOpacity(value, FF.DEFAULT_SETTINGS.partyFrame.statusTextOpacity)
+        end,
+        set = function(value)
+            local opacity = SanitizeOpacity(value, FF.DEFAULT_SETTINGS.partyFrame.statusTextOpacity)
+            FF.db.profile.partyFrame.statusTextOpacity = opacity
+
+            local color = SanitizeStatusTextColor(
+                FF.db.profile.partyFrame.statusTextColor,
+                FF.DEFAULT_SETTINGS.partyFrame.statusTextColor
+            )
+            color.a = opacity
+            FF.db.profile.partyFrame.statusTextColor = color
+
+            FF:UpdateStatusTextColor()
+            FF:RequestStatusTextSettingsRefresh()
+        end,
+        desc = "Adjust opacity for status text on party frames.",
+        prefix = PARTY_FRAME_PREFIX,
+    })
+
+    local statusTextUseClassColorsElement = SettingsLib:CreateCheckbox(rootCategory, {
         key = "StatusTextUseClassColors",
         name = "Use class colors",
         default = FF.DEFAULT_SETTINGS.partyFrame.statusTextUseClassColors,
@@ -1034,23 +1115,40 @@ function FF:SetupOptions()
                 FF.db.profile.partyFrame.statusTextColor,
                 FF.DEFAULT_SETTINGS.partyFrame.statusTextColor
             )
-            return color.r, color.g, color.b, color.a
+            return color.r, color.g, color.b
         end,
-        setColor = function(_, r, g, b, a)
-            FF.db.profile.partyFrame.statusTextColor = SanitizeStatusTextColor(
-                { r = r, g = g, b = b, a = a },
+        setColor = function(_, r, g, b)
+            local currentColor = SanitizeStatusTextColor(
+                FF.db.profile.partyFrame.statusTextColor,
                 FF.DEFAULT_SETTINGS.partyFrame.statusTextColor
             )
+            local opacity = SanitizeOpacity(
+                FF.db.profile.partyFrame.statusTextOpacity,
+                currentColor.a
+            )
+            FF.db.profile.partyFrame.statusTextColor = SanitizeStatusTextColor(
+                { r = r, g = g, b = b, a = opacity },
+                FF.DEFAULT_SETTINGS.partyFrame.statusTextColor
+            )
+            FF.db.profile.partyFrame.statusTextOpacity = opacity
             FF:UpdateStatusTextColor()
+            FF:RequestStatusTextSettingsRefresh()
         end,
         getDefaultColor = function()
             local color = SanitizeStatusTextColor(
                 FF.DEFAULT_SETTINGS.partyFrame.statusTextColor,
                 { r = 1, g = 1, b = 1, a = 1 }
             )
-            return color.r, color.g, color.b, color.a
+            return color.r, color.g, color.b
         end,
-        hasOpacity = true,
+        hasOpacity = false,
+        isEnabled = function()
+            return FF.db.profile.partyFrame.statusTextUseClassColors ~= true
+        end,
+        parent = statusTextUseClassColorsElement,
+        parentCheck = function()
+            return FF.db.profile.partyFrame.statusTextUseClassColors ~= true
+        end,
         minHeight = 36,
     })
 
@@ -1177,7 +1275,46 @@ function FF:SetupOptions()
         prefix = PARTY_FRAME_PREFIX,
     })
 
-    SettingsLib:CreateCheckbox(rootCategory, {
+    SettingsLib:CreateSlider(rootCategory, {
+        key = "PlayerNameOpacity",
+        name = "Player name opacity",
+        default = FF.DEFAULT_SETTINGS.partyFrame.playerNameOpacity,
+        min = 0,
+        max = 1,
+        step = 0.01,
+        formatter = function(value)
+            return string.format("%d%%", math.floor((value * 100) + 0.5))
+        end,
+        get = function()
+            local value = FF.db.profile.partyFrame.playerNameOpacity
+            if value == nil then
+                local color = SanitizeStatusTextColor(
+                    FF.db.profile.partyFrame.playerNameColor,
+                    FF.DEFAULT_SETTINGS.partyFrame.playerNameColor
+                )
+                value = color.a
+            end
+
+            return SanitizeOpacity(value, FF.DEFAULT_SETTINGS.partyFrame.playerNameOpacity)
+        end,
+        set = function(value)
+            local opacity = SanitizeOpacity(value, FF.DEFAULT_SETTINGS.partyFrame.playerNameOpacity)
+            FF.db.profile.partyFrame.playerNameOpacity = opacity
+
+            local color = SanitizeStatusTextColor(
+                FF.db.profile.partyFrame.playerNameColor,
+                FF.DEFAULT_SETTINGS.partyFrame.playerNameColor
+            )
+            color.a = opacity
+            FF.db.profile.partyFrame.playerNameColor = color
+
+            FF:UpdatePlayerNameColor()
+        end,
+        desc = "Adjust opacity for player name text on party frames.",
+        prefix = PARTY_FRAME_PREFIX,
+    })
+
+    local playerNameUseClassColorsElement = SettingsLib:CreateCheckbox(rootCategory, {
         key = "PlayerNameUseClassColors",
         name = "Use class colors",
         default = FF.DEFAULT_SETTINGS.partyFrame.playerNameUseClassColors,
@@ -1202,13 +1339,22 @@ function FF:SetupOptions()
                 FF.db.profile.partyFrame.playerNameColor,
                 FF.DEFAULT_SETTINGS.partyFrame.playerNameColor
             )
-            return color.r, color.g, color.b, color.a
+            return color.r, color.g, color.b
         end,
-        setColor = function(_, r, g, b, a)
-            FF.db.profile.partyFrame.playerNameColor = SanitizeStatusTextColor(
-                { r = r, g = g, b = b, a = a },
+        setColor = function(_, r, g, b)
+            local currentColor = SanitizeStatusTextColor(
+                FF.db.profile.partyFrame.playerNameColor,
                 FF.DEFAULT_SETTINGS.partyFrame.playerNameColor
             )
+            local opacity = SanitizeOpacity(
+                FF.db.profile.partyFrame.playerNameOpacity,
+                currentColor.a
+            )
+            FF.db.profile.partyFrame.playerNameColor = SanitizeStatusTextColor(
+                { r = r, g = g, b = b, a = opacity },
+                FF.DEFAULT_SETTINGS.partyFrame.playerNameColor
+            )
+            FF.db.profile.partyFrame.playerNameOpacity = opacity
             FF:UpdatePlayerNameColor()
         end,
         getDefaultColor = function()
@@ -1216,9 +1362,16 @@ function FF:SetupOptions()
                 FF.DEFAULT_SETTINGS.partyFrame.playerNameColor,
                 { r = 1, g = 1, b = 1, a = 1 }
             )
-            return color.r, color.g, color.b, color.a
+            return color.r, color.g, color.b
         end,
-        hasOpacity = true,
+        hasOpacity = false,
+        isEnabled = function()
+            return FF.db.profile.partyFrame.playerNameUseClassColors ~= true
+        end,
+        parent = playerNameUseClassColorsElement,
+        parentCheck = function()
+            return FF.db.profile.partyFrame.playerNameUseClassColors ~= true
+        end,
         minHeight = 36,
     })
 
