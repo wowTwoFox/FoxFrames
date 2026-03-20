@@ -84,13 +84,23 @@ local function RegisterLSMTextures()
     end
 end
 
+local function ReassertPlayerFrameVisibility(_, unit)
+    if unit and unit ~= "player" then
+        return
+    end
+
+    if FF and FF.ShowPlayerFrameIfNeeded then
+        FF:ShowPlayerFrameIfNeeded()
+    end
+end
+
 -- Update role icons on all frames
 local function GroupChangeEvent(event, ...)
     if FF.RebuildIncomingCastUnitMap then
         FF:RebuildIncomingCastUnitMap()
     end
 
-    FF:ShowPlayerFrameIfNeeded()
+    ReassertPlayerFrameVisibility()
 
     if not FF:InAllowedGroup() then
         return
@@ -125,6 +135,7 @@ function FF:UNIT_MODEL_CHANGED(event, ...)
     -- Caused by the frames being laid-out when the anchor points are set to TOPLEFT
     -- We fix it by re-applying the layout after the anchor points are correctly set
     RequestPartyFrameLayoutUpdate("UNIT_MODEL_CHANGED")
+    ReassertPlayerFrameVisibility()
 end
 
 function FF:OnInitialize()
@@ -151,6 +162,12 @@ function FF:OnInitialize()
         -- This is needed to re-align the player frames
         RequestPartyFrameLayoutUpdate("PartyFrame:SetPoint")
     end)
+
+    if PlayerFrame and PlayerFrame.HookScript then
+        PlayerFrame:HookScript("OnShow", function()
+            FF:ShowPlayerFrameIfNeeded()
+        end)
+    end
 
     if type(CompactUnitFrame_UpdateAuras) == "function" then
         hooksecurefunc("CompactUnitFrame_UpdateAuras", function(frame)
@@ -205,8 +222,14 @@ function FF:OnEnable()
     self:RegisterEvent("PARTY_LEADER_CHANGED", GroupChangeEvent)
     self:RegisterEvent("PLAYER_ROLES_ASSIGNED", GroupChangeEvent)
     self:RegisterEvent("COMPACT_UNIT_FRAME_PROFILES_LOADED", GroupChangeEvent)
+    self:RegisterEvent("PLAYER_ENTERING_WORLD", GroupChangeEvent)
     self:RegisterEvent("UNIT_MODEL_CHANGED")
     self:RegisterEvent("PLAYER_REGEN_ENABLED")
+    self:RegisterEvent("PLAYER_REGEN_DISABLED", ReassertPlayerFrameVisibility)
+    self:RegisterEvent("PLAYER_TARGET_CHANGED", ReassertPlayerFrameVisibility)
+    self:RegisterEvent("PLAYER_FOCUS_CHANGED", ReassertPlayerFrameVisibility)
+    self:RegisterEvent("UNIT_ENTERED_VEHICLE", ReassertPlayerFrameVisibility)
+    self:RegisterEvent("UNIT_EXITED_VEHICLE", ReassertPlayerFrameVisibility)
     self:RegisterIncomingCastUnitEvents()
 
     -- Register internal messages
@@ -243,6 +266,8 @@ function FF:PLAYER_REGEN_ENABLED()
     if partyLayoutDirty then
         RequestPartyFrameLayoutUpdate("PLAYER_REGEN_ENABLED")
     end
+
+    ReassertPlayerFrameVisibility()
 end
 
 function FF:FOXFRAMES_INCOMING_CASTS_UPDATED(event, casterUnit, cast)

@@ -61,14 +61,16 @@ function FF:ShowPartyFrameIfNeeded()
 end
 
 function FF:ShowPlayerFrameIfNeeded()
+    if not PlayerFrame then
+        return
+    end
+
     local showType = DB:GetPlayerFrameShowType()
 
     if showType == DB.PLAYER_FRAME_SHOW_TYPES.SOLO then
         PlayerFrame:SetShown(Blizzard:InSoloMode())
-    elseif showType == DB.PLAYER_FRAME_SHOW_TYPES.NEVER then
-        PlayerFrame:SetShown(false)
     else
-        PlayerFrame:SetShown(true)
+        PlayerFrame:SetShown(showType == DB.PLAYER_FRAME_SHOW_TYPES.ALWAYS)
     end
 end
 
@@ -459,7 +461,6 @@ function FF:UpdateHealthBarTexture(healthBar)
         end
     end
 
-    Utils:Log("FF:UpdateHealthBarTexture", healthBar)
     healthBar:SetStatusBarTexture(texture)
 end
 
