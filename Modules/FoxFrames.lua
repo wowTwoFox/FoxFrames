@@ -57,6 +57,11 @@ end
 function FF:ShowPartyFrameIfNeeded()
     if not Blizzard:InSoloMode() then return end
     if not CompactPartyFrame then return end
+
+    if InCombatLockdown and InCombatLockdown() then
+        return
+    end
+
     CompactPartyFrame:SetShown(DB:GetShowInSolo())
 end
 
@@ -65,13 +70,23 @@ function FF:ShowPlayerFrameIfNeeded()
         return
     end
 
+    if InCombatLockdown and InCombatLockdown() then
+        return
+    end
+
     local showType = DB:GetPlayerFrameShowType()
+    local shouldShow
 
     if showType == DB.PLAYER_FRAME_SHOW_TYPES.SOLO then
-        PlayerFrame:SetShown(Blizzard:InSoloMode())
+        shouldShow = Blizzard:InSoloMode()
     else
-        PlayerFrame:SetShown(showType == DB.PLAYER_FRAME_SHOW_TYPES.ALWAYS)
+        shouldShow = showType == DB.PLAYER_FRAME_SHOW_TYPES.ALWAYS
     end
+
+    PlayerFrame:SetAlpha(shouldShow and 1 or 0)
+    PlayerFrame:EnableMouse(shouldShow)
+    PlayerFrame:EnableMouseWheel(shouldShow)
+    PlayerFrame:EnableKeyboard(shouldShow)
 end
 
 function FF:ShowPartyFrameTitleIfNeeded()

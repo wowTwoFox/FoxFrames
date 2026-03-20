@@ -9,7 +9,7 @@ function Object:New()
 end
 
 function Object:Log(title, logObject)
-    local DevTool = _G.DevTool
+    local DevTool = rawget(_G, "DevTool")
     local titleWithDate = date("%H:%M:%S") .. " " .. title
     logObject = logObject or title
 
@@ -48,14 +48,24 @@ function Object:LogBlockedAddon(event, blockedAddon, blockedFunction)
         payload.stack = stack
     end
 
-    -- Prevent recursive loops if DevTool logging itself triggers another blocked action.
-    if not self._ffBlockedActionsLogging then return end
+    -- Prevent recursive loops if logging itself triggers another blocked action.
+    if self._ffBlockedActionsLogging then return end
     self._ffBlockedActionsLogging = true
     local title = "ADDON_ACTION_BLOCKED: " .. tostring(blockedAddon) .. " -> " .. tostring(blockedFunction)
     if payload.inCombat ~= nil then
         title = title .. " (combat=" .. tostring(payload.inCombat) .. ")"
     end
+
+    local hasDevTool = rawget(_G, "DevTool") ~= nil
     self:Log(title, payload)
+    if not hasDevTool then
+        local msg = self:C("ff6b6b", "FoxFrames") .. " " .. title
+        if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+            DEFAULT_CHAT_FRAME:AddMessage(msg)
+        else
+            print(msg)
+        end
+    end
     self._ffBlockedActionsLogging = false
 end
 

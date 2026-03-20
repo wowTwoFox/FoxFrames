@@ -89,6 +89,10 @@ local function ReassertPlayerFrameVisibility(_, unit)
         return
     end
 
+    if InCombatLockdown and InCombatLockdown() then
+        return
+    end
+
     if FF and FF.ShowPlayerFrameIfNeeded then
         FF:ShowPlayerFrameIfNeeded()
     end
@@ -267,6 +271,10 @@ function FF:PLAYER_REGEN_ENABLED()
         RequestPartyFrameLayoutUpdate("PLAYER_REGEN_ENABLED")
     end
 
+    if self.ShowPartyFrameIfNeeded then
+        self:ShowPartyFrameIfNeeded()
+    end
+
     ReassertPlayerFrameVisibility()
 end
 
@@ -274,8 +282,6 @@ function FF:PLAYER_REGEN_DISABLED()
     if self.SetIncomingCastIndicatorPreviewEnabled then
         self:SetIncomingCastIndicatorPreviewEnabled(false)
     end
-
-    ReassertPlayerFrameVisibility()
 end
 
 function FF:FOXFRAMES_INCOMING_CASTS_UPDATED(event, casterUnit, cast)
