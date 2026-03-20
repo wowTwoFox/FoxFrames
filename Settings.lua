@@ -76,6 +76,11 @@ function FF:OpenSettings()
     Settings.OpenToCategory(self._rootCategory:GetID())
 end
 
+function FF:OpenIncomingCastsSettings()
+    if not self._incomingCastsCategory then return end
+    Settings.OpenToCategory(self._incomingCastsCategory:GetID())
+end
+
 local function SanitizePosition(value, fallback)
     return DB:SanitizeIncomingCastPosition(value, fallback)
 end
@@ -123,6 +128,7 @@ end
 local function CreateIncomingCastsSettings(rootCategory)
     local incomingCastsPrefix = SETTINGS_PREFIX .. "IncomingCasts_"
     local incomingCastsCategory = SettingsLib:CreateCategory(rootCategory, "Incoming Casts")
+    FF._incomingCastsCategory = incomingCastsCategory
 
     SettingsLib:CreateText(
         incomingCastsCategory,

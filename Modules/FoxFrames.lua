@@ -431,10 +431,16 @@ function FF:SlashCommand(input)
     if not trimmedInput or trimmedInput == "" then
         FF:OpenSettings()
     elseif trimmedInput == "preview" or trimmedInput == "p" then
-        FF:OpenSettings()
         FF:ToggleIncomingCastIndicatorPreview()
+    elseif trimmedInput == "c" or trimmedInput == "casts" then
+        FF:OpenIncomingCastsSettings()
     else
-        self:Print("Usage: /ff - open config")
+        self:Print(
+            Utils:C("ffd100", "Usage: \n") ..
+            Utils:C("80c0ff", "/ff") .. " open config,\n" ..
+            Utils:C("80c0ff", "/ff c") .. " or " .. Utils:C("80c0ff", "casts") .. " incoming casts settings, \n" ..
+            Utils:C("80c0ff", "/ff p") .. " or " .. Utils:C("80c0ff", "preview") .. " preview incoming casts"
+        )
     end
 end
 

@@ -110,6 +110,23 @@ function Object:SetHideCountdownNumbersSafe(cooldown, hideCountdownNumbers)
     return pcall(cooldown.SetHideCountdownNumbers, cooldown, hideCountdownNumbers)
 end
 
+function Object:C(hex, text)
+    local value = tostring(text or "")
+    local color = type(hex) == "string" and hex or "ffffff"
+
+    color = color:gsub("^#", "")
+
+    if #color == 8 then
+        return ("|c%s%s|r"):format(color, value)
+    end
+
+    if #color == 6 then
+        return ("|cff%s%s|r"):format(color, value)
+    end
+
+    return value
+end
+
 local utils = Object:New()
 
 if addon then
