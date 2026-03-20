@@ -611,11 +611,6 @@ function FF:SetupOptions()
         isEnabled = function() return true end,
     })
 
-    SettingsLib:CreateText(
-    rootCategory, 
-        "You need to reload the UI when setting the 'Default' texture."
-    )
-
     SettingsLib:CreateHeader(rootCategory, {
         name = "Status Text",
     })

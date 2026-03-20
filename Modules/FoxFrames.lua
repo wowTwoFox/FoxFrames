@@ -6,6 +6,32 @@ local Utils = addon.Utils
 local Blizzard = addon.Blizzard
 local DB = addon.DB
 
+local function GetStatusBarTexturePath(healthBar)
+    if not (healthBar and healthBar.GetStatusBarTexture) then
+        return nil
+    end
+
+    local textureObject = healthBar:GetStatusBarTexture()
+    if not (textureObject and textureObject.GetTexture) then
+        return nil
+    end
+
+    local ok, textureRef = pcall(textureObject.GetTexture, textureObject)
+    if not ok then
+        return nil
+    end
+
+    if type(textureRef) == "number" then
+        return textureRef
+    end
+
+    if type(textureRef) == "string" and textureRef ~= "" then
+        return textureRef
+    end
+
+    return nil
+end
+
 function FF:InAllowedGroup()
     if Blizzard:InRaidGroup() then return true end
     return BlizzardSettings:GetUseRaidStylePartyFrames() and Blizzard:InPartyGroup()
@@ -415,8 +441,23 @@ function FF:UpdateHealthBarTexture(healthBar)
         Utils:Log("NO HEALTH BAR")
         return
     end
+
     local texture = DB:GetHealthBarTexture()
-    if not texture then return end
+    if not texture then
+        local originalTexture = healthBar._ffOriginalTexturePath
+        if originalTexture then
+            healthBar:SetStatusBarTexture(originalTexture)
+            healthBar._ffOriginalTexturePath = nil
+        end
+        return
+    end
+
+    if not healthBar._ffOriginalTexturePath then
+        local currentTexture = GetStatusBarTexturePath(healthBar)
+        if currentTexture and currentTexture ~= texture then
+            healthBar._ffOriginalTexturePath = currentTexture
+        end
+    end
 
     Utils:Log("FF:UpdateHealthBarTexture", healthBar)
     healthBar:SetStatusBarTexture(texture)
