@@ -225,7 +225,7 @@ function FF:OnEnable()
     self:RegisterEvent("PLAYER_ENTERING_WORLD", GroupChangeEvent)
     self:RegisterEvent("UNIT_MODEL_CHANGED")
     self:RegisterEvent("PLAYER_REGEN_ENABLED")
-    self:RegisterEvent("PLAYER_REGEN_DISABLED", ReassertPlayerFrameVisibility)
+    self:RegisterEvent("PLAYER_REGEN_DISABLED")
     self:RegisterEvent("PLAYER_TARGET_CHANGED", ReassertPlayerFrameVisibility)
     self:RegisterEvent("PLAYER_FOCUS_CHANGED", ReassertPlayerFrameVisibility)
     self:RegisterEvent("UNIT_ENTERED_VEHICLE", ReassertPlayerFrameVisibility)
@@ -265,6 +265,14 @@ function FF:PLAYER_REGEN_ENABLED()
     -- If we skipped a layout update during combat, retry once combat drops.
     if partyLayoutDirty then
         RequestPartyFrameLayoutUpdate("PLAYER_REGEN_ENABLED")
+    end
+
+    ReassertPlayerFrameVisibility()
+end
+
+function FF:PLAYER_REGEN_DISABLED()
+    if self.SetIncomingCastIndicatorPreviewEnabled then
+        self:SetIncomingCastIndicatorPreviewEnabled(false)
     end
 
     ReassertPlayerFrameVisibility()
