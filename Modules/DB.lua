@@ -44,8 +44,6 @@ local growthDirections = {
     RIGHT = "RIGHT",
 }
 
-local defaultTexture = "DEFAULT"
-
 local defaultSettings = {
     playerFrame = {
         showType = playerFrameShowTypes.ALWAYS,
@@ -85,7 +83,8 @@ local defaultSettings = {
         playerNameAnchorPoint = anchorPoints.TOP,
         playerNameOffsetX = 0,
         playerNameOffsetY = 6,
-        healthBarTexture = defaultTexture,
+        useCustomHealthBarTexture = false,
+        healthBarTexture = nil,
         allowAnyAnchoring = false,
         trackIncomingCasts = false,
     },
@@ -509,10 +508,12 @@ end
 
 function Object:GetHealthBarTexture()
     local profile = self:GetPartyFrameDB()
-    local texture = profile and profile.healthBarTexture
-    local defaultValue = self.DEFAULT_TEXTURE or defaultTexture
+    if not profile or profile.useCustomHealthBarTexture ~= true then
+        return nil
+    end
 
-    if type(texture) ~= "string" or texture == "" or texture == defaultValue then
+    local texture = profile.healthBarTexture
+    if type(texture) ~= "string" or texture == "" then
         return nil
     end
 
@@ -532,19 +533,34 @@ function Object:GetTrackIncomingCasts()
 end
 
 function Object:MigrateAndSanitizeDB()
-    local profile = self:GetPlayerFrameDB()
-    if not profile then
-        return
+    local playerProfile = self:GetPlayerFrameDB()
+    if playerProfile then
+        -- Migrate old playerFrameShowTypes from lowercase to uppercase
+        local showType = playerProfile.showType
+        if showType == "Always" then
+            playerProfile.showType = playerFrameShowTypes.ALWAYS
+        elseif showType == "Solo" then
+            playerProfile.showType = playerFrameShowTypes.SOLO
+        elseif showType == "Never" then
+            playerProfile.showType = playerFrameShowTypes.NEVER
+        end
     end
 
-    -- Migrate old playerFrameShowTypes from lowercase to uppercase
-    local showType = profile.showType
-    if showType == "Always" then
-        profile.showType = playerFrameShowTypes.ALWAYS
-    elseif showType == "Solo" then
-        profile.showType = playerFrameShowTypes.SOLO
-    elseif showType == "Never" then
-        profile.showType = playerFrameShowTypes.NEVER
+    local partyProfile = self:GetPartyFrameDB()
+    if partyProfile then
+        -- Migrate old healthBarTexture = "DEFAULT" to nil
+        if partyProfile.healthBarTexture == "DEFAULT" then
+            partyProfile.healthBarTexture = nil
+        end
+        
+        -- Migrate old UseCustomHealthBarTexture setting to useCustomHealthBarTexture
+        if partyProfile.UseCustomHealthBarTexture == true then
+            partyProfile.useCustomHealthBarTexture = true
+            partyProfile.UseCustomHealthBarTexture = nil
+        elseif partyProfile.UseCustomHealthBarTexture == false then
+            partyProfile.useCustomHealthBarTexture = false
+            partyProfile.UseCustomHealthBarTexture = nil
+        end
     end
 end
 
@@ -559,7 +575,6 @@ end
 
 local db = Object:New()
 db.DEFAULT_SETTINGS = defaultSettings
-db.DEFAULT_TEXTURE = defaultTexture
 db.ANCHOR_POINTS = anchorPoints
 db.FRAME_ANCHOR_TARGETS = frameAnchorTargets
 db.PLAYER_FRAME_SHOW_TYPES = playerFrameShowTypes

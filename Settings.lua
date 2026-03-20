@@ -6,7 +6,7 @@ local DB = addon.DB
 local SettingsLib = LibStub("LibEQOLSettingsMode-1.0")
 local SETTINGS_PREFIX = "FoxFrames_"
 
-local ANCHOR_POINTS = {
+local ANCHOR_POINT_LABELS = {
     [DB.ANCHOR_POINTS.TOPLEFT] = "Top Left",
     [DB.ANCHOR_POINTS.TOP] = "Top",
     [DB.ANCHOR_POINTS.TOPRIGHT] = "Top Right",
@@ -17,7 +17,7 @@ local ANCHOR_POINTS = {
     [DB.ANCHOR_POINTS.BOTTOM] = "Bottom",
     [DB.ANCHOR_POINTS.BOTTOMRIGHT] = "Bottom Right",
 }
-local FRAME_ANCHOR_TARGETS = {
+local FRAME_ANCHOR_TARGET_LABELS = {
     [DB.FRAME_ANCHOR_TARGETS.FRAME] = "Party Frame",
     [DB.FRAME_ANCHOR_TARGETS.HEALTHBAR] = "Health Bar",
 }
@@ -26,27 +26,23 @@ local PLAYER_FRAME_SHOW_TYPE_LABELS = {
     [DB.PLAYER_FRAME_SHOW_TYPES.SOLO] = "Solo",
     [DB.PLAYER_FRAME_SHOW_TYPES.NEVER] = "Never",
 }
-local DEFAULT_TEXTURE = DB.DEFAULT_TEXTURE
+local GROWTH_DIRECTION_LABELS = {
+    [DB.GROWTH_DIRECTIONS.RIGHT] = "Right",
+    [DB.GROWTH_DIRECTIONS.LEFT] = "Left",
+    [DB.GROWTH_DIRECTIONS.DOWN] = "Down",
+    [DB.GROWTH_DIRECTIONS.UP] = "Up",
+}
 
 function FF:GetTextures()
     local alreadyAddedPaths = {}
 
     -- Always add built-in textures at the top in specific order
     local textures = {{
-        path = DEFAULT_TEXTURE,
-        name = "Default"
-    }, {
         path = "Interface\\RaidFrame\\Raid-Bar-Hp-Fill",
         name = "Raid"
     }, {
-        path = "Interface\\TargetingFrame\\UI-StatusBar",
-        name = "Blizzard"
-    }, {
         path = "Interface\\Buttons\\WHITE8X8",
         name = "Flat"
-    }, {
-        path = "Interface\\PaperDollInfoFrame\\UI-Character-Skills-Bar",
-        name = "Glossy"
     }}
 
     -- Go through built in textures
@@ -199,17 +195,7 @@ local function CreateIncomingCastsSettings(rootCategory)
         key = "IncomingCastIconPosition",
         name = "Targeted spell position",
         default = incomingCastBarDefaults.position,
-        values = {
-            TOPLEFT = "Top left",
-            TOP = "Up",
-            TOPRIGHT = "Top right",
-            LEFT = "Left",
-            CENTER = "Center",
-            RIGHT = "Right",
-            BOTTOMLEFT = "Bottom left",
-            BOTTOM = "Down",
-            BOTTOMRIGHT = "Bottom right",
-        },
+        values = ANCHOR_POINT_LABELS,
         get = function()
             return SanitizePosition(
                 GetIncomingCastBarValue("position"),
@@ -232,12 +218,7 @@ local function CreateIncomingCastsSettings(rootCategory)
         key = "IncomingCastIconGrowDirection",
         name = "Grow Direction",
         default = incomingCastBarDefaults.growthDirection,
-        values = {
-            [DB.GROWTH_DIRECTIONS.RIGHT] = "Right",
-            [DB.GROWTH_DIRECTIONS.LEFT] = "Left",
-            [DB.GROWTH_DIRECTIONS.DOWN] = "Down",
-            [DB.GROWTH_DIRECTIONS.UP] = "Up",
-        },
+        values = GROWTH_DIRECTION_LABELS,
         get = function()
             local pos = SanitizePosition(
                 GetIncomingCastBarValue("position"),
@@ -581,10 +562,31 @@ function FF:SetupOptions()
         table.insert(textureOrder, texture.path)
     end
 
+    local useCustomHealthBarTextureElement = SettingsLib:CreateCheckbox(rootCategory, {
+        key = "UseCustomHealthBarTexture",
+        name = "Use Custom Health Bar Texture",
+        default = false,
+        get = function()
+            return PartyFrameProfile().useCustomHealthBarTexture == true
+        end,
+        set = function(value)
+            PartyFrameProfile().useCustomHealthBarTexture = value
+            if value then
+                -- Default to first available texture if enabling
+                if not PartyFrameProfile().healthBarTexture and textures[1] then
+                    PartyFrameProfile().healthBarTexture = textures[1].path
+                end
+            end
+            FF:UpdateFrames()
+        end,
+        desc = "Enable to use a custom health bar texture instead of the default.",
+        prefix = PARTY_FRAME_PREFIX,
+    })
+
     SettingsLib:CreateScrollDropdown(rootCategory, {
         key = "HealthBarTexture",
         name = "Health Bar Texture",
-        default = DEFAULT_TEXTURE,
+        default = textures[1].path,
         optionfunc = function()
             -- Return values in the order they were added
             local orderedValues = {}
@@ -595,20 +597,18 @@ function FF:SetupOptions()
         end,
         order = textureOrder,
         get = function()
-            return PartyFrameProfile().healthBarTexture or DEFAULT_TEXTURE
+            return PartyFrameProfile().healthBarTexture or textures[1].path
         end,
         set = function(value)
-            if value == DEFAULT_TEXTURE then
-                PartyFrameProfile().healthBarTexture = nil
-            else
-                PartyFrameProfile().healthBarTexture = value
-            end
-
+            PartyFrameProfile().healthBarTexture = value
             FF:UpdateFrames()
         end,
         height = 220, -- scrollable menu
         prefix = PARTY_FRAME_PREFIX,
-        isEnabled = function() return true end,
+        parent = useCustomHealthBarTextureElement,
+        parentCheck = function()
+            return PartyFrameProfile().useCustomHealthBarTexture == true
+        end,
     })
 
     SettingsLib:CreateHeader(rootCategory, {
@@ -619,7 +619,7 @@ function FF:SetupOptions()
         key = "StatusTextAnchorTarget",
         name = "Anchor to",
         default = DB.DEFAULT_SETTINGS.partyFrame.statusTextAnchorTarget,
-        values = FRAME_ANCHOR_TARGETS,
+        values = FRAME_ANCHOR_TARGET_LABELS,
         get = function()
             return SanitizeIncomingCastAnchorFrame(
                 PartyFrameProfile().statusTextAnchorTarget,
@@ -642,7 +642,7 @@ function FF:SetupOptions()
         key = "StatusTextAnchorPoint",
         name = "Status text anchor",
         default = DB.DEFAULT_SETTINGS.partyFrame.statusTextAnchorPoint,
-        values = ANCHOR_POINTS,
+        values = ANCHOR_POINT_LABELS,
         get = function()
             return SanitizeStatusTextAnchorPoint(
                 PartyFrameProfile().statusTextAnchorPoint,
@@ -850,7 +850,7 @@ function FF:SetupOptions()
         key = "PlayerNameAnchorTarget",
         name = "Anchor to",
         default = DB.DEFAULT_SETTINGS.partyFrame.playerNameAnchorTarget,
-        values = FRAME_ANCHOR_TARGETS,
+        values = FRAME_ANCHOR_TARGET_LABELS,
         get = function()
             return SanitizeIncomingCastAnchorFrame(
                 PartyFrameProfile().playerNameAnchorTarget,
@@ -872,7 +872,7 @@ function FF:SetupOptions()
         key = "PlayerNameAnchorPoint",
         name = "Player name anchor",
         default = DB.DEFAULT_SETTINGS.partyFrame.playerNameAnchorPoint,
-        values = ANCHOR_POINTS,
+        values = ANCHOR_POINT_LABELS,
         get = function()
             return SanitizeStatusTextAnchorPoint(
                 PartyFrameProfile().playerNameAnchorPoint,
