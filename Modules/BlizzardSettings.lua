@@ -11,6 +11,33 @@ function Object:GetUseRaidStylePartyFrames()
     return EditModeManagerFrame:UseRaidStylePartyFrames() or false
 end
 
+function Object:GetPartyFramesUseHorizontalGroups()
+    if not (EditModeManagerFrame and EditModeManagerFrame.GetSettingValueBool) then
+        return nil
+    end
+
+    if not (Enum and Enum.EditModeSystem and Enum.EditModeUnitFrameSystemIndices and Enum.EditModeUnitFrameSetting) then
+        return nil
+    end
+
+    local ok, value = pcall(
+        EditModeManagerFrame.GetSettingValueBool,
+        EditModeManagerFrame,
+        Enum.EditModeSystem.UnitFrame,
+        Enum.EditModeUnitFrameSystemIndices.Party,
+        Enum.EditModeUnitFrameSetting.UseHorizontalGroups
+    )
+    if not ok then
+        return nil
+    end
+
+    if value == nil then
+        return nil
+    end
+
+    return value == true
+end
+
 -- Get the current built-in class color setting
 function Object:GetClassColorSetting()
     -- Check if the CompactRaidFrame setting exists

@@ -24,6 +24,109 @@ local anchorPoints = {
     BOTTOMRIGHT = "BOTTOMRIGHT",
 }
 
+local spellBarAnchorModes = {
+    INSIDE = "INSIDE",
+    AUTO = "AUTO",
+    OUTSIDEV = "OUTSIDEV",
+    OUTSIDEH = "OUTSIDEH",
+}
+
+local flipVerticalAnchorPoints = {
+    [anchorPoints.TOPLEFT] = anchorPoints.BOTTOMLEFT,
+    [anchorPoints.TOP] = anchorPoints.BOTTOM,
+    [anchorPoints.TOPRIGHT] = anchorPoints.BOTTOMRIGHT,
+    [anchorPoints.LEFT] = anchorPoints.LEFT,
+    [anchorPoints.CENTER] = anchorPoints.CENTER,
+    [anchorPoints.RIGHT] = anchorPoints.RIGHT,
+    [anchorPoints.BOTTOMLEFT] = anchorPoints.TOPLEFT,
+    [anchorPoints.BOTTOM] = anchorPoints.TOP,
+    [anchorPoints.BOTTOMRIGHT] = anchorPoints.TOPRIGHT,
+}
+
+local flipHorizontalAnchorPoints = {
+    [anchorPoints.TOPLEFT] = anchorPoints.TOPRIGHT,
+    [anchorPoints.TOP] = anchorPoints.TOP,
+    [anchorPoints.TOPRIGHT] = anchorPoints.TOPLEFT,
+    [anchorPoints.LEFT] = anchorPoints.RIGHT,
+    [anchorPoints.CENTER] = anchorPoints.CENTER,
+    [anchorPoints.RIGHT] = anchorPoints.LEFT,
+    [anchorPoints.BOTTOMLEFT] = anchorPoints.BOTTOMRIGHT,
+    [anchorPoints.BOTTOM] = anchorPoints.BOTTOM,
+    [anchorPoints.BOTTOMRIGHT] = anchorPoints.BOTTOMLEFT,
+}
+
+local function FlipVerticalAnchorPoint(point)
+    return flipVerticalAnchorPoints[point] or point
+end
+
+local function FlipHorizontalAnchorPoint(point)
+    return flipHorizontalAnchorPoints[point] or point
+end
+
+local function GetFrameCenterSafe(frame)
+    if not (frame and frame.GetCenter) then
+        return nil
+    end
+
+    local ok, x, y = pcall(frame.GetCenter, frame)
+    if not ok then
+        return nil
+    end
+
+    if type(x) ~= "number" or type(y) ~= "number" then
+        return nil
+    end
+
+    return x, y
+end
+
+local function GetPartyFramesLayoutAxis()
+    local settings = BlizzardSettings
+    if settings and settings.GetPartyFramesUseHorizontalGroups then
+        local isHorizontal = settings:GetPartyFramesUseHorizontalGroups()
+        if isHorizontal ~= nil then
+            return isHorizontal and "HORIZONTAL" or "VERTICAL"
+        end
+    end
+
+    local blizzard = addon and addon.Blizzard
+    local frames = blizzard and blizzard.GetFrames and blizzard:GetFrames() or {}
+
+    local x1, y1, x2, y2
+    for _, frame in ipairs(frames) do
+        local x, y = GetFrameCenterSafe(frame)
+        if x and y then
+            if not x1 then
+                x1, y1 = x, y
+            else
+                x2, y2 = x, y
+                break
+            end
+        end
+    end
+
+    if not (x1 and y1 and x2 and y2) then
+        return nil
+    end
+
+    local ok, dx, dy = pcall(function()
+        return math.abs(x2 - x1), math.abs(y2 - y1)
+    end)
+    if not ok or type(dx) ~= "number" or type(dy) ~= "number" then
+        return nil
+    end
+
+    if dx == 0 and dy == 0 then
+        return nil
+    end
+
+    if dy > dx then
+        return "VERTICAL"
+    end
+
+    return "HORIZONTAL"
+end
+
 local frameAnchorTargets = {
     FRAME = "FRAME",
     HEALTHBAR = "HEALTHBAR",
@@ -98,6 +201,7 @@ local defaultSettings = {
         spellCount = 3,
         anchorFrame = frameAnchorTargets.HEALTHBAR,
         position = anchorPoints.BOTTOMLEFT,
+        anchorMode = spellBarAnchorModes.INSIDE,
         growthDirection = growthDirections.RIGHT,
         offsetX = 2,
         offsetY = 2,
@@ -215,14 +319,68 @@ function Object:GetIncomingCastIndicatorRelativeAnchor()
 end
 
 function Object:GetIncomingCastIndicatorSpellBarAnchor(relativeAnchor)
-    local fallback = self:GetIncomingCastIndicatorRelativeAnchor()
+    local relativeFallback = self:GetIncomingCastIndicatorRelativeAnchor()
 
-    local value = relativeAnchor
-    if value == nil then
-        return fallback
+    local relative = relativeAnchor
+    if relative == nil then
+        relative = relativeFallback
+    else
+        relative = self:SanitizeIncomingCastPosition(relative, relativeFallback)
     end
 
-    return self:SanitizeIncomingCastPosition(value, fallback)
+    local profile = self:GetIncomingCastBarDB()
+    local configuredValue = profile and profile.anchorMode
+    local mode = self:SanitizeIncomingCastSpellBarAnchorMode(configuredValue, defaultSettings.incomingCastBar.anchorMode)
+
+    if mode == spellBarAnchorModes.INSIDE then
+        return relative
+    end
+
+    if mode == spellBarAnchorModes.OUTSIDEV then
+        return FlipVerticalAnchorPoint(relative)
+    end
+
+    if mode == spellBarAnchorModes.OUTSIDEH then
+        return FlipHorizontalAnchorPoint(relative)
+    end
+
+    if mode == spellBarAnchorModes.AUTO then
+        local verticalCandidate = FlipVerticalAnchorPoint(relative)
+        local horizontalCandidate = FlipHorizontalAnchorPoint(relative)
+
+        local layoutAxis = GetPartyFramesLayoutAxis()
+        local preferred
+
+        -- Auto chooses an outside axis based on the party frame alignment:
+        -- - Frames in a column (VERTICAL) -> prefer outside horizontally (LEFT/RIGHT)
+        -- - Frames in a row (HORIZONTAL) -> prefer outside vertically (TOP/BOTTOM)
+        -- If the preferred axis doesn't move the anchor (e.g. TOP has no horizontal flip),
+        -- fall back to the other axis.
+        if layoutAxis == "VERTICAL" then
+            preferred = horizontalCandidate
+            if preferred == relative then
+                preferred = verticalCandidate
+            end
+        elseif layoutAxis == "HORIZONTAL" then
+            preferred = verticalCandidate
+            if preferred == relative then
+                preferred = horizontalCandidate
+            end
+        else
+            preferred = verticalCandidate
+            if preferred == relative then
+                preferred = horizontalCandidate
+            end
+        end
+
+        if preferred ~= relative then
+            return preferred
+        end
+
+        return relative
+    end
+
+    return relative
 end
 
 function Object:GetIncomingCastIndicatorAnchorFrame()
@@ -346,11 +504,7 @@ function Object:GetIncomingCastIndicatorOffsetX(relativeAnchor)
 
     local offsetX = Utils:ClampInteger(configuredValue, -200, 200, fallback)
 
-    local anchor = relativeAnchor
-    if anchor == nil then
-        anchor = self:GetIncomingCastIndicatorRelativeAnchor()
-    end
-
+    local anchor = self:GetIncomingCastIndicatorSpellBarAnchor(relativeAnchor)
     if IsRightAnchor(anchor) then
         offsetX = -offsetX
     end
@@ -366,11 +520,7 @@ function Object:GetIncomingCastIndicatorOffsetY(relativeAnchor)
 
     local offsetY = Utils:ClampInteger(configuredValue, -200, 200, fallback)
 
-    local anchor = relativeAnchor
-    if anchor == nil then
-        anchor = self:GetIncomingCastIndicatorRelativeAnchor()
-    end
-
+    local anchor = self:GetIncomingCastIndicatorSpellBarAnchor(relativeAnchor)
     if IsTopAnchor(anchor) then
         offsetY = -offsetY
     end
@@ -380,6 +530,15 @@ end
 
 function Object:SanitizeIncomingCastPosition(value, fallback)
     return Utils:SanitizeOption(value, anchorPoints) or fallback
+end
+
+function Object:SanitizeIncomingCastSpellBarAnchorMode(value, fallback)
+    -- Compatibility: old "OUTSIDE" mode was renamed to AUTO.
+    if value == "OUTSIDE" then
+        value = spellBarAnchorModes.AUTO
+    end
+
+    return Utils:SanitizeOption(value, spellBarAnchorModes) or fallback
 end
 
 function Object:SanitizeIncomingCastGrowDirection(value, fallback)
@@ -720,6 +879,7 @@ end
 local db = Object:New()
 db.DEFAULT_SETTINGS = defaultSettings
 db.ANCHOR_POINTS = anchorPoints
+db.SPELL_BAR_ANCHOR_MODES = spellBarAnchorModes
 db.FRAME_ANCHOR_TARGETS = frameAnchorTargets
 db.PLAYER_FRAME_SHOW_TYPES = playerFrameShowTypes
 db.GROWTH_DIRECTIONS = growthDirections

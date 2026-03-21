@@ -33,6 +33,13 @@ local GROWTH_DIRECTION_LABELS = {
     [DB.GROWTH_DIRECTIONS.UP] = "Up",
 }
 
+local SPELL_BAR_ANCHOR_MODE_LABELS = {
+    [DB.SPELL_BAR_ANCHOR_MODES.INSIDE] = "Inside",
+    [DB.SPELL_BAR_ANCHOR_MODES.AUTO] = "Outside (Auto)",
+    [DB.SPELL_BAR_ANCHOR_MODES.OUTSIDEV] = "Outside (Vertical)",
+    [DB.SPELL_BAR_ANCHOR_MODES.OUTSIDEH] = "Outside (Horizontal)",
+}
+
 function FF:GetTextures()
     local alreadyAddedPaths = {}
 
@@ -95,6 +102,10 @@ end
 
 local function SanitizeStatusTextColor(value, fallback)
     return DB:SanitizeStatusTextColor(value, fallback)
+end
+
+local function SanitizeIncomingCastSpellBarAnchorMode(value, fallback)
+    return DB:SanitizeIncomingCastSpellBarAnchorMode(value, fallback)
 end
 
 local function SanitizeOpacity(value, fallback)
@@ -217,6 +228,29 @@ local function CreateIncomingCastsSettings(rootCategory)
             FF:UpdateIncomingCastIndicators()
         end,
         desc = "Where to anchor targeted spell icons on the party frame.",
+        prefix = incomingCastsPrefix,
+    })
+
+    SettingsLib:CreateDropdown(incomingCastsCategory, {
+        key = "IncomingCastFrameAnchor",
+        name = "Anchor",
+        default = incomingCastBarDefaults.anchorMode,
+        values = SPELL_BAR_ANCHOR_MODE_LABELS,
+        get = function()
+            return SanitizeIncomingCastSpellBarAnchorMode(
+                GetIncomingCastBarValue("anchorMode"),
+                incomingCastBarDefaults.anchorMode
+            )
+        end,
+        set = function(value)
+            SetIncomingCastBarValue(
+                "anchorMode",
+                SanitizeIncomingCastSpellBarAnchorMode(value, incomingCastBarDefaults.anchorMode)
+            )
+            FF:SetupIncomingCastIndicators()
+            FF:UpdateIncomingCastIndicators()
+        end,
+        desc = "Inside uses the same anchor point as Position.\nOutside (Vertical) flips Top <-> Bottom.\nOutside (Horizontal) flips Left <-> Right.\nOutside (Auto) picks Vertical/Horizontal based on the party frame orientation (horizontal vs vertical layout).\nExample: party frames stacked top-to-bottom -> Auto uses Outside (Horizontal).",
         prefix = incomingCastsPrefix,
     })
 
