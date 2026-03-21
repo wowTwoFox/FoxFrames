@@ -96,8 +96,7 @@ local function GetRandomIncomingCastPreviewSpells(count)
         return {}
     end
 
-    count = Utils:ClampNumber(count, 1, poolSize, poolSize)
-    count = math.floor(count + 0.5)
+    count = Utils:ClampInteger(count, 1, poolSize, poolSize)
 
     local availableSpells = {}
     for index, previewSpell in ipairs(spellPool) do
@@ -207,9 +206,7 @@ function FF:StartIncomingCastIndicatorPreviewStream()
         local now = GetTime()
 
         -- Read desired spell display count from settings
-        local incomingCastBarProfile = DB:GetIncomingCastBarDB()
-        local desiredCount = Utils:ClampNumber(incomingCastBarProfile and incomingCastBarProfile.spellCount, 1, 6, 3)
-        desiredCount = math.floor(desiredCount + 0.5)
+        local desiredCount = DB:GetIncomingCastIndicatorCount()
 
         -- For each target unit, emit N spells (with slight variance)
         for _, targetUnit in ipairs(currentTargets) do

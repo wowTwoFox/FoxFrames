@@ -1,9 +1,6 @@
 local addonName, addon = ...
 
-local FF = FoxFrames
-if not FF then
-    return
-end
+local FF = assert(FoxFrames, "FoxFrames: global FoxFrames missing (load order issue)")
 
 local Utils = addon.Utils
 local DB = addon.DB
@@ -408,154 +405,19 @@ function FF:PLAYER_FOCUS_CHANGED()
     return self:ScanAllEnemyCasts()
 end
 
-local function GetSpellIconBaseSize()
-    local spellIconMixin = addon and addon.SpellIconMixin
-    return tonumber(spellIconMixin and spellIconMixin.SPELL_ICON_BASE_SIZE) or 22
-end
-
-local function GetIncomingCastIndicatorIconConfig(incomingCastBarProfile, incomingCastBarDefaults)
-    local incomingCastBarIconProfile = incomingCastBarProfile and incomingCastBarProfile.icon
-    local incomingCastBarIconDefaults = incomingCastBarDefaults.icon or {}
-
-    local baseSize = GetSpellIconBaseSize()
-
-    local scale = Utils:ClampNumber(incomingCastBarIconProfile and incomingCastBarIconProfile.scale, 0.5, 3, incomingCastBarIconDefaults.scale or 1)
-
-    -- Keep the hash stable and avoid float jitter.
-    scale = math.floor((scale * 100) + 0.5) / 100
-
-    -- This is the size used for layout (wrapper frame). The visual icon frame is
-    -- kept at baseSize and scaled, so borders/overlays scale proportionally.
-    local size = baseSize * scale
-
-    local spacing = Utils:ClampNumber(incomingCastBarIconProfile and incomingCastBarIconProfile.spacing, -10, 50, incomingCastBarIconDefaults.spacing or 0)
-    spacing = math.floor(spacing + 0.5)
-
-    local cooldownFontSize = Utils:ClampNumber(incomingCastBarIconProfile and incomingCastBarIconProfile.cooldownFontSize, 8, 32, incomingCastBarIconDefaults.cooldownFontSize or 10)
-    cooldownFontSize = math.floor(cooldownFontSize + 0.5)
-
-    local showBorder = incomingCastBarIconProfile and incomingCastBarIconProfile.showBorder
-    if showBorder == nil then
-        showBorder = incomingCastBarIconDefaults.showBorder ~= false
-    else
-        showBorder = showBorder == true
-    end
-
-    local showSwipe = incomingCastBarIconProfile and incomingCastBarIconProfile.showSwipe
-    if showSwipe == nil then
-        showSwipe = incomingCastBarIconDefaults.showSwipe ~= false
-    else
-        showSwipe = showSwipe == true
-    end
-
-    local showCooldownText = incomingCastBarIconProfile and incomingCastBarIconProfile.showCooldownText
-    if showCooldownText == nil then
-        showCooldownText = incomingCastBarIconDefaults.showCooldownText ~= false
-    else
-        showCooldownText = showCooldownText == true
-    end
-
-    return {
-        baseSize = baseSize,
-        scale = scale,
-        size = size,
-        spacing = spacing,
-        cooldownFontSize = cooldownFontSize,
-        showBorder = showBorder,
-        showSwipe = showSwipe,
-        showCooldownText = showCooldownText,
-    }
-end
-
-local function GetIncomingCastIndicatorAnchorFrame(incomingCastBarProfile, incomingCastBarDefaults)
-    local anchorFrame = incomingCastBarDefaults.anchorFrame or "HEALTHBAR"
-    local configuredAnchorFrame = incomingCastBarProfile and incomingCastBarProfile.anchorFrame
-    if configuredAnchorFrame == "HEALTHBAR" or configuredAnchorFrame == "FRAME" then
-        anchorFrame = configuredAnchorFrame
-    end
-    return anchorFrame
-end
-
 local function GetIncomingCastIndicatorConfig()
-    local incomingCastBarProfile = DB:GetIncomingCastBarDB()
-    local incomingCastBarDefaults = DB.DEFAULT_SETTINGS.incomingCastBar
-    local iconConfig = GetIncomingCastIndicatorIconConfig(incomingCastBarProfile, incomingCastBarDefaults)
-    local anchorFrame = GetIncomingCastIndicatorAnchorFrame(incomingCastBarProfile, incomingCastBarDefaults)
+    local relativeAnchor = DB:GetIncomingCastIndicatorRelativeAnchor()
 
-    local count = Utils:ClampNumber(incomingCastBarProfile and incomingCastBarProfile.spellCount, 1, 6, incomingCastBarDefaults.spellCount or 3)
-    count = math.floor(count + 0.5)
-
-    local position = incomingCastBarDefaults.position or "BOTTOMLEFT"
-    local configuredPosition = incomingCastBarProfile and incomingCastBarProfile.position
-    if configuredPosition ~= nil then
-        local value = configuredPosition
-        if value == "UP" then
-            value = "TOP"
-        elseif value == "DOWN" then
-            value = "BOTTOM"
-        end
-
-        if value == "TOPLEFT" or value == "TOP" or value == "TOPRIGHT"
-            or value == "LEFT" or value == "CENTER" or value == "RIGHT"
-            or value == "BOTTOMLEFT" or value == "BOTTOM" or value == "BOTTOMRIGHT" then
-            position = value
-        end
-    end
-
-    local growDirection = incomingCastBarDefaults.growthDirection or DB.GROWTH_DIRECTIONS.RIGHT
-    do
-        -- Backward-friendly behavior: if the user hasn't explicitly chosen a grow direction,
-        -- keep the old behavior where right-anchored positions grow left.
-        local explicitValue = incomingCastBarProfile and rawget(incomingCastBarProfile, "growthDirection")
-
-        if explicitValue == nil then
-            if position == "TOPRIGHT" or position == "RIGHT" or position == "BOTTOMRIGHT" then
-                growDirection = DB.GROWTH_DIRECTIONS.LEFT
-            else
-                growDirection = incomingCastBarDefaults.growthDirection or DB.GROWTH_DIRECTIONS.RIGHT
-            end
-        else
-            if DB.GROWTH_DIRECTIONS[explicitValue] then
-                growDirection = explicitValue
-            end
-        end
-    end
-
-    local offsetX = incomingCastBarDefaults.offsetX or 2
-    local configuredOffsetX = incomingCastBarProfile and incomingCastBarProfile.offsetX
-    if configuredOffsetX ~= nil then
-        offsetX = Utils:ClampNumber(configuredOffsetX, -200, 200, incomingCastBarDefaults.offsetX or 2)
-    end
-    offsetX = math.floor(offsetX + 0.5)
-
-    local offsetY = incomingCastBarDefaults.offsetY or 2
-    local configuredOffsetY = incomingCastBarProfile and incomingCastBarProfile.offsetY
-    if configuredOffsetY ~= nil then
-        offsetY = Utils:ClampNumber(configuredOffsetY, -200, 200, incomingCastBarDefaults.offsetY or 2)
-    end
-    offsetY = math.floor(offsetY + 0.5)
-
-    local hash = string.format(
-        "%d:%.2f:%d:%d:%d:%d:%d:%s:%s",
-        count,
-        iconConfig.scale,
-        iconConfig.spacing,
-        iconConfig.cooldownFontSize,
-        iconConfig.showBorder and 1 or 0,
-        iconConfig.showSwipe and 1 or 0,
-        iconConfig.showCooldownText and 1 or 0,
-        growDirection,
-        anchorFrame
-    )
-
-    iconConfig.count = count
-    iconConfig.growDirection = growDirection
-    iconConfig.hash = hash
+    local iconConfig, anchorFrame = DB:GetIncomingCastIndicatorIconConfig(relativeAnchor)
+    local frameAnchor = DB:GetIncomingCastIndicatorSpellBarAnchor(relativeAnchor)
+    local offsetX = DB:GetIncomingCastIndicatorOffsetX(relativeAnchor)
+    local offsetY = DB:GetIncomingCastIndicatorOffsetY(relativeAnchor)
 
     return {
         icon = iconConfig,
         anchorFrame = anchorFrame,
-        position = position,
+        relativeAnchor = relativeAnchor,
+        frameAnchor = frameAnchor,
         offsetX = offsetX,
         offsetY = offsetY,
     }
@@ -566,7 +428,7 @@ local function GetIncomingCastHostFrame(unitFrame, config)
         return nil
     end
 
-    if config and config.anchorFrame == "FRAME" then
+    if config and config.anchorFrame == DB.FRAME_ANCHOR_TARGETS.FRAME then
         return unitFrame
     end
 

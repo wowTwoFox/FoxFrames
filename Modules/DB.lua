@@ -1,10 +1,8 @@
 local addonName, addon = ...
 
-local Utils = addon and addon.Utils
+assert(addon and addon.Utils, "FoxFrames: addon table or Utils missing (load order issue)")
 
-if not (addon and Utils) then
-    return
-end
+local Utils = addon.Utils
 
 local Object = {}
 Object.__index = Object
@@ -43,6 +41,14 @@ local growthDirections = {
     LEFT = "LEFT",
     RIGHT = "RIGHT",
 }
+
+local function IsRightAnchor(point)
+    return point == anchorPoints.TOPRIGHT or point == anchorPoints.RIGHT or point == anchorPoints.BOTTOMRIGHT
+end
+
+local function IsTopAnchor(point)
+    return point == anchorPoints.TOPLEFT or point == anchorPoints.TOP or point == anchorPoints.TOPRIGHT
+end
 
 local defaultSettings = {
     playerFrame = {
@@ -195,33 +201,197 @@ function Object:SetIncomingCastBarIconValue(key, value)
     end
 end
 
-function Object:SanitizeIncomingCastPosition(value, fallback)
-    if anchorPoints[value] then
-        return value
+function Object:GetIncomingCastIndicatorRelativeAnchor()
+    local fallback = defaultSettings.incomingCastBar.position
+
+    local profile = self:GetIncomingCastBarDB()
+    local value = profile and profile.position
+
+    if value == nil then
+        return fallback
     end
 
-    return fallback
+    return self:SanitizeIncomingCastPosition(value, fallback)
+end
+
+function Object:GetIncomingCastIndicatorSpellBarAnchor(relativeAnchor)
+    local fallback = self:GetIncomingCastIndicatorRelativeAnchor()
+
+    local value = relativeAnchor
+    if value == nil then
+        return fallback
+    end
+
+    return self:SanitizeIncomingCastPosition(value, fallback)
+end
+
+function Object:GetIncomingCastIndicatorAnchorFrame()
+    local fallback = defaultSettings.incomingCastBar.anchorFrame
+
+    local profile = self:GetIncomingCastBarDB()
+    local value = profile and profile.anchorFrame
+    if value == nil then
+        return fallback
+    end
+
+    return self:SanitizeIncomingCastAnchorFrame(value, fallback)
+end
+
+function Object:GetIncomingCastIndicatorCount()
+    local profile = self:GetIncomingCastBarDB()
+    return Utils:ClampInteger(profile and profile.spellCount, 1, 6, defaultSettings.incomingCastBar.spellCount)
+end
+
+function Object:GetIncomingCastIndicatorIconConfig(relativeAnchor)
+    local iconDefaults = defaultSettings.incomingCastBar.icon
+
+    local profile = self:GetIncomingCastBarDB()
+    local iconProfile = profile and profile.icon
+
+    local spellIconMixin = addon and addon.SpellIconMixin
+    local baseSize = tonumber(spellIconMixin and spellIconMixin.SPELL_ICON_BASE_SIZE) or 22
+
+    local scaleFallback = iconDefaults.scale
+    local scale = Utils:ClampNumber(iconProfile and iconProfile.scale, 0.5, 3, scaleFallback)
+    -- Keep hash stable and avoid float jitter.
+    scale = Utils:RoundToDecimals(scale, 2, scaleFallback) or scaleFallback
+
+    -- This is the size used for layout (wrapper frame). The visual icon frame is
+    -- kept at baseSize and scaled, so borders/overlays scale proportionally.
+    local size = baseSize * scale
+
+    local spacing = Utils:ClampInteger(iconProfile and iconProfile.spacing, -10, 50, iconDefaults.spacing)
+    local cooldownFontSize = Utils:ClampInteger(iconProfile and iconProfile.cooldownFontSize, 8, 32, iconDefaults.cooldownFontSize)
+
+    local showBorder = iconProfile and iconProfile.showBorder
+    if showBorder == nil then
+        showBorder = iconDefaults.showBorder ~= false
+    else
+        showBorder = showBorder == true
+    end
+
+    local showSwipe = iconProfile and iconProfile.showSwipe
+    if showSwipe == nil then
+        showSwipe = iconDefaults.showSwipe ~= false
+    else
+        showSwipe = showSwipe == true
+    end
+
+    local showCooldownText = iconProfile and iconProfile.showCooldownText
+    if showCooldownText == nil then
+        showCooldownText = iconDefaults.showCooldownText ~= false
+    else
+        showCooldownText = showCooldownText == true
+    end
+
+    local count = self:GetIncomingCastIndicatorCount()
+    local growDirection = self:GetIncomingCastIndicatorGrowDirection(relativeAnchor)
+    local anchorFrame = self:GetIncomingCastIndicatorAnchorFrame()
+
+    local hash = string.format(
+        "%d:%.2f:%d:%d:%d:%d:%d:%s:%s",
+        count,
+        scale,
+        spacing,
+        cooldownFontSize,
+        showBorder and 1 or 0,
+        showSwipe and 1 or 0,
+        showCooldownText and 1 or 0,
+        growDirection,
+        anchorFrame
+    )
+
+    return {
+        baseSize = baseSize,
+        scale = scale,
+        size = size,
+        spacing = spacing,
+        cooldownFontSize = cooldownFontSize,
+        showBorder = showBorder,
+        showSwipe = showSwipe,
+        showCooldownText = showCooldownText,
+        count = count,
+        growDirection = growDirection,
+        hash = hash,
+    }, anchorFrame
+end
+
+function Object:GetIncomingCastIndicatorGrowDirection(relativeAnchor)
+    local fallback = defaultSettings.incomingCastBar.growthDirection
+
+    local profile = self:GetIncomingCastBarDB()
+    local explicitValue = profile and rawget(profile, "growthDirection")
+
+    if explicitValue == nil then
+        local anchor = relativeAnchor
+        if anchor == nil then
+            anchor = self:GetIncomingCastIndicatorRelativeAnchor()
+        end
+
+        if IsRightAnchor(anchor) then
+            return growthDirections.LEFT
+        end
+
+        return fallback
+    end
+
+    return self:SanitizeIncomingCastGrowDirection(explicitValue, fallback)
+end
+
+function Object:GetIncomingCastIndicatorOffsetX(relativeAnchor)
+    local fallback = defaultSettings.incomingCastBar.offsetX
+
+    local profile = self:GetIncomingCastBarDB()
+    local configuredValue = profile and profile.offsetX
+
+    local offsetX = Utils:ClampInteger(configuredValue, -200, 200, fallback)
+
+    local anchor = relativeAnchor
+    if anchor == nil then
+        anchor = self:GetIncomingCastIndicatorRelativeAnchor()
+    end
+
+    if IsRightAnchor(anchor) then
+        offsetX = -offsetX
+    end
+
+    return offsetX
+end
+
+function Object:GetIncomingCastIndicatorOffsetY(relativeAnchor)
+    local fallback = defaultSettings.incomingCastBar.offsetY
+
+    local profile = self:GetIncomingCastBarDB()
+    local configuredValue = profile and profile.offsetY
+
+    local offsetY = Utils:ClampInteger(configuredValue, -200, 200, fallback)
+
+    local anchor = relativeAnchor
+    if anchor == nil then
+        anchor = self:GetIncomingCastIndicatorRelativeAnchor()
+    end
+
+    if IsTopAnchor(anchor) then
+        offsetY = -offsetY
+    end
+
+    return offsetY
+end
+
+function Object:SanitizeIncomingCastPosition(value, fallback)
+    return Utils:SanitizeOption(value, anchorPoints) or fallback
 end
 
 function Object:SanitizeIncomingCastGrowDirection(value, fallback)
-    if growthDirections[value] then
-        return value
-    end
-    return fallback
+    return Utils:SanitizeOption(value, growthDirections) or fallback
 end
 
 function Object:SanitizeIncomingCastAnchorFrame(value, fallback)
-    if frameAnchorTargets[value] then
-        return value
-    end
-    return fallback
+    return Utils:SanitizeOption(value, frameAnchorTargets) or fallback
 end
 
 function Object:SanitizeStatusTextAnchorPoint(value, fallback)
-    if anchorPoints[value] then
-        return value
-    end
-    return fallback
+    return Utils:SanitizeOption(value, anchorPoints) or fallback
 end
 
 function Object:SanitizeStatusTextColor(value, fallback)
@@ -253,15 +423,13 @@ end
 function Object:SanitizeOpacity(value, fallback)
     local sanitizedFallback = Utils:ClampNumber(fallback, 0, 1, 1)
     local opacity = Utils:ClampNumber(value, 0, 1, sanitizedFallback)
-    return math.floor((opacity * 100) + 0.5) / 100
+    return Utils:RoundToDecimals(opacity, 2, sanitizedFallback)
 end
 
 function Object:GetAuraCountdownFontSize()
     local defaultSize = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.countdownFontSize) or 12
     local profile = self:GetPartyFrameDB()
-    local size = Utils:ClampNumber(profile and profile.countdownFontSize, 8, 32, defaultSize)
-
-    return math.floor(size + 0.5)
+    return Utils:ClampInteger(profile and profile.countdownFontSize, 8, 32, defaultSize)
 end
 
 function Object:GetStatusTextAnchorTarget()
@@ -270,11 +438,7 @@ function Object:GetStatusTextAnchorTarget()
     local profile = self:GetPartyFrameDB()
     local target = profile and profile.statusTextAnchorTarget
 
-    if frameAnchorTargets[target] then
-        return target
-    end
-
-    return defaultTarget
+    return Utils:SanitizeOption(target, frameAnchorTargets) or defaultTarget
 end
 
 function Object:GetStatusTextAnchorPoint()
@@ -283,21 +447,17 @@ function Object:GetStatusTextAnchorPoint()
     local profile = self:GetPartyFrameDB()
     local point = profile and profile.statusTextAnchorPoint
 
-    if anchorPoints[point] then
-        return point
-    end
-
-    return defaultPoint
+    return Utils:SanitizeOption(point, anchorPoints) or defaultPoint
 end
 
 function Object:GetStatusTextAnchorOffsets()
     local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame) or {}
     local profile = self:GetPartyFrameDB()
 
-    local offsetX = Utils:ClampNumber(profile and profile.statusTextOffsetX, -100, 100, defaults.statusTextOffsetX or 0)
-    local offsetY = Utils:ClampNumber(profile and profile.statusTextOffsetY, -100, 100, defaults.statusTextOffsetY or 0)
+    local offsetX = Utils:ClampInteger(profile and profile.statusTextOffsetX, -100, 100, defaults.statusTextOffsetX or 0)
+    local offsetY = Utils:ClampInteger(profile and profile.statusTextOffsetY, -100, 100, defaults.statusTextOffsetY or 0)
 
-    return math.floor(offsetX + 0.5), math.floor(offsetY + 0.5)
+    return offsetX, offsetY
 end
 
 function Object:GetStatusTextColor()
@@ -334,11 +494,7 @@ function Object:GetPlayerNameAnchorTarget()
     local profile = self:GetPartyFrameDB()
     local target = profile and profile.playerNameAnchorTarget
 
-    if frameAnchorTargets[target] then
-        return target
-    end
-
-    return defaultTarget
+    return Utils:SanitizeOption(target, frameAnchorTargets) or defaultTarget
 end
 
 function Object:GetPlayerNameAnchorPoint()
@@ -347,21 +503,17 @@ function Object:GetPlayerNameAnchorPoint()
     local profile = self:GetPartyFrameDB()
     local point = profile and profile.playerNameAnchorPoint
 
-    if anchorPoints[point] then
-        return point
-    end
-
-    return defaultPoint
+    return Utils:SanitizeOption(point, anchorPoints) or defaultPoint
 end
 
 function Object:GetPlayerNameAnchorOffsets()
     local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame) or {}
     local profile = self:GetPartyFrameDB()
 
-    local offsetX = Utils:ClampNumber(profile and profile.playerNameOffsetX, -100, 100, defaults.playerNameOffsetX or 0)
-    local offsetY = Utils:ClampNumber(profile and profile.playerNameOffsetY, -100, 100, defaults.playerNameOffsetY or 0)
+    local offsetX = Utils:ClampInteger(profile and profile.playerNameOffsetX, -100, 100, defaults.playerNameOffsetX or 0)
+    local offsetY = Utils:ClampInteger(profile and profile.playerNameOffsetY, -100, 100, defaults.playerNameOffsetY or 0)
 
-    return math.floor(offsetX + 0.5), math.floor(offsetY + 0.5)
+    return offsetX, offsetY
 end
 
 function Object:GetPlayerNameColor()
@@ -395,15 +547,13 @@ end
 function Object:GetPlayerNameFontSize()
     local defaultSize = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerNameFontSize) or 10
     local profile = self:GetPartyFrameDB()
-    local size = Utils:ClampNumber(profile and profile.playerNameFontSize, 8, 32, defaultSize)
-    return math.floor(size + 0.5)
+    return Utils:ClampInteger(profile and profile.playerNameFontSize, 8, 32, defaultSize)
 end
 
 function Object:GetHealthTextFontSize()
     local defaultSize = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.healthTextFontSize) or 10
     local profile = self:GetPartyFrameDB()
-    local size = Utils:ClampNumber(profile and profile.healthTextFontSize, 8, 32, defaultSize)
-    return math.floor(size + 0.5)
+    return Utils:ClampInteger(profile and profile.healthTextFontSize, 8, 32, defaultSize)
 end
 
 function Object:GetAllowAnyAnchoring()
@@ -438,13 +588,7 @@ function Object:GetPlayerFrameShowType()
     local profile = self:GetPlayerFrameDB()
     local value = profile and profile.showType
 
-    if value == configuredTypes.ALWAYS
-        or value == configuredTypes.SOLO
-        or value == configuredTypes.NEVER then
-        return value
-    end
-
-    return defaultValue
+    return Utils:SanitizeOption(value, configuredTypes) or defaultValue
 end
 
 function Object:GetShowPartyFrameTitle()

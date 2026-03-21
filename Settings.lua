@@ -199,7 +199,7 @@ local function CreateIncomingCastsSettings(rootCategory)
 
     SettingsLib:CreateDropdown(incomingCastsCategory, {
         key = "IncomingCastIconPosition",
-        name = "Targeted spell position",
+        name = "Position",
         default = incomingCastBarDefaults.position,
         values = ANCHOR_POINT_LABELS,
         get = function()
@@ -226,26 +226,8 @@ local function CreateIncomingCastsSettings(rootCategory)
         default = incomingCastBarDefaults.growthDirection,
         values = GROWTH_DIRECTION_LABELS,
         get = function()
-            local pos = SanitizePosition(
-                GetIncomingCastBarValue("position"),
-                incomingCastBarDefaults.position
-            )
-
-            local dir = GetIncomingCastBarValue("growthDirection")
-
-            if dir == nil then
-                if pos == "TOPRIGHT" or pos == "RIGHT" or pos == "BOTTOMRIGHT" then
-                    dir = DB.GROWTH_DIRECTIONS.LEFT
-                else
-                    dir = incomingCastBarDefaults.growthDirection
-                end
-            end
-
-            if not DB.GROWTH_DIRECTIONS[dir] then
-                dir = incomingCastBarDefaults.growthDirection
-            end
-
-            return dir
+            local relativeAnchor = DB:GetIncomingCastIndicatorRelativeAnchor()
+            return DB:GetIncomingCastIndicatorGrowDirection(relativeAnchor)
         end,
         set = function(value)
             SetIncomingCastBarValue("growthDirection", value)
@@ -264,7 +246,7 @@ local function CreateIncomingCastsSettings(rootCategory)
         max = 40,
         step = 1,
         formatter = function(value)
-            return string.format("%ipx", math.floor((value) + 0.5))
+            return string.format("%ipx", Utils:ClampInteger(value, -40, 40, incomingCastBarDefaults.offsetX))
         end,
         get = function()
             local value = GetIncomingCastBarValue("offsetX")
@@ -274,7 +256,7 @@ local function CreateIncomingCastsSettings(rootCategory)
             return value
         end,
         set = function(value)
-            SetIncomingCastBarValue("offsetX", value)
+            SetIncomingCastBarValue("offsetX", Utils:ClampInteger(value, -40, 40, incomingCastBarDefaults.offsetX))
 
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
@@ -291,7 +273,7 @@ local function CreateIncomingCastsSettings(rootCategory)
         max = 40,
         step = 1,
         formatter = function(value)
-            return string.format("%ipx", math.floor((value) + 0.5))
+            return string.format("%ipx", Utils:ClampInteger(value, -40, 40, incomingCastBarDefaults.offsetY))
         end,
         get = function()
             local value = GetIncomingCastBarValue("offsetY")
@@ -301,7 +283,7 @@ local function CreateIncomingCastsSettings(rootCategory)
             return value
         end,
         set = function(value)
-            SetIncomingCastBarValue("offsetY", value)
+            SetIncomingCastBarValue("offsetY", Utils:ClampInteger(value, -40, 40, incomingCastBarDefaults.offsetY))
 
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
@@ -318,7 +300,7 @@ local function CreateIncomingCastsSettings(rootCategory)
         max = 6,
         step = 1,
         formatter = function(value)
-            return string.format("%i", math.floor((value) + 0.5))
+            return string.format("%i", Utils:ClampInteger(value, 1, 6, incomingCastBarDefaults.spellCount))
         end,
         get = function()
             local value = GetIncomingCastBarValue("spellCount")
@@ -328,7 +310,7 @@ local function CreateIncomingCastsSettings(rootCategory)
             return value
         end,
         set = function(value)
-            SetIncomingCastBarValue("spellCount", value)
+            SetIncomingCastBarValue("spellCount", Utils:ClampInteger(value, 1, 6, incomingCastBarDefaults.spellCount))
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
         end,
@@ -344,7 +326,10 @@ local function CreateIncomingCastsSettings(rootCategory)
         max = 2,
         step = 0.10,
         formatter = function(value)
-            return string.format("%d%%", math.floor((value * 100) + 0.5))
+            return string.format(
+                "%d%%",
+                Utils:ClampInteger((value and (value * 100) or nil), 50, 200, (incomingCastBarIconDefaults.scale or 1) * 100)
+            )
         end,
         get = function()
             local value = GetIncomingCastBarIconValue("scale")
@@ -371,7 +356,7 @@ local function CreateIncomingCastsSettings(rootCategory)
         max = 20,
         step = 1,
         formatter = function(value)
-            return string.format("%i", math.floor((value) + 0.5))
+            return string.format("%i", Utils:ClampInteger(value, -10, 20, incomingCastBarIconDefaults.spacing))
         end,
         get = function()
             local value = GetIncomingCastBarIconValue("spacing")
@@ -381,7 +366,7 @@ local function CreateIncomingCastsSettings(rootCategory)
             return value
         end,
         set = function(value)
-            SetIncomingCastBarIconValue("spacing", value)
+            SetIncomingCastBarIconValue("spacing", Utils:ClampInteger(value, -10, 20, incomingCastBarIconDefaults.spacing))
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
         end,
@@ -457,7 +442,7 @@ local function CreateIncomingCastsSettings(rootCategory)
         max = 32,
         step = 1,
         formatter = function(value)
-            return string.format("%ipt", math.floor((value) + 0.5))
+            return string.format("%ipt", Utils:ClampInteger(value, 8, 32, incomingCastBarIconDefaults.cooldownFontSize))
         end,
         get = function()
             local value = GetIncomingCastBarIconValue("cooldownFontSize")
@@ -467,7 +452,7 @@ local function CreateIncomingCastsSettings(rootCategory)
             return value
         end,
         set = function(value)
-            SetIncomingCastBarIconValue("cooldownFontSize", math.floor((value) + 0.5))
+            SetIncomingCastBarIconValue("cooldownFontSize", Utils:ClampInteger(value, 8, 32, incomingCastBarIconDefaults.cooldownFontSize))
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
         end,
@@ -675,7 +660,7 @@ function FF:SetupOptions()
         max = 40,
         step = 1,
         formatter = function(value)
-            return string.format("%ipx", math.floor((value) + 0.5))
+            return string.format("%ipx", Utils:ClampInteger(value, -40, 40, DB.DEFAULT_SETTINGS.partyFrame.statusTextOffsetX))
         end,
         get = function()
             local value = PartyFrameProfile().statusTextOffsetX
@@ -685,7 +670,7 @@ function FF:SetupOptions()
             return value
         end,
         set = function(value)
-            PartyFrameProfile().statusTextOffsetX = math.floor((value) + 0.5)
+            PartyFrameProfile().statusTextOffsetX = Utils:ClampInteger(value, -40, 40, DB.DEFAULT_SETTINGS.partyFrame.statusTextOffsetX)
             FF:UpdateStatusTextAnchoring()
             FF:RequestStatusTextSettingsRefresh()
         end,
@@ -701,7 +686,7 @@ function FF:SetupOptions()
         max = 40,
         step = 1,
         formatter = function(value)
-            return string.format("%ipx", math.floor((value) + 0.5))
+            return string.format("%ipx", Utils:ClampInteger(value, -40, 40, DB.DEFAULT_SETTINGS.partyFrame.statusTextOffsetY))
         end,
         get = function()
             local value = PartyFrameProfile().statusTextOffsetY
@@ -711,7 +696,7 @@ function FF:SetupOptions()
             return value
         end,
         set = function(value)
-            PartyFrameProfile().statusTextOffsetY = math.floor((value) + 0.5)
+            PartyFrameProfile().statusTextOffsetY = Utils:ClampInteger(value, -40, 40, DB.DEFAULT_SETTINGS.partyFrame.statusTextOffsetY)
             FF:UpdateStatusTextAnchoring()
             FF:RequestStatusTextSettingsRefresh()
         end,
@@ -727,7 +712,7 @@ function FF:SetupOptions()
         max = 32,
         step = 1,
         formatter = function(value)
-            return string.format("%ipt", math.floor((value) + 0.5))
+            return string.format("%ipt", Utils:ClampInteger(value, 8, 32, DB.DEFAULT_SETTINGS.partyFrame.healthTextFontSize))
         end,
         get = function()
             local value = PartyFrameProfile().healthTextFontSize
@@ -737,7 +722,7 @@ function FF:SetupOptions()
             return value
         end,
         set = function(value)
-            PartyFrameProfile().healthTextFontSize = math.floor((value) + 0.5)
+            PartyFrameProfile().healthTextFontSize = Utils:ClampInteger(value, 8, 32, DB.DEFAULT_SETTINGS.partyFrame.healthTextFontSize)
             FF:UpdateHealthTextFontSize()
             FF:RequestStatusTextSettingsRefresh()
         end,
@@ -753,7 +738,10 @@ function FF:SetupOptions()
         max = 1,
         step = 0.01,
         formatter = function(value)
-            return string.format("%d%%", math.floor((value * 100) + 0.5))
+            return string.format(
+                "%d%%",
+                Utils:ClampInteger((value and (value * 100) or nil), 0, 100, (DB.DEFAULT_SETTINGS.partyFrame.statusTextOpacity or 1) * 100)
+            )
         end,
         get = function()
             local value = PartyFrameProfile().statusTextOpacity
@@ -904,7 +892,7 @@ function FF:SetupOptions()
         max = 40,
         step = 1,
         formatter = function(value)
-            return string.format("%ipx", math.floor((value) + 0.5))
+            return string.format("%ipx", Utils:ClampInteger(value, -40, 40, DB.DEFAULT_SETTINGS.partyFrame.playerNameOffsetX))
         end,
         get = function()
             local value = PartyFrameProfile().playerNameOffsetX
@@ -914,7 +902,7 @@ function FF:SetupOptions()
             return value
         end,
         set = function(value)
-            PartyFrameProfile().playerNameOffsetX = math.floor((value) + 0.5)
+            PartyFrameProfile().playerNameOffsetX = Utils:ClampInteger(value, -40, 40, DB.DEFAULT_SETTINGS.partyFrame.playerNameOffsetX)
             FF:UpdatePlayerNameAnchoring()
         end,
         desc = "Horizontal offset for player name anchoring.",
@@ -929,7 +917,7 @@ function FF:SetupOptions()
         max = 40,
         step = 1,
         formatter = function(value)
-            return string.format("%ipx", math.floor((value) + 0.5))
+            return string.format("%ipx", Utils:ClampInteger(value, -40, 40, DB.DEFAULT_SETTINGS.partyFrame.playerNameOffsetY))
         end,
         get = function()
             local value = PartyFrameProfile().playerNameOffsetY
@@ -939,7 +927,7 @@ function FF:SetupOptions()
             return value
         end,
         set = function(value)
-            PartyFrameProfile().playerNameOffsetY = math.floor((value) + 0.5)
+            PartyFrameProfile().playerNameOffsetY = Utils:ClampInteger(value, -40, 40, DB.DEFAULT_SETTINGS.partyFrame.playerNameOffsetY)
             FF:UpdatePlayerNameAnchoring()
         end,
         desc = "Vertical offset for player name anchoring.",
@@ -954,7 +942,7 @@ function FF:SetupOptions()
         max = 32,
         step = 1,
         formatter = function(value)
-            return string.format("%ipt", math.floor((value) + 0.5))
+            return string.format("%ipt", Utils:ClampInteger(value, 8, 32, DB.DEFAULT_SETTINGS.partyFrame.playerNameFontSize))
         end,
         get = function()
             local value = PartyFrameProfile().playerNameFontSize
@@ -964,7 +952,7 @@ function FF:SetupOptions()
             return value
         end,
         set = function(value)
-            PartyFrameProfile().playerNameFontSize = math.floor((value) + 0.5)
+            PartyFrameProfile().playerNameFontSize = Utils:ClampInteger(value, 8, 32, DB.DEFAULT_SETTINGS.partyFrame.playerNameFontSize)
             FF:UpdatePlayerNameFontSize()
         end,
         desc = "Adjust the player name text size on party frames.",
@@ -979,7 +967,10 @@ function FF:SetupOptions()
         max = 1,
         step = 0.01,
         formatter = function(value)
-            return string.format("%d%%", math.floor((value * 100) + 0.5))
+            return string.format(
+                "%d%%",
+                Utils:ClampInteger((value and (value * 100) or nil), 0, 100, (DB.DEFAULT_SETTINGS.partyFrame.playerNameOpacity or 1) * 100)
+            )
         end,
         get = function()
             local value = PartyFrameProfile().playerNameOpacity
@@ -1152,7 +1143,7 @@ function FF:SetupOptions()
         max = 32,
         step = 1,
         formatter = function(value)
-            return string.format("%ipt", math.floor((value) + 0.5))
+            return string.format("%ipt", Utils:ClampInteger(value, 8, 32, DB.DEFAULT_SETTINGS.partyFrame.countdownFontSize))
         end,
         get = function()
             local value = PartyFrameProfile().countdownFontSize
@@ -1162,7 +1153,7 @@ function FF:SetupOptions()
             return value
         end,
         set = function(value)
-            PartyFrameProfile().countdownFontSize = math.floor((value) + 0.5)
+            PartyFrameProfile().countdownFontSize = Utils:ClampInteger(value, 8, 32, DB.DEFAULT_SETTINGS.partyFrame.countdownFontSize)
             self:UpdateAuraCountdownFontSize()
         end,
         desc = "Adjust the buff/debuff countdown text size on party frames.",

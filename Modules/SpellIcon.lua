@@ -102,8 +102,7 @@ local function CenterSpellIconCooldownText(cooldown, iconConfig)
     if fontString.GetFont and fontString.SetFont then
         local fontFile, fontHeight, fontFlags = fontString:GetFont()
         if fontFile and fontHeight then
-            local desiredFontHeight = Utils:ClampNumber(iconConfig and iconConfig.cooldownFontSize, 8, 32, fontHeight)
-            desiredFontHeight = math.floor(desiredFontHeight + 0.5)
+            local desiredFontHeight = Utils:ClampInteger(iconConfig and iconConfig.cooldownFontSize, 8, 32, fontHeight)
             local flags = fontFlags or ""
             if not flags:find("THICKOUTLINE", 1, true) then
                 if flags:find("OUTLINE", 1, true) then

@@ -99,6 +99,54 @@ function Object:ClampNumber(value, minValue, maxValue, fallback)
     return num
 end
 
+function Object:ClampInteger(value, minValue, maxValue, fallback)
+    local num = self:ClampNumber(value, minValue, maxValue, fallback)
+    return math.floor(num + 0.5)
+end
+
+function Object:RoundToDecimals(value, decimals, fallback)
+    local num = value
+    if type(num) ~= "number" then
+        num = tonumber(num)
+    end
+    if type(num) ~= "number" then
+        num = fallback
+    end
+    if type(num) ~= "number" then
+        return nil
+    end
+
+    local places = decimals
+    if type(places) ~= "number" then
+        places = tonumber(places)
+    end
+    if type(places) ~= "number" then
+        places = 0
+    end
+    places = math.floor(places + 0.5)
+    if places < 0 then
+        places = 0
+    end
+
+    local multiplier = 10 ^ places
+    return math.floor((num * multiplier) + 0.5) / multiplier
+end
+
+function Object:SanitizeOption(value, options)
+    if value == nil then
+        return nil
+    end
+    if type(options) ~= "table" then
+        return nil
+    end
+
+    if options[value] ~= nil then
+        return value
+    end
+
+    return nil
+end
+
 function Object:GetCooldownCountdownFontString(cooldown)
     if not (cooldown and cooldown.GetCountdownFontString) then
         return nil

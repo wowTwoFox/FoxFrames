@@ -1,9 +1,10 @@
 local addonName, addon = ...
 
 local Utils = addon.Utils
+local DB = addon.DB
 
-local SPELL_BAR_DEFAULT_GROW_DIRECTION = "RIGHT"
-local SPELL_BAR_DEFAULT_POSITION = "BOTTOMLEFT"
+local SPELL_BAR_DEFAULT_GROW_DIRECTION = DB.GROWTH_DIRECTIONS.RIGHT
+local SPELL_BAR_DEFAULT_POSITION = DB.ANCHOR_POINTS.BOTTOMLEFT
 local SPELL_BAR_DEFAULT_OFFSET_X = 2
 local SPELL_BAR_DEFAULT_OFFSET_Y = 2
 
@@ -86,42 +87,29 @@ function SpellBarMixin:ApplyContainerPosition(frame, config)
         return
     end
 
-    local position = (config and config.position) or SPELL_BAR_DEFAULT_POSITION
-    if position == "UP" then
-        position = "TOP"
-    elseif position == "DOWN" then
-        position = "BOTTOM"
-    end
+    local relativeAnchor = Utils:SanitizeOption(
+        config and (config.relativeAnchor or config.position),
+        DB.ANCHOR_POINTS
+    ) or SPELL_BAR_DEFAULT_POSITION
 
-    if position ~= "TOPLEFT" and position ~= "TOP" and position ~= "TOPRIGHT"
-        and position ~= "LEFT" and position ~= "CENTER" and position ~= "RIGHT"
-        and position ~= "BOTTOMLEFT" and position ~= "BOTTOM" and position ~= "BOTTOMRIGHT" then
-        position = SPELL_BAR_DEFAULT_POSITION
-    end
+    local frameAnchor = Utils:SanitizeOption(
+        config and (config.frameAnchor or config.spellBarAnchor or config.position or config.relativeAnchor),
+        DB.ANCHOR_POINTS
+    ) or relativeAnchor
 
-    local offsetX = Utils:ClampNumber(config and config.offsetX, -200, 200, SPELL_BAR_DEFAULT_OFFSET_X)
-    offsetX = math.floor(offsetX + 0.5)
-
-    local offsetY = Utils:ClampNumber(config and config.offsetY, -200, 200, SPELL_BAR_DEFAULT_OFFSET_Y)
-    offsetY = math.floor(offsetY + 0.5)
+    local offsetX = Utils:ClampInteger(config and config.offsetX, -200, 200, SPELL_BAR_DEFAULT_OFFSET_X)
+    local offsetY = Utils:ClampInteger(config and config.offsetY, -200, 200, SPELL_BAR_DEFAULT_OFFSET_Y)
 
     local xOffset = offsetX
     local yOffset = offsetY
-    if position == "TOPRIGHT" or position == "RIGHT" or position == "BOTTOMRIGHT" then
-        xOffset = -offsetX
-    end
 
-    if position == "TOPLEFT" or position == "TOP" or position == "TOPRIGHT" then
-        yOffset = -offsetY
-    end
-
-    local anchorHash = string.format("%s:%d:%d", position, offsetX, offsetY)
+    local anchorHash = string.format("%s:%s:%d:%d", relativeAnchor, frameAnchor, offsetX, offsetY)
     if container._ffSpellBarAnchorHash == anchorHash then
         return
     end
 
     container:ClearAllPoints()
-    container:SetPoint(position, frame, position, xOffset, yOffset)
+    container:SetPoint(frameAnchor, frame, relativeAnchor, xOffset, yOffset)
     container._ffSpellBarAnchorHash = anchorHash
 end
 
@@ -150,21 +138,11 @@ function SpellBarMixin:ApplyIconContainerLayout(iconConfig)
     local iconSize = iconConfig.size or iconBaseSize
     local iconSpacing = iconConfig.spacing or 0
 
-    local iconCount = tonumber(iconConfig.count)
-    if type(iconCount) ~= "number" then
-        iconCount = 1
-    end
-    iconCount = math.floor(iconCount + 0.5)
-    if iconCount < 1 then
-        iconCount = 1
-    end
+    local iconCount = Utils:ClampInteger(iconConfig.count, 1, math.huge, 1)
 
-    local growDirection = iconConfig.growDirection or SPELL_BAR_DEFAULT_GROW_DIRECTION
-    if growDirection ~= "RIGHT" and growDirection ~= "LEFT" and growDirection ~= "DOWN" and growDirection ~= "UP" then
-        growDirection = SPELL_BAR_DEFAULT_GROW_DIRECTION
-    end
+    local growDirection = Utils:SanitizeOption(iconConfig.growDirection, DB.GROWTH_DIRECTIONS) or SPELL_BAR_DEFAULT_GROW_DIRECTION
 
-    local isVertical = growDirection == "DOWN" or growDirection == "UP"
+    local isVertical = growDirection == DB.GROWTH_DIRECTIONS.DOWN or growDirection == DB.GROWTH_DIRECTIONS.UP
 
     container.isHorizontal = true
     container.stride = isVertical and 1 or iconCount
@@ -261,13 +239,11 @@ function SpellBarMixin:UpdateFromCastList(targetUnit, castList, config)
 
     local desiredCount = iconConfig.count or (config and config.count) or 0
 
-    local growDirection = iconConfig.growDirection or (config and config.growDirection)
-    if growDirection ~= "RIGHT" and growDirection ~= "LEFT" and growDirection ~= "DOWN" and growDirection ~= "UP" then
-        growDirection = SPELL_BAR_DEFAULT_GROW_DIRECTION
-    end
+    local growDirection = Utils:SanitizeOption(iconConfig.growDirection or (config and config.growDirection), DB.GROWTH_DIRECTIONS)
+        or SPELL_BAR_DEFAULT_GROW_DIRECTION
 
-    local isVertical = growDirection == "DOWN" or growDirection == "UP"
-    local reverseIcons = growDirection == "LEFT" or growDirection == "UP"
+    local isVertical = growDirection == DB.GROWTH_DIRECTIONS.DOWN or growDirection == DB.GROWTH_DIRECTIONS.UP
+    local reverseIcons = growDirection == DB.GROWTH_DIRECTIONS.LEFT or growDirection == DB.GROWTH_DIRECTIONS.UP
 
     local targetedCastList = {}
     local untargetedCastList = {}
@@ -341,7 +317,11 @@ function SpellBarMixin:UpdateFromCastList(targetUnit, castList, config)
             end
         end
 
-        local sizeHash = string.format("%d:%d", math.floor(width + 0.5), math.floor(height + 0.5))
+        local sizeHash = string.format(
+            "%d:%d",
+            Utils:ClampInteger(width, 0, math.huge, 0),
+            Utils:ClampInteger(height, 0, math.huge, 0)
+        )
         if container._ffSpellBarDesiredSizeHash ~= sizeHash then
             container._ffSpellBarDesiredSizeHash = sizeHash
             if container.SetSize then
