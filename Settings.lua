@@ -2,20 +2,21 @@ local addonName, addon = ...
 local FF = FoxFrames
 local Utils = addon.Utils
 local DB = addon.DB
+local Constants = addon.Constants
 
 local SettingsLib = LibStub("LibEQOLSettingsMode-1.0")
 local SETTINGS_PREFIX = "FoxFrames_"
 
 local ANCHOR_POINT_LABELS = {
-    [DB.ANCHOR_POINTS.TOPLEFT] = "Top Left",
-    [DB.ANCHOR_POINTS.TOP] = "Top",
-    [DB.ANCHOR_POINTS.TOPRIGHT] = "Top Right",
-    [DB.ANCHOR_POINTS.LEFT] = "Left",
-    [DB.ANCHOR_POINTS.CENTER] = "Center",
-    [DB.ANCHOR_POINTS.RIGHT] = "Right",
-    [DB.ANCHOR_POINTS.BOTTOMLEFT] = "Bottom Left",
-    [DB.ANCHOR_POINTS.BOTTOM] = "Bottom",
-    [DB.ANCHOR_POINTS.BOTTOMRIGHT] = "Bottom Right",
+    [Constants.ANCHOR_POINTS.TOPLEFT] = "Top Left",
+    [Constants.ANCHOR_POINTS.TOP] = "Top",
+    [Constants.ANCHOR_POINTS.TOPRIGHT] = "Top Right",
+    [Constants.ANCHOR_POINTS.LEFT] = "Left",
+    [Constants.ANCHOR_POINTS.CENTER] = "Center",
+    [Constants.ANCHOR_POINTS.RIGHT] = "Right",
+    [Constants.ANCHOR_POINTS.BOTTOMLEFT] = "Bottom Left",
+    [Constants.ANCHOR_POINTS.BOTTOM] = "Bottom",
+    [Constants.ANCHOR_POINTS.BOTTOMRIGHT] = "Bottom Right",
 }
 local FRAME_ANCHOR_TARGET_LABELS = {
     [DB.FRAME_ANCHOR_TARGETS.FRAME] = "Party Frame",
@@ -27,10 +28,10 @@ local PLAYER_FRAME_SHOW_TYPE_LABELS = {
     [DB.PLAYER_FRAME_SHOW_TYPES.NEVER] = "Never",
 }
 local GROWTH_DIRECTION_LABELS = {
-    [DB.GROWTH_DIRECTIONS.RIGHT] = "Right",
-    [DB.GROWTH_DIRECTIONS.LEFT] = "Left",
-    [DB.GROWTH_DIRECTIONS.DOWN] = "Down",
-    [DB.GROWTH_DIRECTIONS.UP] = "Up",
+    [Constants.GROWTH_DIRECTIONS.RIGHT] = "Right",
+    [Constants.GROWTH_DIRECTIONS.LEFT] = "Left",
+    [Constants.GROWTH_DIRECTIONS.DOWN] = "Down",
+    [Constants.GROWTH_DIRECTIONS.UP] = "Up",
 }
 
 local SPELL_BAR_ANCHOR_MODE_LABELS = {
@@ -96,10 +97,6 @@ local function SanitizeIncomingCastAnchorFrame(value, fallback)
     return DB:SanitizeIncomingCastAnchorFrame(value, fallback)
 end
 
-local function SanitizeStatusTextAnchorPoint(value, fallback)
-    return DB:SanitizeStatusTextAnchorPoint(value, fallback)
-end
-
 local function SanitizeStatusTextColor(value, fallback)
     return DB:SanitizeStatusTextColor(value, fallback)
 end
@@ -128,12 +125,548 @@ local function SetIncomingCastBarValue(key, value)
     DB:SetIncomingCastBarValue(key, value)
 end
 
+local function EnsureSubTable(parent, key)
+    if type(parent) ~= "table" then
+        return nil
+    end
+
+    local value = parent[key]
+    if type(value) ~= "table" then
+        value = {}
+        parent[key] = value
+    end
+
+    return value
+end
+
+local function NormalizePath(path)
+    if type(path) == "table" then
+        return path
+    end
+
+    if type(path) ~= "string" or path == "" then
+        return nil
+    end
+
+    local parts = {}
+    for part in string.gmatch(path, "[^%.]+") do
+        table.insert(parts, part)
+    end
+    return parts
+end
+
+local function GetTableAtPath(root, pathParts)
+    local current = root
+    for _, key in ipairs(pathParts) do
+        if type(current) ~= "table" then
+            return nil
+        end
+        current = current[key]
+    end
+    return current
+end
+
+local function EnsureTableAtPath(root, pathParts)
+    local current = root
+    for _, key in ipairs(pathParts) do
+        current = EnsureSubTable(current, key)
+        if not current then
+            return nil
+        end
+    end
+    return current
+end
+
+local function GetProfileTableAtPath(pathParts)
+    local profile = DB:GetDBProfile()
+    return EnsureTableAtPath(profile, pathParts)
+end
+
+local function GetDefaultsTableAtPath(pathParts)
+    local defaults = GetTableAtPath(DB.DEFAULT_SETTINGS, pathParts)
+    if type(defaults) ~= "table" then
+        defaults = {}
+    end
+    return defaults
+end
+
+local function AddFrameSettings(path, category, keyPrefix, prefix, applySetting)
+    local pathParts = NormalizePath(path)
+    if not (pathParts and category and keyPrefix) then
+        return
+    end
+
+    assert(type(applySetting) == "function", "FoxFrames: AddFrameSettings requires applySetting callback")
+
+    local defaults = GetDefaultsTableAtPath(pathParts)
+
+    local defaultAnchorTarget = SanitizeIncomingCastAnchorFrame(defaults.anchorTarget, DB.FRAME_ANCHOR_TARGETS.FRAME)
+    local defaultPosition = SanitizePosition(defaults.position, Constants.ANCHOR_POINTS.CENTER)
+    local defaultAnchorMode = SanitizeIncomingCastSpellBarAnchorMode(defaults.anchorMode, DB.SPELL_BAR_ANCHOR_MODES.INSIDE)
+    local defaultOffsetX = Utils:ClampInteger(defaults.offsetX, -40, 40, 0)
+    local defaultOffsetY = Utils:ClampInteger(defaults.offsetY, -40, 40, 0)
+    local defaultUseRelativeOffsets = defaults.useRelativeOffsets ~= false
+
+    local function Profile()
+        return GetProfileTableAtPath(pathParts)
+    end
+
+    local function GetValue(key)
+        local profile = Profile()
+        return profile and profile[key]
+    end
+
+    local function SetValue(key, value)
+        local profile = Profile()
+        if profile then
+            profile[key] = value
+        end
+    end
+
+    local function OnChanged(settingKey)
+        applySetting(settingKey)
+    end
+
+    SettingsLib:CreateDropdown(category, {
+        key = keyPrefix .. "AnchorTarget",
+        name = "Anchor To",
+        default = defaultAnchorTarget,
+        values = FRAME_ANCHOR_TARGET_LABELS,
+        get = function()
+            return SanitizeIncomingCastAnchorFrame(GetValue("anchorTarget"), defaultAnchorTarget)
+        end,
+        set = function(value)
+            SetValue("anchorTarget", SanitizeIncomingCastAnchorFrame(value, defaultAnchorTarget))
+            OnChanged("anchorTarget")
+        end,
+        desc = "Choose whether this element is anchored to the party frame or to the health bar.",
+        prefix = prefix,
+    })
+
+    SettingsLib:CreateDropdown(category, {
+        key = keyPrefix .. "Position",
+        name = "Position",
+        default = defaultPosition,
+        values = ANCHOR_POINT_LABELS,
+        get = function()
+            return SanitizePosition(GetValue("position"), defaultPosition)
+        end,
+        set = function(value)
+            SetValue("position", SanitizePosition(value, defaultPosition))
+            OnChanged("position")
+        end,
+        desc = "Anchor point used for this element.",
+        prefix = prefix,
+    })
+
+    SettingsLib:CreateDropdown(category, {
+        key = keyPrefix .. "AnchorMode",
+        name = "Anchor Mode",
+        default = defaultAnchorMode,
+        values = SPELL_BAR_ANCHOR_MODE_LABELS,
+        get = function()
+            return SanitizeIncomingCastSpellBarAnchorMode(GetValue("anchorMode"), defaultAnchorMode)
+        end,
+        set = function(value)
+            SetValue("anchorMode", SanitizeIncomingCastSpellBarAnchorMode(value, defaultAnchorMode))
+            OnChanged("anchorMode")
+        end,
+        desc = "Inside uses the same anchor point as Position.\nOutside (Vertical) flips Top <-> Bottom.\nOutside (Horizontal) flips Left <-> Right.\nOutside (Auto) picks Vertical/Horizontal based on the party frame orientation (horizontal vs vertical layout).\nExample: party frames stacked top-to-bottom -> Auto uses Outside (Horizontal).",
+        prefix = prefix,
+    })
+
+    SettingsLib:CreateSlider(category, {
+        key = keyPrefix .. "OffsetX",
+        name = "X Offset",
+        default = defaultOffsetX,
+        min = -40,
+        max = 40,
+        step = 1,
+        formatter = function(value)
+            return string.format("%ipx", Utils:ClampInteger(value, -40, 40, defaultOffsetX))
+        end,
+        get = function()
+            local value = GetValue("offsetX")
+            if value == nil then
+                value = defaultOffsetX
+            end
+            return Utils:ClampInteger(value, -40, 40, defaultOffsetX)
+        end,
+        set = function(value)
+            SetValue("offsetX", Utils:ClampInteger(value, -40, 40, defaultOffsetX))
+            OnChanged("offsetX")
+        end,
+        desc = "Horizontal offset for anchoring.",
+        prefix = prefix,
+    })
+
+    SettingsLib:CreateSlider(category, {
+        key = keyPrefix .. "OffsetY",
+        name = "Y Offset",
+        default = defaultOffsetY,
+        min = -40,
+        max = 40,
+        step = 1,
+        formatter = function(value)
+            return string.format("%ipx", Utils:ClampInteger(value, -40, 40, defaultOffsetY))
+        end,
+        get = function()
+            local value = GetValue("offsetY")
+            if value == nil then
+                value = defaultOffsetY
+            end
+            return Utils:ClampInteger(value, -40, 40, defaultOffsetY)
+        end,
+        set = function(value)
+            SetValue("offsetY", Utils:ClampInteger(value, -40, 40, defaultOffsetY))
+            OnChanged("offsetY")
+        end,
+        desc = "Vertical offset for anchoring.",
+        prefix = prefix,
+    })
+
+    SettingsLib:CreateCheckbox(category, {
+        key = keyPrefix .. "UseRelativeOffsets",
+        name = "Use Relative Offsets",
+        default = defaultUseRelativeOffsets,
+        get = function()
+            local value = GetValue("useRelativeOffsets")
+            if value == nil then
+                return defaultUseRelativeOffsets
+            end
+            return value == true
+        end,
+        set = function(value)
+            SetValue("useRelativeOffsets", value == true)
+            OnChanged("useRelativeOffsets")
+        end,
+        desc = "When enabled, X/Y offsets are flipped based on anchor point.",
+        prefix = prefix,
+    })
+end
+
+local function AddTextSettings(path, category, keyPrefix, prefix, applySetting)
+    local pathParts = NormalizePath(path)
+    if not (pathParts and category and keyPrefix) then
+        return
+    end
+
+    assert(type(applySetting) == "function", "FoxFrames: AddTextSettings requires applySetting callback")
+
+    local defaults = GetDefaultsTableAtPath(pathParts)
+
+    local defaultFontSize = Utils:ClampInteger(defaults.fontSize, 8, 32, 10)
+    local defaultColor = SanitizeStatusTextColor(defaults.color, { r = 1, g = 1, b = 1, a = 1 })
+    local defaultOpacity = SanitizeOpacity(defaults.opacity, defaultColor.a)
+    local defaultUseClassColors = defaults.useClassColors == true
+
+    local function Profile()
+        return GetProfileTableAtPath(pathParts)
+    end
+
+    local function GetValue(key)
+        local profile = Profile()
+        return profile and profile[key]
+    end
+
+    local function SetValue(key, value)
+        local profile = Profile()
+        if profile then
+            profile[key] = value
+        end
+    end
+
+    local function OnChanged(settingKey)
+        applySetting(settingKey)
+    end
+
+    SettingsLib:CreateSlider(category, {
+        key = keyPrefix .. "FontSize",
+        name = "Size",
+        default = defaultFontSize,
+        min = 8,
+        max = 32,
+        step = 1,
+        formatter = function(value)
+            return string.format("%ipt", Utils:ClampInteger(value, 8, 32, defaultFontSize))
+        end,
+        get = function()
+            local value = GetValue("fontSize")
+            if value == nil then
+                value = defaultFontSize
+            end
+            return Utils:ClampInteger(value, 8, 32, defaultFontSize)
+        end,
+        set = function(value)
+            SetValue("fontSize", Utils:ClampInteger(value, 8, 32, defaultFontSize))
+            OnChanged("fontSize")
+        end,
+        desc = "Adjust the text size on party frames.",
+        prefix = prefix,
+    })
+
+    SettingsLib:CreateSlider(category, {
+        key = keyPrefix .. "Opacity",
+        name = "Opacity",
+        default = defaultOpacity,
+        min = 0,
+        max = 1,
+        step = 0.01,
+        formatter = function(value)
+            return string.format(
+                "%d%%",
+                Utils:ClampInteger((value and (value * 100) or nil), 0, 100, (defaultOpacity or 1) * 100)
+            )
+        end,
+        get = function()
+            local value = GetValue("opacity")
+            if value == nil then
+                local color = SanitizeStatusTextColor(GetValue("color"), defaultColor)
+                value = color.a
+            end
+            return SanitizeOpacity(value, defaultOpacity)
+        end,
+        set = function(value)
+            local opacity = SanitizeOpacity(value, defaultOpacity)
+            SetValue("opacity", opacity)
+
+            local color = SanitizeStatusTextColor(GetValue("color"), defaultColor)
+            color.a = opacity
+            SetValue("color", color)
+
+            OnChanged("opacity")
+        end,
+        desc = "Adjust opacity for text on party frames.",
+        prefix = prefix,
+    })
+
+    local useClassColorsElement = SettingsLib:CreateCheckbox(category, {
+        key = keyPrefix .. "UseClassColors",
+        name = "Use Class Colors",
+        default = defaultUseClassColors,
+        get = function()
+            local value = GetValue("useClassColors")
+            if value == nil then
+                return defaultUseClassColors
+            end
+            return value == true
+        end,
+        set = function(value)
+            SetValue("useClassColors", (value == true))
+            OnChanged("useClassColors")
+        end,
+        desc = "Use class colors instead of the configured static text color.",
+        prefix = prefix,
+    })
+
+    SettingsLib:CreateColorOverrides(category, {
+        key = keyPrefix .. "Color",
+        entries = {
+            { key = keyPrefix, label = "Color" },
+        },
+        getColor = function()
+            local color = SanitizeStatusTextColor(GetValue("color"), defaultColor)
+            return color.r, color.g, color.b
+        end,
+        setColor = function(_, r, g, b)
+            local currentColor = SanitizeStatusTextColor(GetValue("color"), defaultColor)
+            local opacity = SanitizeOpacity(GetValue("opacity"), currentColor.a)
+
+            SetValue("color", SanitizeStatusTextColor({ r = r, g = g, b = b, a = opacity }, defaultColor))
+            SetValue("opacity", opacity)
+            OnChanged("color")
+        end,
+        getDefaultColor = function()
+            local color = SanitizeStatusTextColor(defaultColor, { r = 1, g = 1, b = 1, a = 1 })
+            return color.r, color.g, color.b
+        end,
+        hasOpacity = false,
+        isEnabled = function()
+            return GetValue("useClassColors") ~= true
+        end,
+        parent = useClassColorsElement,
+        parentCheck = function()
+            return GetValue("useClassColors") ~= true
+        end,
+        minHeight = 36,
+    })
+end
+
+local function AddCooldownTextSettings(path, category, keyPrefix, prefix, applySetting)
+    local pathParts = NormalizePath(path)
+    if not (pathParts and category and keyPrefix) then
+        return
+    end
+
+    assert(type(applySetting) == "function", "FoxFrames: AddCooldownTextSettings requires applySetting callback")
+
+    local defaults = GetDefaultsTableAtPath(pathParts)
+
+    local defaultShow = defaults.show == true
+    local defaultFontSize = Utils:ClampInteger(defaults.fontSize, 8, 32, 12)
+
+    local function Profile()
+        return GetProfileTableAtPath(pathParts)
+    end
+
+    local function GetValue(key)
+        local profile = Profile()
+        return profile and profile[key]
+    end
+
+    local function SetValue(key, value)
+        local profile = Profile()
+        if profile then
+            profile[key] = value
+        end
+    end
+
+    local function OnChanged(settingKey)
+        applySetting(settingKey)
+    end
+
+    local showElement = SettingsLib:CreateCheckbox(category, {
+        key = keyPrefix .. "CooldownText",
+        name = "Show Text",
+        default = defaultShow,
+        get = function()
+            local value = GetValue("show")
+            if value == nil then
+                return defaultShow
+            end
+            return value == true
+        end,
+        set = function(value)
+            SetValue("show", value == true)
+            OnChanged("show")
+        end,
+        desc = "Toggle cooldown countdown text visibility.",
+        prefix = prefix,
+    })
+
+    local sliderArgs = {
+        key = keyPrefix .. "CooldownFontSize",
+        name = "Text Size",
+        default = defaultFontSize,
+        min = 8,
+        max = 32,
+        step = 1,
+        formatter = function(value)
+            return string.format("%ipt", Utils:ClampInteger(value, 8, 32, defaultFontSize))
+        end,
+        get = function()
+            local value = GetValue("fontSize")
+            if value == nil then
+                value = defaultFontSize
+            end
+            return Utils:ClampInteger(value, 8, 32, defaultFontSize)
+        end,
+        set = function(value)
+            SetValue("fontSize", Utils:ClampInteger(value, 8, 32, defaultFontSize))
+            OnChanged("fontSize")
+        end,
+        desc = "Adjust cooldown countdown text size.",
+        prefix = prefix,
+    }
+
+    sliderArgs.parent = showElement
+    sliderArgs.parentCheck = function()
+        local value = GetValue("show")
+        if value == nil then
+            value = defaultShow
+        end
+        return value == true
+    end
+
+    SettingsLib:CreateSlider(category, sliderArgs)
+end
+
 local function GetIncomingCastBarIconValue(key)
     return DB:GetIncomingCastBarIconValue(key)
 end
 
 local function SetIncomingCastBarIconValue(key, value)
     DB:SetIncomingCastBarIconValue(key, value)
+end
+
+local function CreateStatusTextSettings(rootCategory, partyFramePrefix)
+    local statusTextCategory = SettingsLib:CreateCategory(rootCategory, "Status Text")
+
+    SettingsLib:CreateHeader(statusTextCategory, {
+        name = "Text",
+    })
+
+    AddTextSettings("partyFrame.statusText", statusTextCategory, "StatusText", partyFramePrefix, function(settingKey)
+        if settingKey == "fontSize" then
+            FF:UpdateHealthTextFontSize()
+        else
+            FF:UpdateStatusTextColor()
+        end
+    end)
+
+    SettingsLib:CreateHeader(statusTextCategory, {
+        name = "Placement",
+    })
+
+    AddFrameSettings("partyFrame.statusText.frame", statusTextCategory, "StatusTextFrame", partyFramePrefix, function(_)
+        FF:UpdateStatusTextAnchoring()
+    end)
+end
+
+local function CreatePlayerNameSettings(rootCategory, partyFramePrefix)
+    local playerNameCategory = SettingsLib:CreateCategory(rootCategory, "Player Name")
+
+    SettingsLib:CreateHeader(playerNameCategory, {
+        name = "Text",
+    })
+
+    AddTextSettings("partyFrame.playerName", playerNameCategory, "PlayerName", partyFramePrefix, function(settingKey)
+        if settingKey == "fontSize" then
+            FF:UpdatePlayerNameFontSize()
+        else
+            FF:UpdatePlayerNameColor()
+        end
+    end)
+
+    SettingsLib:CreateHeader(playerNameCategory, {
+        name = "Placement",
+    })
+
+    AddFrameSettings("partyFrame.playerName.frame", playerNameCategory, "PlayerNameFrame", partyFramePrefix, function(_)
+        FF:UpdatePlayerNameAnchoring()
+    end)
+end
+
+local function CreateBuffsSettings(rootCategory, partyFramePrefix)
+    local buffsCategory = SettingsLib:CreateCategory(rootCategory, "Buffs")
+
+    SettingsLib:CreateHeader(buffsCategory, {
+        name = "Cooldown",
+    })
+
+    AddCooldownTextSettings("partyFrame.buffs.cooldownText", buffsCategory, "Buff", partyFramePrefix, function(settingKey)
+        if settingKey == "show" then
+            FF:ShowBuffCountdownIfNeeded()
+        else
+            FF:UpdateAuraCountdownFontSize()
+        end
+    end)
+end
+
+local function CreateDebuffsSettings(rootCategory, partyFramePrefix)
+    local debuffsCategory = SettingsLib:CreateCategory(rootCategory, "Debuffs")
+
+    SettingsLib:CreateHeader(debuffsCategory, {
+        name = "Cooldown",
+    })
+
+    AddCooldownTextSettings("partyFrame.debuffs.cooldownText", debuffsCategory, "Debuff", partyFramePrefix, function(settingKey)
+        if settingKey == "show" then
+            FF:ShowDebuffCountdownIfNeeded()
+        else
+            FF:UpdateAuraCountdownFontSize()
+        end
+    end)
 end
 
 local function CreateIncomingCastsSettings(rootCategory)
@@ -148,7 +681,7 @@ local function CreateIncomingCastsSettings(rootCategory)
 
     local trackIncomingCastsElement = SettingsLib:CreateCheckbox(incomingCastsCategory, {
         key = "TrackIncomingCasts",
-        name = "Track incoming casts",
+        name = "Track Incoming Casts",
         default = DB.DEFAULT_SETTINGS.partyFrame.trackIncomingCasts,
         get = function()
             return PartyFrameProfile().trackIncomingCasts
@@ -165,7 +698,7 @@ local function CreateIncomingCastsSettings(rootCategory)
 
     SettingsLib:CreateCheckbox(incomingCastsCategory, {
         key = "IncomingCastPreview",
-        name = "Preview incoming casts",
+        name = "Preview Incoming Casts",
         default = false,
         get = function()
             return FF._ffIncomingCastIndicatorPreviewEnabled == true
@@ -181,78 +714,8 @@ local function CreateIncomingCastsSettings(rootCategory)
         end,
     })
 
-    local incomingCastBarDefaults = DB.DEFAULT_SETTINGS.incomingCastBar
+    local incomingCastBarDefaults = DB.DEFAULT_SETTINGS.incomingCastBar or {}
     local incomingCastBarIconDefaults = incomingCastBarDefaults.icon or {}
-
-    SettingsLib:CreateDropdown(incomingCastsCategory, {
-        key = "IncomingCastAnchorFrame",
-        name = "Anchor to",
-        default = incomingCastBarDefaults.anchorFrame,
-        values = {
-            HEALTHBAR = "Health bar",
-            FRAME = "Party frame",
-        },
-        get = function()
-            local value = GetIncomingCastBarValue("anchorFrame")
-            if value ~= "HEALTHBAR" and value ~= "FRAME" then
-                value = incomingCastBarDefaults.anchorFrame
-            end
-            return value
-        end,
-        set = function(value)
-            SetIncomingCastBarValue("anchorFrame", value)
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "Choose whether incoming cast icons are anchored to the party frame or to the frame health bar.",
-        prefix = incomingCastsPrefix,
-    })
-
-    SettingsLib:CreateDropdown(incomingCastsCategory, {
-        key = "IncomingCastIconPosition",
-        name = "Position",
-        default = incomingCastBarDefaults.position,
-        values = ANCHOR_POINT_LABELS,
-        get = function()
-            return SanitizePosition(
-                GetIncomingCastBarValue("position"),
-                incomingCastBarDefaults.position
-            )
-        end,
-        set = function(value)
-            SetIncomingCastBarValue(
-                "position",
-                SanitizePosition(value, incomingCastBarDefaults.position)
-            )
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "Where to anchor targeted spell icons on the party frame.",
-        prefix = incomingCastsPrefix,
-    })
-
-    SettingsLib:CreateDropdown(incomingCastsCategory, {
-        key = "IncomingCastFrameAnchor",
-        name = "Anchor",
-        default = incomingCastBarDefaults.anchorMode,
-        values = SPELL_BAR_ANCHOR_MODE_LABELS,
-        get = function()
-            return SanitizeIncomingCastSpellBarAnchorMode(
-                GetIncomingCastBarValue("anchorMode"),
-                incomingCastBarDefaults.anchorMode
-            )
-        end,
-        set = function(value)
-            SetIncomingCastBarValue(
-                "anchorMode",
-                SanitizeIncomingCastSpellBarAnchorMode(value, incomingCastBarDefaults.anchorMode)
-            )
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "Inside uses the same anchor point as Position.\nOutside (Vertical) flips Top <-> Bottom.\nOutside (Horizontal) flips Left <-> Right.\nOutside (Auto) picks Vertical/Horizontal based on the party frame orientation (horizontal vs vertical layout).\nExample: party frames stacked top-to-bottom -> Auto uses Outside (Horizontal).",
-        prefix = incomingCastsPrefix,
-    })
 
     SettingsLib:CreateDropdown(incomingCastsCategory, {
         key = "IncomingCastIconGrowDirection",
@@ -260,8 +723,7 @@ local function CreateIncomingCastsSettings(rootCategory)
         default = incomingCastBarDefaults.growthDirection,
         values = GROWTH_DIRECTION_LABELS,
         get = function()
-            local relativeAnchor = DB:GetIncomingCastIndicatorRelativeAnchor()
-            return DB:GetIncomingCastIndicatorGrowDirection(relativeAnchor)
+            return DB:GetIncomingCastIndicatorGrowDirection()
         end,
         set = function(value)
             SetIncomingCastBarValue("growthDirection", value)
@@ -273,62 +735,8 @@ local function CreateIncomingCastsSettings(rootCategory)
     })
 
     SettingsLib:CreateSlider(incomingCastsCategory, {
-        key = "IncomingCastIconOffsetX",
-        name = "X offset",
-        default = incomingCastBarDefaults.offsetX,
-        min = -40,
-        max = 40,
-        step = 1,
-        formatter = function(value)
-            return string.format("%ipx", Utils:ClampInteger(value, -40, 40, incomingCastBarDefaults.offsetX))
-        end,
-        get = function()
-            local value = GetIncomingCastBarValue("offsetX")
-            if value == nil then
-                value = incomingCastBarDefaults.offsetX
-            end
-            return value
-        end,
-        set = function(value)
-            SetIncomingCastBarValue("offsetX", Utils:ClampInteger(value, -40, 40, incomingCastBarDefaults.offsetX))
-
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "Horizontal offset (in pixels). Negative allows going outside the frame.",
-        prefix = incomingCastsPrefix,
-    })
-
-    SettingsLib:CreateSlider(incomingCastsCategory, {
-        key = "IncomingCastIconOffsetY",
-        name = "Y offset",
-        default = incomingCastBarDefaults.offsetY,
-        min = -40,
-        max = 40,
-        step = 1,
-        formatter = function(value)
-            return string.format("%ipx", Utils:ClampInteger(value, -40, 40, incomingCastBarDefaults.offsetY))
-        end,
-        get = function()
-            local value = GetIncomingCastBarValue("offsetY")
-            if value == nil then
-                value = incomingCastBarDefaults.offsetY
-            end
-            return value
-        end,
-        set = function(value)
-            SetIncomingCastBarValue("offsetY", Utils:ClampInteger(value, -40, 40, incomingCastBarDefaults.offsetY))
-
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "Vertical offset (in pixels). Negative allows going outside the frame.",
-        prefix = incomingCastsPrefix,
-    })
-
-    SettingsLib:CreateSlider(incomingCastsCategory, {
         key = "IncomingCastIconCount",
-        name = "Targeted spell icon count",
+        name = "Targeted Spell Icon Count",
         default = incomingCastBarDefaults.spellCount,
         min = 1,
         max = 6,
@@ -354,7 +762,7 @@ local function CreateIncomingCastsSettings(rootCategory)
 
     SettingsLib:CreateSlider(incomingCastsCategory, {
         key = "IncomingCastIconScale",
-        name = "Icon scale",
+        name = "Icon Scale",
         default = incomingCastBarIconDefaults.scale,
         min = 0.5,
         max = 2,
@@ -384,7 +792,7 @@ local function CreateIncomingCastsSettings(rootCategory)
 
     SettingsLib:CreateSlider(incomingCastsCategory, {
         key = "IncomingCastIconSpacing",
-        name = "Icon spacing",
+        name = "Icon Spacing",
         default = incomingCastBarIconDefaults.spacing,
         min = -10,
         max = 20,
@@ -410,7 +818,7 @@ local function CreateIncomingCastsSettings(rootCategory)
 
     SettingsLib:CreateCheckbox(incomingCastsCategory, {
         key = "IncomingCastIconBorder",
-        name = "Show icon border",
+        name = "Show Icon Border",
         default = incomingCastBarIconDefaults.showBorder,
         get = function()
             local value = GetIncomingCastBarIconValue("showBorder")
@@ -428,9 +836,13 @@ local function CreateIncomingCastsSettings(rootCategory)
         prefix = incomingCastsPrefix,
     })
 
+    SettingsLib:CreateHeader(incomingCastsCategory, {
+        name = "Cooldown",
+    })
+
     SettingsLib:CreateCheckbox(incomingCastsCategory, {
         key = "IncomingCastIconSwipe",
-        name = "Show cooldown swipe",
+        name = "Show Cooldown Swipe",
         default = incomingCastBarIconDefaults.showSwipe,
         get = function()
             local value = GetIncomingCastBarIconValue("showSwipe")
@@ -448,59 +860,19 @@ local function CreateIncomingCastsSettings(rootCategory)
         prefix = incomingCastsPrefix,
     })
 
-    local incomingCastIconCooldownTextElement = SettingsLib:CreateCheckbox(incomingCastsCategory, {
-        key = "IncomingCastIconCooldownText",
-        name = "Show cooldown text",
-        default = incomingCastBarIconDefaults.showCooldownText,
-        get = function()
-            local value = GetIncomingCastBarIconValue("showCooldownText")
-            if value == nil then
-                value = incomingCastBarIconDefaults.showCooldownText
-            end
-            return value
-        end,
-        set = function(value)
-            SetIncomingCastBarIconValue("showCooldownText", value)
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "Toggle the cooldown countdown text on targeted spell icons.",
-        prefix = incomingCastsPrefix,
+    AddCooldownTextSettings("incomingCastBar.icon.cooldownText", incomingCastsCategory, "IncomingCastIcon", incomingCastsPrefix, function(_)
+        FF:SetupIncomingCastIndicators()
+        FF:UpdateIncomingCastIndicators()
+    end)
+
+    SettingsLib:CreateHeader(incomingCastsCategory, {
+        name = "Placement",
     })
 
-    SettingsLib:CreateSlider(incomingCastsCategory, {
-        key = "IncomingCastIconCooldownFontSize",
-        name = "Cooldown text size",
-        default = incomingCastBarIconDefaults.cooldownFontSize,
-        min = 8,
-        max = 32,
-        step = 1,
-        formatter = function(value)
-            return string.format("%ipt", Utils:ClampInteger(value, 8, 32, incomingCastBarIconDefaults.cooldownFontSize))
-        end,
-        get = function()
-            local value = GetIncomingCastBarIconValue("cooldownFontSize")
-            if value == nil then
-                value = incomingCastBarIconDefaults.cooldownFontSize
-            end
-            return value
-        end,
-        set = function(value)
-            SetIncomingCastBarIconValue("cooldownFontSize", Utils:ClampInteger(value, 8, 32, incomingCastBarIconDefaults.cooldownFontSize))
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "Adjust the cooldown countdown text size on targeted spell icons.",
-        prefix = incomingCastsPrefix,
-        parent = incomingCastIconCooldownTextElement,
-        parentCheck = function()
-            local value = GetIncomingCastBarIconValue("showCooldownText")
-            if value == nil then
-                value = incomingCastBarIconDefaults.showCooldownText
-            end
-            return value == true
-        end,
-    })
+    AddFrameSettings("incomingCastBar.frame", incomingCastsCategory, "IncomingCastFrame", incomingCastsPrefix, function(_)
+        FF:SetupIncomingCastIndicators()
+        FF:UpdateIncomingCastIndicators()
+    end)
 end
 
 function FF:SetupOptions()
@@ -520,7 +892,7 @@ function FF:SetupOptions()
 
     SettingsLib:CreateCheckbox(rootCategory, {
         key = "ShowInSolo",
-        name = "Show in Solo",
+        name = "Show In Solo",
         default = DB.DEFAULT_SETTINGS.partyFrame.showInSolo,
         get = function() return PartyFrameProfile().showInSolo end,
         set = function(value)
@@ -637,466 +1009,6 @@ function FF:SetupOptions()
     })
 
     SettingsLib:CreateHeader(rootCategory, {
-        name = "Status Text",
-    })
-
-    SettingsLib:CreateDropdown(rootCategory, {
-        key = "StatusTextAnchorTarget",
-        name = "Anchor to",
-        default = DB.DEFAULT_SETTINGS.partyFrame.statusTextAnchorTarget,
-        values = FRAME_ANCHOR_TARGET_LABELS,
-        get = function()
-            return SanitizeIncomingCastAnchorFrame(
-                PartyFrameProfile().statusTextAnchorTarget,
-                DB.DEFAULT_SETTINGS.partyFrame.statusTextAnchorTarget
-            )
-        end,
-        set = function(value)
-            PartyFrameProfile().statusTextAnchorTarget = SanitizeIncomingCastAnchorFrame(
-                value,
-                DB.DEFAULT_SETTINGS.partyFrame.statusTextAnchorTarget
-            )
-            FF:UpdateStatusTextAnchoring()
-            FF:RequestStatusTextSettingsRefresh()
-        end,
-        desc = "Choose whether status text is anchored to the party frame or health bar.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateDropdown(rootCategory, {
-        key = "StatusTextAnchorPoint",
-        name = "Status text anchor",
-        default = DB.DEFAULT_SETTINGS.partyFrame.statusTextAnchorPoint,
-        values = ANCHOR_POINT_LABELS,
-        get = function()
-            return SanitizeStatusTextAnchorPoint(
-                PartyFrameProfile().statusTextAnchorPoint,
-                DB.DEFAULT_SETTINGS.partyFrame.statusTextAnchorPoint
-            )
-        end,
-        set = function(value)
-            PartyFrameProfile().statusTextAnchorPoint = SanitizeStatusTextAnchorPoint(
-                value,
-                DB.DEFAULT_SETTINGS.partyFrame.statusTextAnchorPoint
-            )
-            FF:UpdateStatusTextAnchoring()
-            FF:RequestStatusTextSettingsRefresh()
-        end,
-        desc = "Anchor point used for status text on party frames.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateSlider(rootCategory, {
-        key = "StatusTextOffsetX",
-        name = "Status text X offset",
-        default = DB.DEFAULT_SETTINGS.partyFrame.statusTextOffsetX,
-        min = -40,
-        max = 40,
-        step = 1,
-        formatter = function(value)
-            return string.format("%ipx", Utils:ClampInteger(value, -40, 40, DB.DEFAULT_SETTINGS.partyFrame.statusTextOffsetX))
-        end,
-        get = function()
-            local value = PartyFrameProfile().statusTextOffsetX
-            if value == nil then
-                value = DB.DEFAULT_SETTINGS.partyFrame.statusTextOffsetX
-            end
-            return value
-        end,
-        set = function(value)
-            PartyFrameProfile().statusTextOffsetX = Utils:ClampInteger(value, -40, 40, DB.DEFAULT_SETTINGS.partyFrame.statusTextOffsetX)
-            FF:UpdateStatusTextAnchoring()
-            FF:RequestStatusTextSettingsRefresh()
-        end,
-        desc = "Horizontal offset for status text anchoring.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateSlider(rootCategory, {
-        key = "StatusTextOffsetY",
-        name = "Status text Y offset",
-        default = DB.DEFAULT_SETTINGS.partyFrame.statusTextOffsetY,
-        min = -40,
-        max = 40,
-        step = 1,
-        formatter = function(value)
-            return string.format("%ipx", Utils:ClampInteger(value, -40, 40, DB.DEFAULT_SETTINGS.partyFrame.statusTextOffsetY))
-        end,
-        get = function()
-            local value = PartyFrameProfile().statusTextOffsetY
-            if value == nil then
-                value = DB.DEFAULT_SETTINGS.partyFrame.statusTextOffsetY
-            end
-            return value
-        end,
-        set = function(value)
-            PartyFrameProfile().statusTextOffsetY = Utils:ClampInteger(value, -40, 40, DB.DEFAULT_SETTINGS.partyFrame.statusTextOffsetY)
-            FF:UpdateStatusTextAnchoring()
-            FF:RequestStatusTextSettingsRefresh()
-        end,
-        desc = "Vertical offset for status text anchoring.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateSlider(rootCategory, {
-        key = "HealthTextFontSize",
-        name = "Status text size",
-        default = DB.DEFAULT_SETTINGS.partyFrame.healthTextFontSize,
-        min = 8,
-        max = 32,
-        step = 1,
-        formatter = function(value)
-            return string.format("%ipt", Utils:ClampInteger(value, 8, 32, DB.DEFAULT_SETTINGS.partyFrame.healthTextFontSize))
-        end,
-        get = function()
-            local value = PartyFrameProfile().healthTextFontSize
-            if value == nil then
-                value = DB.DEFAULT_SETTINGS.partyFrame.healthTextFontSize
-            end
-            return value
-        end,
-        set = function(value)
-            PartyFrameProfile().healthTextFontSize = Utils:ClampInteger(value, 8, 32, DB.DEFAULT_SETTINGS.partyFrame.healthTextFontSize)
-            FF:UpdateHealthTextFontSize()
-            FF:RequestStatusTextSettingsRefresh()
-        end,
-        desc = "Adjust the status text size on party frames.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateSlider(rootCategory, {
-        key = "StatusTextOpacity",
-        name = "Status text opacity",
-        default = DB.DEFAULT_SETTINGS.partyFrame.statusTextOpacity,
-        min = 0,
-        max = 1,
-        step = 0.01,
-        formatter = function(value)
-            return string.format(
-                "%d%%",
-                Utils:ClampInteger((value and (value * 100) or nil), 0, 100, (DB.DEFAULT_SETTINGS.partyFrame.statusTextOpacity or 1) * 100)
-            )
-        end,
-        get = function()
-            local value = PartyFrameProfile().statusTextOpacity
-            if value == nil then
-                local color = SanitizeStatusTextColor(
-                    PartyFrameProfile().statusTextColor,
-                    DB.DEFAULT_SETTINGS.partyFrame.statusTextColor
-                )
-                value = color.a
-            end
-
-            return SanitizeOpacity(value, DB.DEFAULT_SETTINGS.partyFrame.statusTextOpacity)
-        end,
-        set = function(value)
-            local opacity = SanitizeOpacity(value, DB.DEFAULT_SETTINGS.partyFrame.statusTextOpacity)
-            PartyFrameProfile().statusTextOpacity = opacity
-
-            local color = SanitizeStatusTextColor(
-                PartyFrameProfile().statusTextColor,
-                DB.DEFAULT_SETTINGS.partyFrame.statusTextColor
-            )
-            color.a = opacity
-            PartyFrameProfile().statusTextColor = color
-
-            FF:UpdateStatusTextColor()
-            FF:RequestStatusTextSettingsRefresh()
-        end,
-        desc = "Adjust opacity for status text on party frames.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    local statusTextUseClassColorsElement = SettingsLib:CreateCheckbox(rootCategory, {
-        key = "StatusTextUseClassColors",
-        name = "Use class colors",
-        default = DB.DEFAULT_SETTINGS.partyFrame.statusTextUseClassColors,
-        get = function()
-            return PartyFrameProfile().statusTextUseClassColors == true
-        end,
-        set = function(value)
-            PartyFrameProfile().statusTextUseClassColors = (value == true)
-            FF:UpdateStatusTextColor()
-            FF:RequestStatusTextSettingsRefresh()
-        end,
-        desc = "Use class colors for status text instead of the configured static text color.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateColorOverrides(rootCategory, {
-        key = "StatusTextColor",
-        entries = {
-            { key = "StatusText", label = "Status text color" },
-        },
-        getColor = function()
-            local color = SanitizeStatusTextColor(
-                PartyFrameProfile().statusTextColor,
-                DB.DEFAULT_SETTINGS.partyFrame.statusTextColor
-            )
-            return color.r, color.g, color.b
-        end,
-        setColor = function(_, r, g, b)
-            local currentColor = SanitizeStatusTextColor(
-                PartyFrameProfile().statusTextColor,
-                DB.DEFAULT_SETTINGS.partyFrame.statusTextColor
-            )
-            local opacity = SanitizeOpacity(
-                PartyFrameProfile().statusTextOpacity,
-                currentColor.a
-            )
-            PartyFrameProfile().statusTextColor = SanitizeStatusTextColor(
-                { r = r, g = g, b = b, a = opacity },
-                DB.DEFAULT_SETTINGS.partyFrame.statusTextColor
-            )
-            PartyFrameProfile().statusTextOpacity = opacity
-            FF:UpdateStatusTextColor()
-            FF:RequestStatusTextSettingsRefresh()
-        end,
-        getDefaultColor = function()
-            local color = SanitizeStatusTextColor(
-                DB.DEFAULT_SETTINGS.partyFrame.statusTextColor,
-                { r = 1, g = 1, b = 1, a = 1 }
-            )
-            return color.r, color.g, color.b
-        end,
-        hasOpacity = false,
-        isEnabled = function()
-            return PartyFrameProfile().statusTextUseClassColors ~= true
-        end,
-        parent = statusTextUseClassColorsElement,
-        parentCheck = function()
-            return PartyFrameProfile().statusTextUseClassColors ~= true
-        end,
-        minHeight = 36,
-    })
-
-    SettingsLib:CreateHeader(rootCategory, {
-        name = "Player Name",
-    })
-
-    SettingsLib:CreateDropdown(rootCategory, {
-        key = "PlayerNameAnchorTarget",
-        name = "Anchor to",
-        default = DB.DEFAULT_SETTINGS.partyFrame.playerNameAnchorTarget,
-        values = FRAME_ANCHOR_TARGET_LABELS,
-        get = function()
-            return SanitizeIncomingCastAnchorFrame(
-                PartyFrameProfile().playerNameAnchorTarget,
-                DB.DEFAULT_SETTINGS.partyFrame.playerNameAnchorTarget
-            )
-        end,
-        set = function(value)
-            PartyFrameProfile().playerNameAnchorTarget = SanitizeIncomingCastAnchorFrame(
-                value,
-                DB.DEFAULT_SETTINGS.partyFrame.playerNameAnchorTarget
-            )
-            FF:UpdatePlayerNameAnchoring()
-        end,
-        desc = "Choose whether player name is anchored to the party frame or health bar.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateDropdown(rootCategory, {
-        key = "PlayerNameAnchorPoint",
-        name = "Player name anchor",
-        default = DB.DEFAULT_SETTINGS.partyFrame.playerNameAnchorPoint,
-        values = ANCHOR_POINT_LABELS,
-        get = function()
-            return SanitizeStatusTextAnchorPoint(
-                PartyFrameProfile().playerNameAnchorPoint,
-                DB.DEFAULT_SETTINGS.partyFrame.playerNameAnchorPoint
-            )
-        end,
-        set = function(value)
-            PartyFrameProfile().playerNameAnchorPoint = SanitizeStatusTextAnchorPoint(
-                value,
-                DB.DEFAULT_SETTINGS.partyFrame.playerNameAnchorPoint
-            )
-            FF:UpdatePlayerNameAnchoring()
-        end,
-        desc = "Anchor point used for player name on party frames.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateSlider(rootCategory, {
-        key = "PlayerNameOffsetX",
-        name = "Player name X offset",
-        default = DB.DEFAULT_SETTINGS.partyFrame.playerNameOffsetX,
-        min = -40,
-        max = 40,
-        step = 1,
-        formatter = function(value)
-            return string.format("%ipx", Utils:ClampInteger(value, -40, 40, DB.DEFAULT_SETTINGS.partyFrame.playerNameOffsetX))
-        end,
-        get = function()
-            local value = PartyFrameProfile().playerNameOffsetX
-            if value == nil then
-                value = DB.DEFAULT_SETTINGS.partyFrame.playerNameOffsetX
-            end
-            return value
-        end,
-        set = function(value)
-            PartyFrameProfile().playerNameOffsetX = Utils:ClampInteger(value, -40, 40, DB.DEFAULT_SETTINGS.partyFrame.playerNameOffsetX)
-            FF:UpdatePlayerNameAnchoring()
-        end,
-        desc = "Horizontal offset for player name anchoring.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateSlider(rootCategory, {
-        key = "PlayerNameOffsetY",
-        name = "Player name Y offset",
-        default = DB.DEFAULT_SETTINGS.partyFrame.playerNameOffsetY,
-        min = -40,
-        max = 40,
-        step = 1,
-        formatter = function(value)
-            return string.format("%ipx", Utils:ClampInteger(value, -40, 40, DB.DEFAULT_SETTINGS.partyFrame.playerNameOffsetY))
-        end,
-        get = function()
-            local value = PartyFrameProfile().playerNameOffsetY
-            if value == nil then
-                value = DB.DEFAULT_SETTINGS.partyFrame.playerNameOffsetY
-            end
-            return value
-        end,
-        set = function(value)
-            PartyFrameProfile().playerNameOffsetY = Utils:ClampInteger(value, -40, 40, DB.DEFAULT_SETTINGS.partyFrame.playerNameOffsetY)
-            FF:UpdatePlayerNameAnchoring()
-        end,
-        desc = "Vertical offset for player name anchoring.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateSlider(rootCategory, {
-        key = "PlayerNameFontSize",
-        name = "Player name size",
-        default = DB.DEFAULT_SETTINGS.partyFrame.playerNameFontSize,
-        min = 8,
-        max = 32,
-        step = 1,
-        formatter = function(value)
-            return string.format("%ipt", Utils:ClampInteger(value, 8, 32, DB.DEFAULT_SETTINGS.partyFrame.playerNameFontSize))
-        end,
-        get = function()
-            local value = PartyFrameProfile().playerNameFontSize
-            if value == nil then
-                value = DB.DEFAULT_SETTINGS.partyFrame.playerNameFontSize
-            end
-            return value
-        end,
-        set = function(value)
-            PartyFrameProfile().playerNameFontSize = Utils:ClampInteger(value, 8, 32, DB.DEFAULT_SETTINGS.partyFrame.playerNameFontSize)
-            FF:UpdatePlayerNameFontSize()
-        end,
-        desc = "Adjust the player name text size on party frames.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateSlider(rootCategory, {
-        key = "PlayerNameOpacity",
-        name = "Player name opacity",
-        default = DB.DEFAULT_SETTINGS.partyFrame.playerNameOpacity,
-        min = 0,
-        max = 1,
-        step = 0.01,
-        formatter = function(value)
-            return string.format(
-                "%d%%",
-                Utils:ClampInteger((value and (value * 100) or nil), 0, 100, (DB.DEFAULT_SETTINGS.partyFrame.playerNameOpacity or 1) * 100)
-            )
-        end,
-        get = function()
-            local value = PartyFrameProfile().playerNameOpacity
-            if value == nil then
-                local color = SanitizeStatusTextColor(
-                    PartyFrameProfile().playerNameColor,
-                    DB.DEFAULT_SETTINGS.partyFrame.playerNameColor
-                )
-                value = color.a
-            end
-
-            return SanitizeOpacity(value, DB.DEFAULT_SETTINGS.partyFrame.playerNameOpacity)
-        end,
-        set = function(value)
-            local opacity = SanitizeOpacity(value, DB.DEFAULT_SETTINGS.partyFrame.playerNameOpacity)
-            PartyFrameProfile().playerNameOpacity = opacity
-
-            local color = SanitizeStatusTextColor(
-                PartyFrameProfile().playerNameColor,
-                DB.DEFAULT_SETTINGS.partyFrame.playerNameColor
-            )
-            color.a = opacity
-            PartyFrameProfile().playerNameColor = color
-
-            FF:UpdatePlayerNameColor()
-        end,
-        desc = "Adjust opacity for player name text on party frames.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    local playerNameUseClassColorsElement = SettingsLib:CreateCheckbox(rootCategory, {
-        key = "PlayerNameUseClassColors",
-        name = "Use class colors",
-        default = DB.DEFAULT_SETTINGS.partyFrame.playerNameUseClassColors,
-        get = function()
-            return PartyFrameProfile().playerNameUseClassColors == true
-        end,
-        set = function(value)
-            PartyFrameProfile().playerNameUseClassColors = (value == true)
-            FF:UpdatePlayerNameColor()
-        end,
-        desc = "Use class colors for player name instead of the configured static text color.",
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    SettingsLib:CreateColorOverrides(rootCategory, {
-        key = "PlayerNameColor",
-        entries = {
-            { key = "PlayerName", label = "Player name color" },
-        },
-        getColor = function()
-            local color = SanitizeStatusTextColor(
-                PartyFrameProfile().playerNameColor,
-                DB.DEFAULT_SETTINGS.partyFrame.playerNameColor
-            )
-            return color.r, color.g, color.b
-        end,
-        setColor = function(_, r, g, b)
-            local currentColor = SanitizeStatusTextColor(
-                PartyFrameProfile().playerNameColor,
-                DB.DEFAULT_SETTINGS.partyFrame.playerNameColor
-            )
-            local opacity = SanitizeOpacity(
-                PartyFrameProfile().playerNameOpacity,
-                currentColor.a
-            )
-            PartyFrameProfile().playerNameColor = SanitizeStatusTextColor(
-                { r = r, g = g, b = b, a = opacity },
-                DB.DEFAULT_SETTINGS.partyFrame.playerNameColor
-            )
-            PartyFrameProfile().playerNameOpacity = opacity
-            FF:UpdatePlayerNameColor()
-        end,
-        getDefaultColor = function()
-            local color = SanitizeStatusTextColor(
-                DB.DEFAULT_SETTINGS.partyFrame.playerNameColor,
-                { r = 1, g = 1, b = 1, a = 1 }
-            )
-            return color.r, color.g, color.b
-        end,
-        hasOpacity = false,
-        isEnabled = function()
-            return PartyFrameProfile().playerNameUseClassColors ~= true
-        end,
-        parent = playerNameUseClassColorsElement,
-        parentCheck = function()
-            return PartyFrameProfile().playerNameUseClassColors ~= true
-        end,
-        minHeight = 36,
-    })
-
-    SettingsLib:CreateHeader(rootCategory, {
         name = "Role Icons",
     })
 
@@ -1140,61 +1052,6 @@ function FF:SetupOptions()
     })
 
     SettingsLib:CreateHeader(rootCategory, {
-        name = "Buff/Debuffs",
-    })
-
-    SettingsLib:CreateCheckbox(rootCategory, {
-        key = "ShowBuffCountdown",
-        name = "Show Buff Countdown",
-        default = DB.DEFAULT_SETTINGS.partyFrame.showBuffCountdown,
-        get = function() return PartyFrameProfile().showBuffCountdown end,
-        set = function(value)
-            PartyFrameProfile().showBuffCountdown = value
-            self:ShowBuffCountdownIfNeeded()
-        end,
-        desc = "Toggle the buff countdown visibility on the frame.",
-        prefix = PARTY_FRAME_PREFIX
-    })
-
-    SettingsLib:CreateCheckbox(rootCategory, {
-        key = "ShowDebuffCountdown",
-        name = "Show Debuff Countdown",
-        default = DB.DEFAULT_SETTINGS.partyFrame.showDebuffCountdown,
-        get = function() return PartyFrameProfile().showDebuffCountdown end,
-        set = function(value)
-            PartyFrameProfile().showDebuffCountdown = value
-            self:ShowDebuffCountdownIfNeeded()
-        end,
-        desc = "Toggle the debuff countdown visibility on the frame.",
-        prefix = PARTY_FRAME_PREFIX
-    })
-
-    SettingsLib:CreateSlider(rootCategory, {
-        key = "CountdownFontSize",
-        name = "Countdown Text Size",
-        default = DB.DEFAULT_SETTINGS.partyFrame.countdownFontSize,
-        min = 8,
-        max = 32,
-        step = 1,
-        formatter = function(value)
-            return string.format("%ipt", Utils:ClampInteger(value, 8, 32, DB.DEFAULT_SETTINGS.partyFrame.countdownFontSize))
-        end,
-        get = function()
-            local value = PartyFrameProfile().countdownFontSize
-            if value == nil then
-                value = DB.DEFAULT_SETTINGS.partyFrame.countdownFontSize
-            end
-            return value
-        end,
-        set = function(value)
-            PartyFrameProfile().countdownFontSize = Utils:ClampInteger(value, 8, 32, DB.DEFAULT_SETTINGS.partyFrame.countdownFontSize)
-            self:UpdateAuraCountdownFontSize()
-        end,
-        desc = "Adjust the buff/debuff countdown text size on party frames.",
-        prefix = PARTY_FRAME_PREFIX
-    })
-
-    SettingsLib:CreateHeader(rootCategory, {
         name = "Frames",
     })
 
@@ -1214,5 +1071,9 @@ function FF:SetupOptions()
         prefix = PARTY_FRAME_PREFIX
     })
 
+    CreateStatusTextSettings(rootCategory, PARTY_FRAME_PREFIX)
+    CreatePlayerNameSettings(rootCategory, PARTY_FRAME_PREFIX)
+    CreateBuffsSettings(rootCategory, PARTY_FRAME_PREFIX)
+    CreateDebuffsSettings(rootCategory, PARTY_FRAME_PREFIX)
     CreateIncomingCastsSettings(rootCategory)
 end

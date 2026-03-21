@@ -1,5 +1,10 @@
 local addonName, addon = ...
 
+assert(addon and addon.Constants, "FoxFrames: addon table or Constants missing (load order issue)")
+
+local Constants = addon.Constants
+local anchorPoints = Constants.ANCHOR_POINTS
+
 local Object = {}
 Object.__index = Object -- When a key is missing, look in BlizzardSettings
 
@@ -145,6 +150,61 @@ function Object:SanitizeOption(value, options)
     end
 
     return nil
+end
+
+function Object:SanitizeAxis(value, fallback)
+    return self:SanitizeLayoutAxis(value, fallback)
+end
+
+function Object:SanitizeLayoutAxis(value, fallback)
+    return self:SanitizeOption(value, Constants.LAYOUT_AXIS) or fallback
+end
+
+function Object:SanitizeGrowthDirection(value, fallback)
+    return self:SanitizeOption(value, Constants.GROWTH_DIRECTIONS) or fallback
+end
+
+function Object:SanitizeAnchorPoint(value, fallback)
+    return self:SanitizeOption(value, Constants.ANCHOR_POINTS) or fallback
+end
+
+function Object:IsAnchorRightAligned(point)
+    return point == anchorPoints.TOPRIGHT or point == anchorPoints.RIGHT or point == anchorPoints.BOTTOMRIGHT
+end
+
+function Object:IsAnchorLeftAligned(point)
+    return point == anchorPoints.TOPLEFT or point == anchorPoints.LEFT or point == anchorPoints.BOTTOMLEFT
+end
+
+function Object:IsAnchorTopAligned(point)
+    return point == anchorPoints.TOPLEFT or point == anchorPoints.TOP or point == anchorPoints.TOPRIGHT
+end
+
+function Object:IsAnchorBottomAligned(point)
+    return point == anchorPoints.BOTTOMLEFT or point == anchorPoints.BOTTOM or point == anchorPoints.BOTTOMRIGHT
+end
+
+function Object:IsAnchorVerticalAligned(point)
+    return point == anchorPoints.LEFT or point == anchorPoints.CENTER or point == anchorPoints.RIGHT
+end
+
+function Object:IsAnchorHorizontalAligned(point)
+    return point == anchorPoints.TOP or point == anchorPoints.CENTER or point == anchorPoints.BOTTOM
+end
+
+function Object:FlipToRelativeOffsets(offsetX, offsetY, point)
+    local x = offsetX
+    local y = offsetY
+
+    if self:IsAnchorRightAligned(point) and type(x) == "number" then
+        x = -x
+    end
+
+    if (self:IsAnchorTopAligned(point) or self:IsAnchorVerticalAligned(point)) and type(y) == "number" then
+        y = -y
+    end
+
+    return x, y
 end
 
 function Object:GetCooldownCountdownFontString(cooldown)

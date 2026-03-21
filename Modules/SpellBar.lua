@@ -1,10 +1,10 @@
 local addonName, addon = ...
 
 local Utils = addon.Utils
-local DB = addon.DB
+local Constants = addon.Constants
 
-local SPELL_BAR_DEFAULT_GROW_DIRECTION = DB.GROWTH_DIRECTIONS.RIGHT
-local SPELL_BAR_DEFAULT_POSITION = DB.ANCHOR_POINTS.BOTTOMLEFT
+local SPELL_BAR_DEFAULT_GROW_DIRECTION = Constants.GROWTH_DIRECTIONS.RIGHT
+local SPELL_BAR_DEFAULT_POSITION = Constants.ANCHOR_POINTS.BOTTOMLEFT
 local SPELL_BAR_DEFAULT_OFFSET_X = 2
 local SPELL_BAR_DEFAULT_OFFSET_Y = 2
 
@@ -87,15 +87,15 @@ function SpellBarMixin:ApplyContainerPosition(frame, config)
         return
     end
 
-    local relativeAnchor = Utils:SanitizeOption(
+    local relativeAnchor = Utils:SanitizeAnchorPoint(
         config and (config.relativeAnchor or config.position),
-        DB.ANCHOR_POINTS
-    ) or SPELL_BAR_DEFAULT_POSITION
+        SPELL_BAR_DEFAULT_POSITION
+    )
 
-    local frameAnchor = Utils:SanitizeOption(
+    local frameAnchor = Utils:SanitizeAnchorPoint(
         config and (config.frameAnchor or config.spellBarAnchor or config.position or config.relativeAnchor),
-        DB.ANCHOR_POINTS
-    ) or relativeAnchor
+        relativeAnchor
+    )
 
     local offsetX = Utils:ClampInteger(config and config.offsetX, -200, 200, SPELL_BAR_DEFAULT_OFFSET_X)
     local offsetY = Utils:ClampInteger(config and config.offsetY, -200, 200, SPELL_BAR_DEFAULT_OFFSET_Y)
@@ -140,9 +140,9 @@ function SpellBarMixin:ApplyIconContainerLayout(iconConfig)
 
     local iconCount = Utils:ClampInteger(iconConfig.count, 1, math.huge, 1)
 
-    local growDirection = Utils:SanitizeOption(iconConfig.growDirection, DB.GROWTH_DIRECTIONS) or SPELL_BAR_DEFAULT_GROW_DIRECTION
+    local growDirection = Utils:SanitizeGrowthDirection(iconConfig.growDirection, SPELL_BAR_DEFAULT_GROW_DIRECTION)
 
-    local isVertical = growDirection == DB.GROWTH_DIRECTIONS.DOWN or growDirection == DB.GROWTH_DIRECTIONS.UP
+    local isVertical = growDirection == Constants.GROWTH_DIRECTIONS.DOWN or growDirection == Constants.GROWTH_DIRECTIONS.UP
 
     container.isHorizontal = true
     container.stride = isVertical and 1 or iconCount
@@ -239,11 +239,13 @@ function SpellBarMixin:UpdateFromCastList(targetUnit, castList, config)
 
     local desiredCount = iconConfig.count or (config and config.count) or 0
 
-    local growDirection = Utils:SanitizeOption(iconConfig.growDirection or (config and config.growDirection), DB.GROWTH_DIRECTIONS)
-        or SPELL_BAR_DEFAULT_GROW_DIRECTION
+    local growDirection = Utils:SanitizeGrowthDirection(
+        iconConfig.growDirection or (config and config.growDirection),
+        SPELL_BAR_DEFAULT_GROW_DIRECTION
+    )
 
-    local isVertical = growDirection == DB.GROWTH_DIRECTIONS.DOWN or growDirection == DB.GROWTH_DIRECTIONS.UP
-    local reverseIcons = growDirection == DB.GROWTH_DIRECTIONS.LEFT or growDirection == DB.GROWTH_DIRECTIONS.UP
+    local isVertical = growDirection == Constants.GROWTH_DIRECTIONS.DOWN or growDirection == Constants.GROWTH_DIRECTIONS.UP
+    local reverseIcons = growDirection == Constants.GROWTH_DIRECTIONS.LEFT or growDirection == Constants.GROWTH_DIRECTIONS.UP
 
     local targetedCastList = {}
     local untargetedCastList = {}

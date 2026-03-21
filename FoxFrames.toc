@@ -10,6 +10,9 @@
 ## X-Curse-Project-ID: 1482279
 ## Category: Raid Frames
 
+# Constants (no dependencies)
+Modules\Constants.lua
+
 # Libs
 embeds.xml
 

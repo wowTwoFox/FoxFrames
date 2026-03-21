@@ -4,6 +4,7 @@ local FF = assert(FoxFrames, "FoxFrames: global FoxFrames missing (load order is
 
 local Utils = addon.Utils
 local DB = addon.DB
+local Blizzard = addon.Blizzard
 function FF:RegisterIncomingCastUnitEvents()
     -- Midnight+ safe approach:
     -- - Track enemy casts by caster *unit token* (nameplateX)
@@ -405,17 +406,88 @@ function FF:PLAYER_FOCUS_CHANGED()
     return self:ScanAllEnemyCasts()
 end
 
-local function GetIncomingCastIndicatorConfig()
-    local relativeAnchor = DB:GetIncomingCastIndicatorRelativeAnchor()
+local function GetIncomingCastIndicatorIconConfig(relativeAnchor)
+    local incomingCastDefaults = (DB.DEFAULT_SETTINGS and DB.DEFAULT_SETTINGS.incomingCastBar) or {}
+    local iconDefaults = incomingCastDefaults.icon or {}
 
-    local iconConfig, anchorFrame = DB:GetIncomingCastIndicatorIconConfig(relativeAnchor)
-    local frameAnchor = DB:GetIncomingCastIndicatorSpellBarAnchor(relativeAnchor)
-    local offsetX = DB:GetIncomingCastIndicatorOffsetX(relativeAnchor)
-    local offsetY = DB:GetIncomingCastIndicatorOffsetY(relativeAnchor)
+    local profile = DB:GetIncomingCastBarDB()
+    local iconProfile = profile and profile.icon
+
+    local spellIconMixin = addon and addon.SpellIconMixin
+    local baseSize = tonumber(spellIconMixin and spellIconMixin.SPELL_ICON_BASE_SIZE) or 22
+
+    local scaleFallback = iconDefaults.scale
+    local scale = Utils:ClampNumber(iconProfile and iconProfile.scale, 0.5, 3, scaleFallback)
+    -- Keep hash stable and avoid float jitter.
+    scale = Utils:RoundToDecimals(scale, 2, scaleFallback) or scaleFallback
+
+    -- This is the size used for layout (wrapper frame). The visual icon frame is
+    -- kept at baseSize and scaled, so borders/overlays scale proportionally.
+    local size = baseSize * scale
+
+    local spacing = Utils:ClampInteger(iconProfile and iconProfile.spacing, -10, 50, iconDefaults.spacing)
+    local cooldownFontSize = DB:GetIncomingCastIndicatorIconCooldownTextFontSize()
+
+    local showBorder = iconProfile and iconProfile.showBorder
+    if showBorder == nil then
+        showBorder = iconDefaults.showBorder ~= false
+    else
+        showBorder = showBorder == true
+    end
+
+    local showSwipe = iconProfile and iconProfile.showSwipe
+    if showSwipe == nil then
+        showSwipe = iconDefaults.showSwipe ~= false
+    else
+        showSwipe = showSwipe == true
+    end
+
+    local showCooldownText = DB:GetIncomingCastIndicatorIconCooldownTextShow()
+
+    local count = DB:GetIncomingCastIndicatorCount()
+    local growDirection = DB:GetIncomingCastIndicatorGrowDirection(relativeAnchor)
+    local anchorTarget = DB:GetIncomingCastIndicatorAnchorFrame()
+
+    local hash = string.format(
+        "%d:%.2f:%d:%d:%d:%d:%d:%s:%s",
+        count,
+        scale,
+        spacing,
+        cooldownFontSize,
+        showBorder and 1 or 0,
+        showSwipe and 1 or 0,
+        showCooldownText and 1 or 0,
+        growDirection,
+        anchorTarget
+    )
+
+    return {
+        baseSize = baseSize,
+        scale = scale,
+        size = size,
+        spacing = spacing,
+        cooldownText = {
+            show = showCooldownText,
+            fontSize = cooldownFontSize,
+        },
+        showBorder = showBorder,
+        showSwipe = showSwipe,
+        count = count,
+        growDirection = growDirection,
+        hash = hash,
+    }, anchorTarget
+end
+
+local function GetIncomingCastIndicatorConfig()
+    local layoutAxis = Blizzard:GetPartyFramesLayoutAxis()
+
+    local relativeAnchor, frameAnchor, offsetX, offsetY = DB:GetIncomingCastIndicatorAnchorsAndOffsets(layoutAxis)
+
+    local iconConfig, anchorTarget = GetIncomingCastIndicatorIconConfig(relativeAnchor)
 
     return {
         icon = iconConfig,
-        anchorFrame = anchorFrame,
+        anchorTarget = anchorTarget,
         relativeAnchor = relativeAnchor,
         frameAnchor = frameAnchor,
         offsetX = offsetX,
@@ -428,7 +500,7 @@ local function GetIncomingCastHostFrame(unitFrame, config)
         return nil
     end
 
-    if config and config.anchorFrame == DB.FRAME_ANCHOR_TARGETS.FRAME then
+    if config and config.anchorTarget == DB.FRAME_ANCHOR_TARGETS.FRAME then
         return unitFrame
     end
 

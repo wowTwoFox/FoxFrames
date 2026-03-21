@@ -41,6 +41,19 @@ local function NormalizeSpellIconConfig(iconConfig)
     if type(iconConfig) ~= "table" then
         return {}
     end
+
+    if type(iconConfig.cooldownText) ~= "table" then
+        iconConfig.cooldownText = {}
+    end
+
+    -- Backward-compatible: migrate legacy flat keys into cooldownText.
+    if iconConfig.cooldownText.show == nil and iconConfig.showCooldownText ~= nil then
+        iconConfig.cooldownText.show = iconConfig.showCooldownText == true
+    end
+    if iconConfig.cooldownText.fontSize == nil and iconConfig.cooldownFontSize ~= nil then
+        iconConfig.cooldownText.fontSize = iconConfig.cooldownFontSize
+    end
+
     return iconConfig
 end
 
@@ -102,7 +115,7 @@ local function CenterSpellIconCooldownText(cooldown, iconConfig)
     if fontString.GetFont and fontString.SetFont then
         local fontFile, fontHeight, fontFlags = fontString:GetFont()
         if fontFile and fontHeight then
-            local desiredFontHeight = Utils:ClampInteger(iconConfig and iconConfig.cooldownFontSize, 8, 32, fontHeight)
+            local desiredFontHeight = Utils:ClampInteger(iconConfig and iconConfig.cooldownText and iconConfig.cooldownText.fontSize, 8, 32, fontHeight)
             local flags = fontFlags or ""
             if not flags:find("THICKOUTLINE", 1, true) then
                 if flags:find("OUTLINE", 1, true) then
@@ -130,9 +143,11 @@ local function ApplyCooldownVisualConfigToCooldown(cooldown, iconConfig)
         showSwipe = true
     end
 
-    local showCooldownText = iconConfig.showCooldownText
+    local showCooldownText = iconConfig.cooldownText and iconConfig.cooldownText.show
     if showCooldownText == nil then
         showCooldownText = true
+    else
+        showCooldownText = showCooldownText == true
     end
 
     if cooldown.SetDrawSwipe then
@@ -223,9 +238,11 @@ local function UpdateCooldownOnSpellFrame(entry, spellFrame, iconConfig)
         showSwipe = true
     end
 
-    local showCooldownText = iconConfig.showCooldownText
+    local showCooldownText = iconConfig.cooldownText and iconConfig.cooldownText.show
     if showCooldownText == nil then
         showCooldownText = true
+    else
+        showCooldownText = showCooldownText == true
     end
 
     local wantCooldown = showSwipe or showCooldownText
@@ -320,9 +337,11 @@ local function UpdateSpellFrameFromEntry(entry, spellFrame, unit, iconConfig)
         showSwipe = true
     end
 
-    local showCooldownText = iconConfig.showCooldownText
+    local showCooldownText = iconConfig.cooldownText and iconConfig.cooldownText.show
     if showCooldownText == nil then
         showCooldownText = true
+    else
+        showCooldownText = showCooldownText == true
     end
 
     local wantCooldown = showSwipe or showCooldownText

@@ -112,11 +112,6 @@ local function GroupChangeEvent(event, ...)
 
     -- Utils:Log("GROUP_CHANGE_EVENT", event)
     FF:UpdateFrames()
-    if FF.RequestStatusTextSettingsRefresh then
-        FF:RequestStatusTextSettingsRefresh()
-    elseif FF.UpdateHealthTextFontSize then
-        FF:UpdateHealthTextFontSize()
-    end
 
     if FF.SetupIncomingCastIndicators then
         FF:SetupIncomingCastIndicators()
@@ -183,21 +178,18 @@ function FF:OnInitialize()
     if type(_G["CompactUnitFrame_UpdateHealthText"]) == "function" then
         hooksecurefunc("CompactUnitFrame_UpdateHealthText", function(frame)
             FF:ApplyStatusTextSettingsForFrame(frame)
-            FF:RequestStatusTextSettingsRefresh()
         end)
     end
 
     if type(_G["CompactUnitFrame_UpdateStatusText"]) == "function" then
         hooksecurefunc("CompactUnitFrame_UpdateStatusText", function(frame)
             FF:ApplyStatusTextSettingsForFrame(frame)
-            FF:RequestStatusTextSettingsRefresh()
         end)
     end
 
     if type(_G["CompactUnitFrame_UpdateAll"]) == "function" then
         hooksecurefunc("CompactUnitFrame_UpdateAll", function(frame)
             FF:ApplyStatusTextSettingsForFrame(frame)
-            FF:RequestStatusTextSettingsRefresh()
         end)
     end
 
@@ -254,14 +246,12 @@ function FF:OnEnable()
             self:UpdatePlayerNameColor()
             self:UpdatePlayerNameFontSize()
             self:ApplyStatusTextSettings()
-            self:RequestStatusTextSettingsRefresh()
         end)
     else
         self:UpdatePlayerNameAnchoring()
         self:UpdatePlayerNameColor()
         self:UpdatePlayerNameFontSize()
         self:ApplyStatusTextSettings()
-        self:RequestStatusTextSettingsRefresh()
     end
 end
 

@@ -5,6 +5,7 @@ local FF = FoxFrames
 local Utils = addon.Utils
 local Blizzard = addon.Blizzard
 local DB = addon.DB
+local Constants = addon.Constants
 
 local function GetStatusBarTexturePath(healthBar)
     if not (healthBar and healthBar.GetStatusBarTexture) then
@@ -94,7 +95,7 @@ function FF:ShowPartyFrameTitleIfNeeded()
     CompactPartyFrame.title:SetShown(DB:GetShowPartyFrameTitle())
 end
 
-function FF:ApplyAuraCountdownFontSizeToCooldown(cooldown)
+function FF:ApplyAuraCountdownFontSizeToCooldown(cooldown, fontSize)
     local fontString = Utils:GetCooldownCountdownFontString(cooldown)
 
     if not fontString then
@@ -106,8 +107,12 @@ function FF:ApplyAuraCountdownFontSizeToCooldown(cooldown)
         return
     end
 
-    local fontSize = DB:GetAuraCountdownFontSize()
-    pcall(fontString.SetFont, fontString, fontFile, fontSize, flags)
+    local size = fontSize
+    if type(size) ~= "number" then
+        size = DB:GetAuraCountdownFontSize()
+    end
+
+    pcall(fontString.SetFont, fontString, fontFile, size, flags)
 end
 
 function FF:ApplyAuraCountdownFontSizeForFrame(frame)
@@ -116,19 +121,21 @@ function FF:ApplyAuraCountdownFontSizeForFrame(frame)
     end
 
     if frame.buffFrames then
+        local buffFontSize = DB:GetBuffCountdownFontSize()
         for _, buffFrame in ipairs(frame.buffFrames) do
             local cooldown = buffFrame and buffFrame.cooldown
             if cooldown then
-                self:ApplyAuraCountdownFontSizeToCooldown(cooldown)
+                self:ApplyAuraCountdownFontSizeToCooldown(cooldown, buffFontSize)
             end
         end
     end
 
     if frame.debuffFrames then
+        local debuffFontSize = DB:GetDebuffCountdownFontSize()
         for _, debuffFrame in ipairs(frame.debuffFrames) do
             local cooldown = debuffFrame and debuffFrame.cooldown
             if cooldown then
-                self:ApplyAuraCountdownFontSizeToCooldown(cooldown)
+                self:ApplyAuraCountdownFontSizeToCooldown(cooldown, debuffFontSize)
             end
         end
     end
@@ -154,27 +161,15 @@ function FF:ApplyStatusTextAnchorForFrame(frame)
         return
     end
 
-    local point = DB:GetStatusTextAnchorPoint()
-    local target = DB:GetStatusTextAnchorTarget()
+    local layoutAxis = Blizzard:GetPartyFramesLayoutAxis()
+    local point, relativePoint, target, offsetX, offsetY = DB:GetStatusTextAnchorsAndOffsets(layoutAxis)
     local relativeTo = frame
     if target == DB.FRAME_ANCHOR_TARGETS.HEALTHBAR and frame.healthBar then
         relativeTo = frame.healthBar
     end
-    local offsetX, offsetY = DB:GetStatusTextAnchorOffsets()
-
-    local xOffset = offsetX
-    local yOffset = offsetY
-
-    if point == DB.ANCHOR_POINTS.TOPLEFT or point == DB.ANCHOR_POINTS.LEFT or point == DB.ANCHOR_POINTS.BOTTOMLEFT then
-        xOffset = -offsetX
-    end
-
-    if point == DB.ANCHOR_POINTS.TOPLEFT or point == DB.ANCHOR_POINTS.TOP or point == DB.ANCHOR_POINTS.TOPRIGHT then
-        yOffset = -offsetY
-    end
 
     statusText:ClearAllPoints()
-    pcall(statusText.SetPoint, statusText, point, relativeTo, point, xOffset, yOffset)
+    pcall(statusText.SetPoint, statusText, point, relativeTo, relativePoint, offsetX, offsetY)
 end
 
 function FF:UpdateStatusTextAnchoring()
@@ -225,30 +220,6 @@ function FF:ApplyStatusTextSettings()
     end
 end
 
-function FF:RequestStatusTextSettingsRefresh()
-    if self._ffStatusTextSettingsRefreshQueued then
-        return
-    end
-
-    self._ffStatusTextSettingsRefreshQueued = true
-
-    local function ApplyNow()
-        self._ffStatusTextSettingsRefreshQueued = false
-        self:ApplyStatusTextSettings()
-    end
-
-    if C_Timer and C_Timer.After then
-        C_Timer.After(0, ApplyNow)
-
-        -- Second pass wins races when Blizzard applies its own defaults later.
-        C_Timer.After(0.15, function()
-            self:ApplyStatusTextSettings()
-        end)
-    else
-        ApplyNow()
-    end
-end
-
 function FF:GetPlayerNameFontString(frame)
     if not self:IsManagedPartyFrame(frame) then
         return nil
@@ -284,27 +255,14 @@ function FF:ApplyPlayerNameAnchorForFrame(frame)
         return
     end
 
-    local point = DB:GetPlayerNameAnchorPoint()
-    local target = DB:GetPlayerNameAnchorTarget()
+    local layoutAxis = Blizzard:GetPartyFramesLayoutAxis()
+    local point, relativePoint, target, offsetX, offsetY = DB:GetPlayerNameAnchorsAndOffsets(layoutAxis)
     local relativeTo = frame
     if target == DB.FRAME_ANCHOR_TARGETS.HEALTHBAR and frame.healthBar then
         relativeTo = frame.healthBar
     end
-    local offsetX, offsetY = DB:GetPlayerNameAnchorOffsets()
-
-    local xOffset = offsetX
-    local yOffset = offsetY
-
-    if point == DB.ANCHOR_POINTS.TOPLEFT or point == DB.ANCHOR_POINTS.LEFT or point == DB.ANCHOR_POINTS.BOTTOMLEFT then
-        xOffset = -offsetX
-    end
-
-    if point == DB.ANCHOR_POINTS.TOPLEFT or point == DB.ANCHOR_POINTS.TOP or point == DB.ANCHOR_POINTS.TOPRIGHT then
-        yOffset = -offsetY
-    end
-
     pcall(nameText.ClearAllPoints, nameText)
-    pcall(nameText.SetPoint, nameText, point, relativeTo, point, xOffset, yOffset)
+    pcall(nameText.SetPoint, nameText, point, relativeTo, relativePoint, offsetX, offsetY)
 end
 
 function FF:UpdatePlayerNameAnchoring()
@@ -390,11 +348,14 @@ function FF:ShowBuffCountdownIfNeededForFrame(frame)
         return
     end
 
+    local show = DB:GetShowBuffCountdown()
+    local fontSize = DB:GetBuffCountdownFontSize()
+
     for _, buffFrame in ipairs(frame.buffFrames) do
         local cooldown = buffFrame and buffFrame.cooldown
         if cooldown then
-            Utils:SetHideCountdownNumbersSafe(cooldown, not DB:GetShowBuffCountdown())
-            self:ApplyAuraCountdownFontSizeToCooldown(cooldown)
+            Utils:SetHideCountdownNumbersSafe(cooldown, not show)
+            self:ApplyAuraCountdownFontSizeToCooldown(cooldown, fontSize)
         end
     end
 end
@@ -410,11 +371,14 @@ function FF:ShowDebuffCountdownIfNeededForFrame(frame)
         return
     end
 
+    local show = DB:GetShowDebuffCountdown()
+    local fontSize = DB:GetDebuffCountdownFontSize()
+
     for _, debuffFrame in ipairs(frame.debuffFrames) do
         local cooldown = debuffFrame and debuffFrame.cooldown
         if cooldown then
-            Utils:SetHideCountdownNumbersSafe(cooldown, not DB:GetShowDebuffCountdown())
-            self:ApplyAuraCountdownFontSizeToCooldown(cooldown)
+            Utils:SetHideCountdownNumbersSafe(cooldown, not show)
+            self:ApplyAuraCountdownFontSizeToCooldown(cooldown, fontSize)
         end
     end
 end
@@ -523,7 +487,6 @@ function FF:SetupFrames()
     self:UpdatePlayerNameColor()
     self:UpdatePlayerNameFontSize()
     self:ApplyStatusTextSettings()
-    self:RequestStatusTextSettingsRefresh()
     self:ShowPartyFrameTitleIfNeeded()
     self:ShowPlayerFrameIfNeeded()
     self:UpdateFrames()
