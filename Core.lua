@@ -242,16 +242,12 @@ function FF:OnEnable()
     -- Apply once after startup so status text exists before sizing it.
     if C_Timer and C_Timer.After then
         C_Timer.After(0, function()
-            self:UpdatePlayerNameAnchoring()
-            self:UpdatePlayerNameColor()
-            self:UpdatePlayerNameFontSize()
             self:ApplyPlayerStatusSettings()
+            self:ApplyPlayerNameSettings()
         end)
     else
-        self:UpdatePlayerNameAnchoring()
-        self:UpdatePlayerNameColor()
-        self:UpdatePlayerNameFontSize()
         self:ApplyPlayerStatusSettings()
+        self:ApplyPlayerNameSettings()
     end
 end
 

@@ -470,6 +470,7 @@ local function AddCooldownTextSettings(path, category, keyPrefix, prefix, applyS
 
     local defaultShow = defaults.show == true
     local defaultFontSize = Utils:ClampInteger(defaults.fontSize, 8, 32, 12)
+    local defaultColor = Utils:SanitizeColor(defaults.color, { r = 1, g = 1, b = 1 })
 
     local function Profile()
         return GetProfileTableAtPath(pathParts)
@@ -510,6 +511,14 @@ local function AddCooldownTextSettings(path, category, keyPrefix, prefix, applyS
         prefix = prefix,
     })
 
+    local function IsCooldownTextEnabled()
+        local value = GetValue("show")
+        if value == nil then
+            value = defaultShow
+        end
+        return value == true
+    end
+
     local sliderArgs = {
         key = keyPrefix .. "CooldownFontSize",
         name = "Text Size",
@@ -537,14 +546,35 @@ local function AddCooldownTextSettings(path, category, keyPrefix, prefix, applyS
 
     sliderArgs.parent = showElement
     sliderArgs.parentCheck = function()
-        local value = GetValue("show")
-        if value == nil then
-            value = defaultShow
-        end
-        return value == true
+        return IsCooldownTextEnabled()
     end
 
     SettingsLib:CreateSlider(category, sliderArgs)
+
+    SettingsLib:CreateColorOverrides(category, {
+        key = keyPrefix .. "CooldownTextColor",
+        entries = {
+            { key = keyPrefix, label = "Color" },
+        },
+        getColor = function()
+            local color = Utils:SanitizeColor(GetValue("color"), defaultColor)
+            return color.r, color.g, color.b
+        end,
+        setColor = function(_, r, g, b)
+            SetValue("color", Utils:SanitizeColor({ r = r, g = g, b = b }, defaultColor))
+            OnChanged("color")
+        end,
+        getDefaultColor = function()
+            local color = Utils:SanitizeColor(defaultColor, { r = 1, g = 1, b = 1 })
+            return color.r, color.g, color.b
+        end,
+        hasOpacity = false,
+        parent = showElement,
+        parentCheck = function()
+            return IsCooldownTextEnabled()
+        end,
+        minHeight = 36,
+    })
 end
 
 local function GetIncomingCastBarIconValue(key)
@@ -613,8 +643,10 @@ local function CreateBuffsSettings(rootCategory, partyFramePrefix)
     AddCooldownTextSettings("partyFrame.buffs.cooldownText", buffsCategory, "Buff", partyFramePrefix, function(settingKey)
         if settingKey == "show" then
             FF:ShowBuffCountdownIfNeeded()
-        else
+        elseif settingKey == "fontSize" then
             FF:UpdateAuraCountdownFontSize()
+        else
+            FF:UpdateAuraCountdownColor()
         end
     end)
 end
@@ -629,8 +661,10 @@ local function CreateDebuffsSettings(rootCategory, partyFramePrefix)
     AddCooldownTextSettings("partyFrame.debuffs.cooldownText", debuffsCategory, "Debuff", partyFramePrefix, function(settingKey)
         if settingKey == "show" then
             FF:ShowDebuffCountdownIfNeeded()
-        else
+        elseif settingKey == "fontSize" then
             FF:UpdateAuraCountdownFontSize()
+        else
+            FF:UpdateAuraCountdownColor()
         end
     end)
 end

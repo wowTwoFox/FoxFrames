@@ -427,6 +427,7 @@ local function GetIncomingCastIndicatorIconConfig(relativeAnchor)
 
     local spacing = Utils:ClampInteger(iconProfile and iconProfile.spacing, -10, 50, iconDefaults.spacing)
     local cooldownFontSize = DB:GetIncomingCastIndicatorIconCooldownTextFontSize()
+    local cooldownTextR, cooldownTextG, cooldownTextB = DB:GetIncomingCastIndicatorIconCooldownTextColor()
 
     local showBorder = iconProfile and iconProfile.showBorder
     if showBorder == nil then
@@ -469,6 +470,11 @@ local function GetIncomingCastIndicatorIconConfig(relativeAnchor)
         cooldownText = {
             show = showCooldownText,
             fontSize = cooldownFontSize,
+            color = {
+                r = cooldownTextR,
+                g = cooldownTextG,
+                b = cooldownTextB,
+            },
         },
         showBorder = showBorder,
         showSwipe = showSwipe,

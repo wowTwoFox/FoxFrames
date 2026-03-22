@@ -54,16 +54,26 @@ local defaultSettings = {
             cooldownText = {
                 show = false,
                 fontSize = 12,
+                color = {
+                    r = 1,
+                    g = 1,
+                    b = 1,
+                },
             },
         },
         debuffs = {
             cooldownText = {
                 show = false,
                 fontSize = 12,
+                color = {
+                    r = 1,
+                    g = 1,
+                    b = 1,
+                },
             },
         },
         playerStatus = {
-            fontSize = 10,
+            fontSize = 20,
             opacity = 1,
             color = {
                 r = 1,
@@ -119,7 +129,12 @@ local defaultSettings = {
             showSwipe = true,
             cooldownText = {
                 show = true,
-                fontSize = 10,
+                fontSize = 12,
+                color = {
+                    r = 1,
+                    g = 1,
+                    b = 1,
+                },
             },
         },
     },
@@ -460,6 +475,12 @@ function Object:GetIncomingCastIndicatorIconCooldownTextFontSize()
     return self:GetTextFontSize(profile, defaults, 8, 32)
 end
 
+function Object:GetIncomingCastIndicatorIconCooldownTextColor()
+    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.incomingCastBar and self.DEFAULT_SETTINGS.incomingCastBar.icon and self.DEFAULT_SETTINGS.incomingCastBar.icon.cooldownText) or {}
+    local profile = self:GetIncomingCastBarIconCooldownTextDB()
+    return self:GetCooldownTextColor(profile, defaults)
+end
+
 function Object:GetIncomingCastIndicatorGrowDirection(relativeAnchor)
     local fallback = defaultSettings.incomingCastBar.growthDirection
 
@@ -570,6 +591,26 @@ function Object:GetCooldownTextShow(cooldownTextProfile, defaults)
     return enabled == true
 end
 
+function Object:GetCooldownTextColor(cooldownTextProfile, defaults)
+    local sanitizedDefaults = defaults
+    if type(sanitizedDefaults) ~= "table" then
+        sanitizedDefaults = {}
+    end
+
+    local profile = cooldownTextProfile
+    if type(profile) ~= "table" then
+        profile = {}
+    end
+
+    local defaultColor = sanitizedDefaults.color
+    if type(defaultColor) ~= "table" then
+        defaultColor = { r = 1, g = 1, b = 1 }
+    end
+
+    local color = Utils:SanitizeColor(profile.color, defaultColor)
+    return color.r, color.g, color.b
+end
+
 function Object:GetBuffCountdownFontSize()
     local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.buffs and self.DEFAULT_SETTINGS.partyFrame.buffs.cooldownText) or {}
     local profile = self:GetBuffsCooldownTextDB()
@@ -580,6 +621,18 @@ function Object:GetDebuffCountdownFontSize()
     local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.debuffs and self.DEFAULT_SETTINGS.partyFrame.debuffs.cooldownText) or {}
     local profile = self:GetDebuffsCooldownTextDB()
     return self:GetTextFontSize(profile, defaults, 8, 32)
+end
+
+function Object:GetBuffCountdownColor()
+    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.buffs and self.DEFAULT_SETTINGS.partyFrame.buffs.cooldownText) or {}
+    local profile = self:GetBuffsCooldownTextDB()
+    return self:GetCooldownTextColor(profile, defaults)
+end
+
+function Object:GetDebuffCountdownColor()
+    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.debuffs and self.DEFAULT_SETTINGS.partyFrame.debuffs.cooldownText) or {}
+    local profile = self:GetDebuffsCooldownTextDB()
+    return self:GetCooldownTextColor(profile, defaults)
 end
 
 function Object:GetAuraCountdownFontSize()

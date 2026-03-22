@@ -115,6 +115,16 @@ function FF:ApplyAuraCountdownFontSizeToCooldown(cooldown, fontSize)
     pcall(fontString.SetFont, fontString, fontFile, size, flags)
 end
 
+function FF:ApplyAuraCountdownColorToCooldown(cooldown, r, g, b)
+    local fontString = Utils:GetCooldownCountdownFontString(cooldown)
+
+    if not (fontString and fontString.SetTextColor) then
+        return
+    end
+
+    pcall(fontString.SetTextColor, fontString, r, g, b)
+end
+
 function FF:ApplyAuraCountdownFontSizeForFrame(frame)
     if not frame then
         return
@@ -141,9 +151,41 @@ function FF:ApplyAuraCountdownFontSizeForFrame(frame)
     end
 end
 
+function FF:ApplyAuraCountdownColorForFrame(frame)
+    if not frame then
+        return
+    end
+
+    if frame.buffFrames then
+        local r, g, b = DB:GetBuffCountdownColor()
+        for _, buffFrame in ipairs(frame.buffFrames) do
+            local cooldown = buffFrame and buffFrame.cooldown
+            if cooldown then
+                self:ApplyAuraCountdownColorToCooldown(cooldown, r, g, b)
+            end
+        end
+    end
+
+    if frame.debuffFrames then
+        local r, g, b = DB:GetDebuffCountdownColor()
+        for _, debuffFrame in ipairs(frame.debuffFrames) do
+            local cooldown = debuffFrame and debuffFrame.cooldown
+            if cooldown then
+                self:ApplyAuraCountdownColorToCooldown(cooldown, r, g, b)
+            end
+        end
+    end
+end
+
 function FF:UpdateAuraCountdownFontSize()
     for _, frame in ipairs(self:GetFrames()) do
         self:ApplyAuraCountdownFontSizeForFrame(frame)
+    end
+end
+
+function FF:UpdateAuraCountdownColor()
+    for _, frame in ipairs(self:GetFrames()) do
+        self:ApplyAuraCountdownColorForFrame(frame)
     end
 end
 
@@ -362,12 +404,14 @@ function FF:ShowBuffCountdownIfNeededForFrame(frame)
 
     local show = DB:GetShowBuffCountdown()
     local fontSize = DB:GetBuffCountdownFontSize()
+    local r, g, b = DB:GetBuffCountdownColor()
 
     for _, buffFrame in ipairs(frame.buffFrames) do
         local cooldown = buffFrame and buffFrame.cooldown
         if cooldown then
             Utils:SetHideCountdownNumbersSafe(cooldown, not show)
             self:ApplyAuraCountdownFontSizeToCooldown(cooldown, fontSize)
+            self:ApplyAuraCountdownColorToCooldown(cooldown, r, g, b)
         end
     end
 end
@@ -385,12 +429,14 @@ function FF:ShowDebuffCountdownIfNeededForFrame(frame)
 
     local show = DB:GetShowDebuffCountdown()
     local fontSize = DB:GetDebuffCountdownFontSize()
+    local r, g, b = DB:GetDebuffCountdownColor()
 
     for _, debuffFrame in ipairs(frame.debuffFrames) do
         local cooldown = debuffFrame and debuffFrame.cooldown
         if cooldown then
             Utils:SetHideCountdownNumbersSafe(cooldown, not show)
             self:ApplyAuraCountdownFontSizeToCooldown(cooldown, fontSize)
+            self:ApplyAuraCountdownColorToCooldown(cooldown, r, g, b)
         end
     end
 end
@@ -470,8 +516,8 @@ function FF:UpdateFrame(frame)
         self:UpdateRoleIcon(frame)
     end
 
-    self:ApplyPlayerNameSettingsForFrame(frame)
     self:ApplyPlayerStatusSettingsForFrame(frame)
+    self:ApplyPlayerNameSettingsForFrame(frame)
     self:UpdateTextures(frame)
 end
 
@@ -493,8 +539,8 @@ function FF:SetupFrames()
     self:ShowBuffCountdownIfNeeded()
     self:ShowDebuffCountdownIfNeeded()
     self:UpdateAuraCountdownFontSize()
-    self:ApplyPlayerNameSettings()
     self:ApplyPlayerStatusSettings()
+    self:ApplyPlayerNameSettings()
     self:ShowPartyFrameTitleIfNeeded()
     self:ShowPlayerFrameIfNeeded()
     self:UpdateFrames()

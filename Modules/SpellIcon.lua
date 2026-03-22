@@ -129,6 +129,12 @@ local function CenterSpellIconCooldownText(cooldown, iconConfig)
             pcall(fontString.SetFont, fontString, fontFile, desiredFontHeight, flags)
         end
     end
+
+    if fontString.SetTextColor then
+        local desiredColor = iconConfig and iconConfig.cooldownText and iconConfig.cooldownText.color
+        local color = Utils:SanitizeColor(desiredColor, { r = 1, g = 1, b = 1 })
+        pcall(fontString.SetTextColor, fontString, color.r, color.g, color.b)
+    end
 end
 
 local function ApplyCooldownVisualConfigToCooldown(cooldown, iconConfig)
