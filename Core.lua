@@ -177,19 +177,19 @@ function FF:OnInitialize()
 
     if type(_G["CompactUnitFrame_UpdateHealthText"]) == "function" then
         hooksecurefunc("CompactUnitFrame_UpdateHealthText", function(frame)
-            FF:ApplyStatusTextSettingsForFrame(frame)
+            FF:ApplyPlayerStatusSettingsForFrame(frame)
         end)
     end
 
     if type(_G["CompactUnitFrame_UpdateStatusText"]) == "function" then
         hooksecurefunc("CompactUnitFrame_UpdateStatusText", function(frame)
-            FF:ApplyStatusTextSettingsForFrame(frame)
+            FF:ApplyPlayerStatusSettingsForFrame(frame)
         end)
     end
 
     if type(_G["CompactUnitFrame_UpdateAll"]) == "function" then
         hooksecurefunc("CompactUnitFrame_UpdateAll", function(frame)
-            FF:ApplyStatusTextSettingsForFrame(frame)
+            FF:ApplyPlayerStatusSettingsForFrame(frame)
         end)
     end
 
@@ -245,13 +245,13 @@ function FF:OnEnable()
             self:UpdatePlayerNameAnchoring()
             self:UpdatePlayerNameColor()
             self:UpdatePlayerNameFontSize()
-            self:ApplyStatusTextSettings()
+            self:ApplyPlayerStatusSettings()
         end)
     else
         self:UpdatePlayerNameAnchoring()
         self:UpdatePlayerNameColor()
         self:UpdatePlayerNameFontSize()
-        self:ApplyStatusTextSettings()
+        self:ApplyPlayerStatusSettings()
     end
 end
 

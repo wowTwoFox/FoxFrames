@@ -35,10 +35,10 @@ local GROWTH_DIRECTION_LABELS = {
 }
 
 local SPELL_BAR_ANCHOR_MODE_LABELS = {
-    [DB.SPELL_BAR_ANCHOR_MODES.INSIDE] = "Inside",
-    [DB.SPELL_BAR_ANCHOR_MODES.AUTO] = "Outside (Auto)",
-    [DB.SPELL_BAR_ANCHOR_MODES.OUTSIDEV] = "Outside (Vertical)",
-    [DB.SPELL_BAR_ANCHOR_MODES.OUTSIDEH] = "Outside (Horizontal)",
+    [Constants.ANCHOR_MODES.INSIDE] = "Inside",
+    [Constants.ANCHOR_MODES.AUTO] = "Outside (Auto)",
+    [Constants.ANCHOR_MODES.OUTSIDEV] = "Outside (Vertical)",
+    [Constants.ANCHOR_MODES.OUTSIDEH] = "Outside (Horizontal)",
 }
 
 function FF:GetTextures()
@@ -87,26 +87,6 @@ end
 function FF:OpenIncomingCastsSettings()
     if not self._incomingCastsCategory then return end
     Settings.OpenToCategory(self._incomingCastsCategory:GetID())
-end
-
-local function SanitizePosition(value, fallback)
-    return DB:SanitizeIncomingCastPosition(value, fallback)
-end
-
-local function SanitizeIncomingCastAnchorFrame(value, fallback)
-    return DB:SanitizeIncomingCastAnchorFrame(value, fallback)
-end
-
-local function SanitizeStatusTextColor(value, fallback)
-    return DB:SanitizeStatusTextColor(value, fallback)
-end
-
-local function SanitizeIncomingCastSpellBarAnchorMode(value, fallback)
-    return DB:SanitizeIncomingCastSpellBarAnchorMode(value, fallback)
-end
-
-local function SanitizeOpacity(value, fallback)
-    return DB:SanitizeOpacity(value, fallback)
 end
 
 local function PartyFrameProfile()
@@ -200,9 +180,9 @@ local function AddFrameSettings(path, category, keyPrefix, prefix, applySetting)
 
     local defaults = GetDefaultsTableAtPath(pathParts)
 
-    local defaultAnchorTarget = SanitizeIncomingCastAnchorFrame(defaults.anchorTarget, DB.FRAME_ANCHOR_TARGETS.FRAME)
-    local defaultPosition = SanitizePosition(defaults.position, Constants.ANCHOR_POINTS.CENTER)
-    local defaultAnchorMode = SanitizeIncomingCastSpellBarAnchorMode(defaults.anchorMode, DB.SPELL_BAR_ANCHOR_MODES.INSIDE)
+    local defaultAnchorTarget = Utils:SanitizeOption(defaults.anchorTarget, DB.FRAME_ANCHOR_TARGETS) or DB.FRAME_ANCHOR_TARGETS.FRAME
+    local defaultPosition = Utils:SanitizeAnchorPoint(defaults.position, Constants.ANCHOR_POINTS.CENTER)
+    local defaultAnchorMode = Utils:SanitizeAnchorMode(defaults.anchorMode, Constants.ANCHOR_MODES.INSIDE)
     local defaultOffsetX = Utils:ClampInteger(defaults.offsetX, -40, 40, 0)
     local defaultOffsetY = Utils:ClampInteger(defaults.offsetY, -40, 40, 0)
     local defaultUseRelativeOffsets = defaults.useRelativeOffsets ~= false
@@ -233,10 +213,10 @@ local function AddFrameSettings(path, category, keyPrefix, prefix, applySetting)
         default = defaultAnchorTarget,
         values = FRAME_ANCHOR_TARGET_LABELS,
         get = function()
-            return SanitizeIncomingCastAnchorFrame(GetValue("anchorTarget"), defaultAnchorTarget)
+            return Utils:SanitizeOption(GetValue("anchorTarget"), DB.FRAME_ANCHOR_TARGETS) or defaultAnchorTarget
         end,
         set = function(value)
-            SetValue("anchorTarget", SanitizeIncomingCastAnchorFrame(value, defaultAnchorTarget))
+            SetValue("anchorTarget", Utils:SanitizeOption(value, DB.FRAME_ANCHOR_TARGETS) or defaultAnchorTarget)
             OnChanged("anchorTarget")
         end,
         desc = "Choose whether this element is anchored to the party frame or to the health bar.",
@@ -249,10 +229,10 @@ local function AddFrameSettings(path, category, keyPrefix, prefix, applySetting)
         default = defaultPosition,
         values = ANCHOR_POINT_LABELS,
         get = function()
-            return SanitizePosition(GetValue("position"), defaultPosition)
+            return Utils:SanitizeAnchorPoint(GetValue("position"), defaultPosition)
         end,
         set = function(value)
-            SetValue("position", SanitizePosition(value, defaultPosition))
+            SetValue("position", Utils:SanitizeAnchorPoint(value, defaultPosition))
             OnChanged("position")
         end,
         desc = "Anchor point used for this element.",
@@ -265,10 +245,10 @@ local function AddFrameSettings(path, category, keyPrefix, prefix, applySetting)
         default = defaultAnchorMode,
         values = SPELL_BAR_ANCHOR_MODE_LABELS,
         get = function()
-            return SanitizeIncomingCastSpellBarAnchorMode(GetValue("anchorMode"), defaultAnchorMode)
+            return Utils:SanitizeAnchorMode(GetValue("anchorMode"), defaultAnchorMode)
         end,
         set = function(value)
-            SetValue("anchorMode", SanitizeIncomingCastSpellBarAnchorMode(value, defaultAnchorMode))
+            SetValue("anchorMode", Utils:SanitizeAnchorMode(value, defaultAnchorMode))
             OnChanged("anchorMode")
         end,
         desc = "Inside uses the same anchor point as Position.\nOutside (Vertical) flips Top <-> Bottom.\nOutside (Horizontal) flips Left <-> Right.\nOutside (Auto) picks Vertical/Horizontal based on the party frame orientation (horizontal vs vertical layout).\nExample: party frames stacked top-to-bottom -> Auto uses Outside (Horizontal).",
@@ -356,8 +336,8 @@ local function AddTextSettings(path, category, keyPrefix, prefix, applySetting)
     local defaults = GetDefaultsTableAtPath(pathParts)
 
     local defaultFontSize = Utils:ClampInteger(defaults.fontSize, 8, 32, 10)
-    local defaultColor = SanitizeStatusTextColor(defaults.color, { r = 1, g = 1, b = 1, a = 1 })
-    local defaultOpacity = SanitizeOpacity(defaults.opacity, defaultColor.a)
+    local defaultColor = Utils:SanitizeColor(defaults.color, { r = 1, g = 1, b = 1 })
+    local defaultOpacity = Utils:SanitizeOpacity(defaults.opacity, 1)
     local defaultUseClassColors = defaults.useClassColors == true
 
     local function Profile()
@@ -419,21 +399,11 @@ local function AddTextSettings(path, category, keyPrefix, prefix, applySetting)
             )
         end,
         get = function()
-            local value = GetValue("opacity")
-            if value == nil then
-                local color = SanitizeStatusTextColor(GetValue("color"), defaultColor)
-                value = color.a
-            end
-            return SanitizeOpacity(value, defaultOpacity)
+            return Utils:SanitizeOpacity(GetValue("opacity"), defaultOpacity)
         end,
         set = function(value)
-            local opacity = SanitizeOpacity(value, defaultOpacity)
+            local opacity = Utils:SanitizeOpacity(value, defaultOpacity)
             SetValue("opacity", opacity)
-
-            local color = SanitizeStatusTextColor(GetValue("color"), defaultColor)
-            color.a = opacity
-            SetValue("color", color)
-
             OnChanged("opacity")
         end,
         desc = "Adjust opacity for text on party frames.",
@@ -465,19 +435,15 @@ local function AddTextSettings(path, category, keyPrefix, prefix, applySetting)
             { key = keyPrefix, label = "Color" },
         },
         getColor = function()
-            local color = SanitizeStatusTextColor(GetValue("color"), defaultColor)
+            local color = Utils:SanitizeColor(GetValue("color"), defaultColor)
             return color.r, color.g, color.b
         end,
         setColor = function(_, r, g, b)
-            local currentColor = SanitizeStatusTextColor(GetValue("color"), defaultColor)
-            local opacity = SanitizeOpacity(GetValue("opacity"), currentColor.a)
-
-            SetValue("color", SanitizeStatusTextColor({ r = r, g = g, b = b, a = opacity }, defaultColor))
-            SetValue("opacity", opacity)
+            SetValue("color", Utils:SanitizeColor({ r = r, g = g, b = b }, defaultColor))
             OnChanged("color")
         end,
         getDefaultColor = function()
-            local color = SanitizeStatusTextColor(defaultColor, { r = 1, g = 1, b = 1, a = 1 })
+            local color = Utils:SanitizeColor(defaultColor, { r = 1, g = 1, b = 1 })
             return color.r, color.g, color.b
         end,
         hasOpacity = false,
@@ -589,18 +555,18 @@ local function SetIncomingCastBarIconValue(key, value)
     DB:SetIncomingCastBarIconValue(key, value)
 end
 
-local function CreateStatusTextSettings(rootCategory, partyFramePrefix)
-    local statusTextCategory = SettingsLib:CreateCategory(rootCategory, "Status Text")
+local function CreatePlayerStatusSettings(rootCategory, partyFramePrefix)
+    local statusTextCategory = SettingsLib:CreateCategory(rootCategory, "Player Status")
 
     SettingsLib:CreateHeader(statusTextCategory, {
         name = "Text",
     })
 
-    AddTextSettings("partyFrame.statusText", statusTextCategory, "StatusText", partyFramePrefix, function(settingKey)
+    AddTextSettings("partyFrame.playerStatus", statusTextCategory, "PlayerStatus", partyFramePrefix, function(settingKey)
         if settingKey == "fontSize" then
-            FF:UpdateHealthTextFontSize()
+            FF:UpdatePlayerStatusFontSize()
         else
-            FF:UpdateStatusTextColor()
+            FF:UpdatePlayerStatusColor()
         end
     end)
 
@@ -608,8 +574,8 @@ local function CreateStatusTextSettings(rootCategory, partyFramePrefix)
         name = "Placement",
     })
 
-    AddFrameSettings("partyFrame.statusText.frame", statusTextCategory, "StatusTextFrame", partyFramePrefix, function(_)
-        FF:UpdateStatusTextAnchoring()
+    AddFrameSettings("partyFrame.playerStatus.frame", statusTextCategory, "PlayerStatusFrame", partyFramePrefix, function(_)
+        FF:UpdatePlayerStatusAnchoring()
     end)
 end
 
@@ -1071,7 +1037,7 @@ function FF:SetupOptions()
         prefix = PARTY_FRAME_PREFIX
     })
 
-    CreateStatusTextSettings(rootCategory, PARTY_FRAME_PREFIX)
+    CreatePlayerStatusSettings(rootCategory, PARTY_FRAME_PREFIX)
     CreatePlayerNameSettings(rootCategory, PARTY_FRAME_PREFIX)
     CreateBuffsSettings(rootCategory, PARTY_FRAME_PREFIX)
     CreateDebuffsSettings(rootCategory, PARTY_FRAME_PREFIX)

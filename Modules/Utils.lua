@@ -168,6 +168,48 @@ function Object:SanitizeAnchorPoint(value, fallback)
     return self:SanitizeOption(value, Constants.ANCHOR_POINTS) or fallback
 end
 
+function Object:SanitizeAnchorMode(value, fallback)
+    local mode = value
+
+    -- Compatibility: old "OUTSIDE" mode was renamed to AUTO.
+    if mode == "OUTSIDE" then
+        mode = Constants.ANCHOR_MODES.AUTO
+    end
+
+    return self:SanitizeOption(mode, Constants.ANCHOR_MODES) or fallback
+end
+
+function Object:SanitizeColor(value, fallback)
+    local fallbackColor = fallback
+    if type(fallbackColor) ~= "table" then
+        fallbackColor = { r = 1, g = 1, b = 1 }
+    end
+
+    local color = value
+    if type(color) ~= "table" then
+        color = fallbackColor
+    end
+
+    return {
+        r = self:ClampNumber(color.r, 0, 1, fallbackColor.r or 1),
+        g = self:ClampNumber(color.g, 0, 1, fallbackColor.g or 1),
+        b = self:ClampNumber(color.b, 0, 1, fallbackColor.b or 1),
+    }
+end
+
+function Object:SanitizeBoolean(value, fallback)
+    if value == nil then
+        return fallback
+    end
+    return value == true
+end
+
+function Object:SanitizeOpacity(value, fallback)
+    local sanitizedFallback = self:ClampNumber(fallback, 0, 1, 1)
+    local opacity = self:ClampNumber(value, 0, 1, sanitizedFallback)
+    return self:RoundToDecimals(opacity, 2, sanitizedFallback)
+end
+
 function Object:IsAnchorRightAligned(point)
     return point == anchorPoints.TOPRIGHT or point == anchorPoints.RIGHT or point == anchorPoints.BOTTOMRIGHT
 end

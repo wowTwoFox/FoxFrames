@@ -58,17 +58,26 @@ local layoutAxis = {
     VERTICAL = "VERTICAL",
 }
 
+local anchorModes = {
+    INSIDE = "INSIDE",
+    AUTO = "AUTO",
+    OUTSIDEV = "OUTSIDEV",
+    OUTSIDEH = "OUTSIDEH",
+}
+
 constants.ANCHOR_POINTS = anchorPoints
 constants.FLIP_VERTICAL_ANCHOR_POINTS = flipVerticalAnchorPoints
 constants.FLIP_HORIZONTAL_ANCHOR_POINTS = flipHorizontalAnchorPoints
 constants.GROWTH_DIRECTIONS = growthDirections
 constants.LAYOUT_AXIS = layoutAxis
+constants.ANCHOR_MODES = anchorModes
 
 constants.anchorPoints = anchorPoints
 constants.flipVerticalAnchorPoints = flipVerticalAnchorPoints
 constants.flipHorizontalAnchorPoints = flipHorizontalAnchorPoints
 constants.growthDirections = growthDirections
 constants.layoutAxis = layoutAxis
+constants.anchorModes = anchorModes
 
 if addon then
     addon.Constants = constants

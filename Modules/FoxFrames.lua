@@ -151,7 +151,7 @@ function FF:IsManagedPartyFrame(frame)
     return Blizzard:IsManagedPartyFrame(frame)
 end
 
-function FF:ApplyStatusTextAnchorForFrame(frame)
+function FF:ApplyPlayerStatusAnchorForFrame(frame)
     if not self:IsManagedPartyFrame(frame) then
         return
     end
@@ -162,7 +162,7 @@ function FF:ApplyStatusTextAnchorForFrame(frame)
     end
 
     local layoutAxis = Blizzard:GetPartyFramesLayoutAxis()
-    local point, relativePoint, target, offsetX, offsetY = DB:GetStatusTextAnchorsAndOffsets(layoutAxis)
+    local point, relativePoint, target, offsetX, offsetY = DB:GetPlayerStatusAnchorsAndOffsets(layoutAxis)
     local relativeTo = frame
     if target == DB.FRAME_ANCHOR_TARGETS.HEALTHBAR and frame.healthBar then
         relativeTo = frame.healthBar
@@ -172,13 +172,13 @@ function FF:ApplyStatusTextAnchorForFrame(frame)
     pcall(statusText.SetPoint, statusText, point, relativeTo, relativePoint, offsetX, offsetY)
 end
 
-function FF:UpdateStatusTextAnchoring()
+function FF:UpdatePlayerStatusAnchoring()
     for _, frame in ipairs(self:GetFrames()) do
-        self:ApplyStatusTextAnchorForFrame(frame)
+        self:ApplyPlayerStatusAnchorForFrame(frame)
     end
 end
 
-function FF:ApplyStatusTextColorForFrame(frame)
+function FF:ApplyPlayerStatusColorForFrame(frame)
     if not self:IsManagedPartyFrame(frame) then
         return
     end
@@ -189,34 +189,34 @@ function FF:ApplyStatusTextColorForFrame(frame)
         return
     end
 
-    if DB:GetStatusTextUseClassColors() then
+    if DB:GetPlayerStatusUseClassColors() then
         local classR, classG, classB = Blizzard:GetClassColorForUnit(frame and frame.unit)
         if classR and classG and classB then
-            local _, _, _, alpha = DB:GetStatusTextColor()
+            local _, _, _, alpha = DB:GetPlayerStatusColor()
             pcall(statusText.SetTextColor, statusText, classR, classG, classB, alpha)
             return
         end
     end
 
-    local r, g, b, a = DB:GetStatusTextColor()
+    local r, g, b, a = DB:GetPlayerStatusColor()
     pcall(statusText.SetTextColor, statusText, r, g, b, a)
 end
 
-function FF:UpdateStatusTextColor()
+function FF:UpdatePlayerStatusColor()
     for _, frame in ipairs(self:GetFrames()) do
-        self:ApplyStatusTextColorForFrame(frame)
+        self:ApplyPlayerStatusColorForFrame(frame)
     end
 end
 
-function FF:ApplyStatusTextSettingsForFrame(frame)
-    self:ApplyStatusTextAnchorForFrame(frame)
-    self:ApplyStatusTextColorForFrame(frame)
-    self:ApplyHealthTextFontSizeForFrame(frame)
+function FF:ApplyPlayerStatusSettingsForFrame(frame)
+    self:ApplyPlayerStatusAnchorForFrame(frame)
+    self:ApplyPlayerStatusColorForFrame(frame)
+    self:ApplyPlayerStatusFontSizeForFrame(frame)
 end
 
-function FF:ApplyStatusTextSettings()
+function FF:ApplyPlayerStatusSettings()
     for _, frame in ipairs(self:GetFrames()) do
-        self:ApplyStatusTextSettingsForFrame(frame)
+        self:ApplyPlayerStatusSettingsForFrame(frame)
     end
 end
 
@@ -318,7 +318,19 @@ function FF:UpdatePlayerNameFontSize()
     end
 end
 
-function FF:ApplyHealthTextFontSizeForFrame(frame)
+function FF:ApplyPlayerNameSettingsForFrame(frame)
+    self:ApplyPlayerNameAnchorForFrame(frame)
+    self:ApplyPlayerNameColorForFrame(frame)
+    self:ApplyPlayerNameFontSizeForFrame(frame)
+end
+
+function FF:ApplyPlayerNameSettings()
+    for _, frame in ipairs(self:GetFrames()) do
+        self:ApplyPlayerNameSettingsForFrame(frame)
+    end
+end
+
+function FF:ApplyPlayerStatusFontSizeForFrame(frame)
     if not self:IsManagedPartyFrame(frame) then
         return
     end
@@ -329,7 +341,7 @@ function FF:ApplyHealthTextFontSizeForFrame(frame)
         return
     end
 
-    local size = DB:GetHealthTextFontSize()
+    local size = DB:GetPlayerStatusFontSize()
 
     local fontFile, _, flags = fontString:GetFont()
     if fontFile then
@@ -337,9 +349,9 @@ function FF:ApplyHealthTextFontSizeForFrame(frame)
     end
 end
 
-function FF:UpdateHealthTextFontSize()
+function FF:UpdatePlayerStatusFontSize()
     for _, frame in ipairs(self:GetFrames()) do
-        self:ApplyHealthTextFontSizeForFrame(frame)
+        self:ApplyPlayerStatusFontSizeForFrame(frame)
     end
 end
 
@@ -458,10 +470,8 @@ function FF:UpdateFrame(frame)
         self:UpdateRoleIcon(frame)
     end
 
-    self:ApplyPlayerNameAnchorForFrame(frame)
-    self:ApplyPlayerNameColorForFrame(frame)
-    self:ApplyPlayerNameFontSizeForFrame(frame)
-    self:ApplyStatusTextSettingsForFrame(frame)
+    self:ApplyPlayerNameSettingsForFrame(frame)
+    self:ApplyPlayerStatusSettingsForFrame(frame)
     self:UpdateTextures(frame)
 end
 
@@ -483,10 +493,8 @@ function FF:SetupFrames()
     self:ShowBuffCountdownIfNeeded()
     self:ShowDebuffCountdownIfNeeded()
     self:UpdateAuraCountdownFontSize()
-    self:UpdatePlayerNameAnchoring()
-    self:UpdatePlayerNameColor()
-    self:UpdatePlayerNameFontSize()
-    self:ApplyStatusTextSettings()
+    self:ApplyPlayerNameSettings()
+    self:ApplyPlayerStatusSettings()
     self:ShowPartyFrameTitleIfNeeded()
     self:ShowPlayerFrameIfNeeded()
     self:UpdateFrames()

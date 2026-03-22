@@ -19,12 +19,7 @@ local flipHorizontalAnchorPoints = Constants.FLIP_HORIZONTAL_ANCHOR_POINTS
 local growthDirections = Constants.GROWTH_DIRECTIONS
 local layoutAxisValues = Constants.LAYOUT_AXIS
 
-local spellBarAnchorModes = {
-    INSIDE = "INSIDE",
-    AUTO = "AUTO",
-    OUTSIDEV = "OUTSIDEV",
-    OUTSIDEH = "OUTSIDEH",
-}
+local anchorModes = Constants.ANCHOR_MODES
 
 local function FlipVerticalAnchorPoint(point)
     return flipVerticalAnchorPoints[point] or point
@@ -67,14 +62,13 @@ local defaultSettings = {
                 fontSize = 12,
             },
         },
-        statusText = {
+        playerStatus = {
             fontSize = 10,
             opacity = 1,
             color = {
                 r = 1,
                 g = 1,
                 b = 1,
-                a = 1,
             },
             useClassColors = false,
             frame = {
@@ -83,7 +77,7 @@ local defaultSettings = {
                 offsetX = 0,
                 offsetY = 0,
                 useRelativeOffsets = true,
-                anchorMode = spellBarAnchorModes.INSIDE,
+                anchorMode = anchorModes.INSIDE,
             },
         },
         playerName = {
@@ -93,7 +87,6 @@ local defaultSettings = {
                 r = 1,
                 g = 1,
                 b = 1,
-                a = 1,
             },
             useClassColors = false,
             frame = {
@@ -102,7 +95,7 @@ local defaultSettings = {
                 offsetX = 0,
                 offsetY = 6,
                 useRelativeOffsets = true,
-                anchorMode = spellBarAnchorModes.INSIDE,
+                anchorMode = anchorModes.INSIDE,
             },
         },
         allowAnyAnchoring = false,
@@ -113,7 +106,7 @@ local defaultSettings = {
         frame = {
             anchorTarget = frameAnchorTargets.HEALTHBAR,
             position = anchorPoints.BOTTOMLEFT,
-            anchorMode = spellBarAnchorModes.INSIDE,
+            anchorMode = anchorModes.INSIDE,
             offsetX = 2,
             offsetY = 2,
             useRelativeOffsets = true,
@@ -206,30 +199,30 @@ function Object:GetDebuffsCooldownTextDB()
     return debuffs.cooldownText
 end
 
-function Object:GetStatusTextDB()
+function Object:GetPlayerStatusDB()
     local partyFrame = self:GetPartyFrameDB()
     if not partyFrame then
         return nil
     end
 
-    if type(partyFrame.statusText) ~= "table" then
-        partyFrame.statusText = {}
+    if type(partyFrame.playerStatus) ~= "table" then
+        partyFrame.playerStatus = {}
     end
 
-    return partyFrame.statusText
+    return partyFrame.playerStatus
 end
 
-function Object:GetStatusTextFrameDB()
-    local statusText = self:GetStatusTextDB()
-    if not statusText then
+function Object:GetPlayerStatusFrameDB()
+    local playerStatus = self:GetPlayerStatusDB()
+    if not playerStatus then
         return nil
     end
 
-    if type(statusText.frame) ~= "table" then
-        statusText.frame = {}
+    if type(playerStatus.frame) ~= "table" then
+        playerStatus.frame = {}
     end
 
-    return statusText.frame
+    return playerStatus.frame
 end
 
 function Object:GetPlayerNameDB()
@@ -366,14 +359,14 @@ function Object:GetFrameAnchorsAndOffsets(frameProfile, defaults, offsetMin, off
     local relativeAnchor = Utils:SanitizeAnchorPoint(configured.position, relativeFallback)
 
     local frameAnchor = relativeAnchor
-    local modeFallback = sanitizedDefaults.anchorMode or spellBarAnchorModes.INSIDE
-    local mode = self:SanitizeIncomingCastSpellBarAnchorMode(configured.anchorMode, modeFallback)
+    local modeFallback = sanitizedDefaults.anchorMode or anchorModes.INSIDE
+    local mode = Utils:SanitizeAnchorMode(configured.anchorMode, modeFallback)
 
-    if mode == spellBarAnchorModes.OUTSIDEV then
+    if mode == anchorModes.OUTSIDEV then
         frameAnchor = FlipVerticalAnchorPoint(relativeAnchor)
-    elseif mode == spellBarAnchorModes.OUTSIDEH then
+    elseif mode == anchorModes.OUTSIDEH then
         frameAnchor = FlipHorizontalAnchorPoint(relativeAnchor)
-    elseif mode == spellBarAnchorModes.AUTO then
+    elseif mode == anchorModes.AUTO then
         local verticalCandidate = FlipVerticalAnchorPoint(relativeAnchor)
         local horizontalCandidate = FlipHorizontalAnchorPoint(relativeAnchor)
 
@@ -417,7 +410,7 @@ function Object:GetFrameAnchorsAndOffsets(frameProfile, defaults, offsetMin, off
     local offsetY = Utils:ClampInteger(configured.offsetY, min, max, fallbackY)
 
     local fallbackUseRelativeOffsets = sanitizedDefaults.useRelativeOffsets ~= false
-    local useRelativeOffsets = self:SanitizeBoolean(configured.useRelativeOffsets, fallbackUseRelativeOffsets)
+    local useRelativeOffsets = Utils:SanitizeBoolean(configured.useRelativeOffsets, fallbackUseRelativeOffsets)
     if useRelativeOffsets then
         offsetX, offsetY = Utils:FlipToRelativeOffsets(offsetX, offsetY, frameAnchor)
     end
@@ -447,7 +440,7 @@ function Object:GetIncomingCastIndicatorAnchorFrame()
         return fallback
     end
 
-    return self:SanitizeIncomingCastAnchorFrame(value, fallback)
+    return Utils:SanitizeOption(value, frameAnchorTargets) or fallback
 end
 
 function Object:GetIncomingCastIndicatorCount()
@@ -486,64 +479,7 @@ function Object:GetIncomingCastIndicatorGrowDirection(relativeAnchor)
         return fallback
     end
 
-    return self:SanitizeIncomingCastGrowDirection(explicitValue, fallback)
-end
-
-function Object:SanitizeIncomingCastPosition(value, fallback)
-    return Utils:SanitizeAnchorPoint(value, fallback)
-end
-
-function Object:SanitizeIncomingCastSpellBarAnchorMode(value, fallback)
-    -- Compatibility: old "OUTSIDE" mode was renamed to AUTO.
-    if value == "OUTSIDE" then
-        value = spellBarAnchorModes.AUTO
-    end
-
-    return Utils:SanitizeOption(value, spellBarAnchorModes) or fallback
-end
-
-function Object:SanitizeIncomingCastGrowDirection(value, fallback)
-    return Utils:SanitizeGrowthDirection(value, fallback)
-end
-
-function Object:SanitizeIncomingCastAnchorFrame(value, fallback)
-    return Utils:SanitizeOption(value, frameAnchorTargets) or fallback
-end
-
-function Object:SanitizeStatusTextAnchorPoint(value, fallback)
-    return Utils:SanitizeAnchorPoint(value, fallback)
-end
-
-function Object:SanitizeStatusTextColor(value, fallback)
-    local fallbackColor = fallback
-    if type(fallbackColor) ~= "table" then
-        fallbackColor = { r = 1, g = 1, b = 1, a = 1 }
-    end
-
-    local color = value
-    if type(color) ~= "table" then
-        color = fallbackColor
-    end
-
-    return {
-        r = Utils:ClampNumber(color.r, 0, 1, fallbackColor.r or 1),
-        g = Utils:ClampNumber(color.g, 0, 1, fallbackColor.g or 1),
-        b = Utils:ClampNumber(color.b, 0, 1, fallbackColor.b or 1),
-        a = Utils:ClampNumber(color.a, 0, 1, fallbackColor.a or 1),
-    }
-end
-
-function Object:SanitizeBoolean(value, fallback)
-    if value == nil then
-        return fallback
-    end
-    return value == true
-end
-
-function Object:SanitizeOpacity(value, fallback)
-    local sanitizedFallback = Utils:ClampNumber(fallback, 0, 1, 1)
-    local opacity = Utils:ClampNumber(value, 0, 1, sanitizedFallback)
-    return Utils:RoundToDecimals(opacity, 2, sanitizedFallback)
+    return Utils:SanitizeGrowthDirection(explicitValue, fallback)
 end
 
 function Object:GetTextColorAndOpacity(textProfile, defaults)
@@ -559,18 +495,17 @@ function Object:GetTextColorAndOpacity(textProfile, defaults)
 
     local defaultColor = sanitizedDefaults.color
     if type(defaultColor) ~= "table" then
-        defaultColor = { r = 1, g = 1, b = 1, a = 1 }
+        defaultColor = { r = 1, g = 1, b = 1 }
     end
 
-    local defaultOpacity = Utils:ClampNumber(sanitizedDefaults.opacity, 0, 1, defaultColor.a or 1)
+    local defaultOpacity = Utils:ClampNumber(sanitizedDefaults.opacity, 0, 1, 1)
 
     local color = profile.color
     local r = Utils:ClampNumber(color and color.r, 0, 1, defaultColor.r or 1)
     local g = Utils:ClampNumber(color and color.g, 0, 1, defaultColor.g or 1)
     local b = Utils:ClampNumber(color and color.b, 0, 1, defaultColor.b or 1)
 
-    local colorOpacity = Utils:ClampNumber(color and color.a, 0, 1, defaultOpacity)
-    local a = Utils:ClampNumber(profile.opacity, 0, 1, colorOpacity)
+    local a = Utils:ClampNumber(profile.opacity, 0, 1, defaultOpacity)
 
     return r, g, b, a
 end
@@ -653,9 +588,9 @@ function Object:GetAuraCountdownFontSize()
     return self:GetBuffCountdownFontSize()
 end
 
-function Object:GetStatusTextAnchorsAndOffsets(layoutAxis)
-    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.statusText and self.DEFAULT_SETTINGS.partyFrame.statusText.frame) or {}
-    local profile = self:GetStatusTextFrameDB()
+function Object:GetPlayerStatusAnchorsAndOffsets(layoutAxis)
+    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerStatus and self.DEFAULT_SETTINGS.partyFrame.playerStatus.frame) or {}
+    local profile = self:GetPlayerStatusFrameDB()
 
     local defaultTarget = defaults.anchorTarget or frameAnchorTargets.FRAME
     local target = Utils:SanitizeOption(profile and profile.anchorTarget, frameAnchorTargets) or defaultTarget
@@ -664,15 +599,15 @@ function Object:GetStatusTextAnchorsAndOffsets(layoutAxis)
     return point, relativePoint, target, offsetX, offsetY
 end
 
-function Object:GetStatusTextColor()
-    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.statusText) or {}
-    local profile = self:GetStatusTextDB()
+function Object:GetPlayerStatusColor()
+    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerStatus) or {}
+    local profile = self:GetPlayerStatusDB()
     return self:GetTextColorAndOpacity(profile, defaults)
 end
 
-function Object:GetStatusTextUseClassColors()
-    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.statusText) or {}
-    local profile = self:GetStatusTextDB()
+function Object:GetPlayerStatusUseClassColors()
+    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerStatus) or {}
+    local profile = self:GetPlayerStatusDB()
     return self:GetTextUseClassColors(profile, defaults)
 end
 
@@ -705,9 +640,9 @@ function Object:GetPlayerNameFontSize()
     return self:GetTextFontSize(profile, defaults, 8, 32)
 end
 
-function Object:GetHealthTextFontSize()
-    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.statusText) or {}
-    local profile = self:GetStatusTextDB()
+function Object:GetPlayerStatusFontSize()
+    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerStatus) or {}
+    local profile = self:GetPlayerStatusDB()
     return self:GetTextFontSize(profile, defaults, 8, 32)
 end
 
@@ -849,20 +784,51 @@ function Object:MigrateAndSanitizeDB()
             partyProfile.UseCustomHealthBarTexture = nil
         end
 
-        -- Migrate legacy flat frame settings into partyFrame.statusText.frame
-        if type(partyProfile.statusText) ~= "table" then
-            partyProfile.statusText = {}
-        end
-        if type(partyProfile.statusText.frame) ~= "table" then
-            partyProfile.statusText.frame = {}
+        -- Rename: partyFrame.statusText -> partyFrame.playerStatus
+        if type(partyProfile.playerStatus) ~= "table" then
+            partyProfile.playerStatus = {}
         end
 
-        local statusTextFrame = partyProfile.statusText.frame
-        local statusTextDefaults = defaultSettings.partyFrame.statusText and defaultSettings.partyFrame.statusText.frame or {}
+        if type(partyProfile.statusText) == "table" then
+            local legacyStatusText = partyProfile.statusText
+            local playerStatus = partyProfile.playerStatus
+
+            for key, value in pairs(legacyStatusText) do
+                if playerStatus[key] == nil then
+                    playerStatus[key] = value
+                end
+            end
+
+            if type(legacyStatusText.frame) == "table" and type(playerStatus.frame) == "table" then
+                for key, value in pairs(legacyStatusText.frame) do
+                    if playerStatus.frame[key] == nil then
+                        playerStatus.frame[key] = value
+                    end
+                end
+            end
+
+            if type(legacyStatusText.color) == "table" and type(playerStatus.color) == "table" then
+                for key, value in pairs(legacyStatusText.color) do
+                    if playerStatus.color[key] == nil then
+                        playerStatus.color[key] = value
+                    end
+                end
+            end
+
+            partyProfile.statusText = nil
+        end
+
+        -- Migrate legacy flat frame settings into partyFrame.playerStatus.frame
+        if type(partyProfile.playerStatus.frame) ~= "table" then
+            partyProfile.playerStatus.frame = {}
+        end
+
+        local playerStatusFrame = partyProfile.playerStatus.frame
+        local playerStatusDefaults = defaultSettings.partyFrame.playerStatus and defaultSettings.partyFrame.playerStatus.frame or {}
 
         if partyProfile.statusTextAnchorTarget ~= nil then
-            if statusTextFrame.anchorTarget == nil or statusTextFrame.anchorTarget == statusTextDefaults.anchorTarget then
-                statusTextFrame.anchorTarget = partyProfile.statusTextAnchorTarget
+            if playerStatusFrame.anchorTarget == nil or playerStatusFrame.anchorTarget == playerStatusDefaults.anchorTarget then
+                playerStatusFrame.anchorTarget = partyProfile.statusTextAnchorTarget
             end
             partyProfile.statusTextAnchorTarget = nil
         end
@@ -872,69 +838,78 @@ function Object:MigrateAndSanitizeDB()
             oldStatusTextPosition = partyProfile.statusTextAnchorPoint
         end
         if oldStatusTextPosition ~= nil then
-            if statusTextFrame.position == nil or statusTextFrame.position == statusTextDefaults.position then
-                statusTextFrame.position = oldStatusTextPosition
+            if playerStatusFrame.position == nil or playerStatusFrame.position == playerStatusDefaults.position then
+                playerStatusFrame.position = oldStatusTextPosition
             end
         end
         partyProfile.statusTextPosition = nil
         partyProfile.statusTextAnchorPoint = nil
 
         if partyProfile.statusTextOffsetX ~= nil then
-            if statusTextFrame.offsetX == nil or statusTextFrame.offsetX == statusTextDefaults.offsetX then
-                statusTextFrame.offsetX = partyProfile.statusTextOffsetX
+            if playerStatusFrame.offsetX == nil or playerStatusFrame.offsetX == playerStatusDefaults.offsetX then
+                playerStatusFrame.offsetX = partyProfile.statusTextOffsetX
             end
             partyProfile.statusTextOffsetX = nil
         end
         if partyProfile.statusTextOffsetY ~= nil then
-            if statusTextFrame.offsetY == nil or statusTextFrame.offsetY == statusTextDefaults.offsetY then
-                statusTextFrame.offsetY = partyProfile.statusTextOffsetY
+            if playerStatusFrame.offsetY == nil or playerStatusFrame.offsetY == playerStatusDefaults.offsetY then
+                playerStatusFrame.offsetY = partyProfile.statusTextOffsetY
             end
             partyProfile.statusTextOffsetY = nil
         end
         if partyProfile.statusTextUseRelativeOffsets ~= nil then
-            if statusTextFrame.useRelativeOffsets == nil or statusTextFrame.useRelativeOffsets == statusTextDefaults.useRelativeOffsets then
-                statusTextFrame.useRelativeOffsets = partyProfile.statusTextUseRelativeOffsets
+            if playerStatusFrame.useRelativeOffsets == nil or playerStatusFrame.useRelativeOffsets == playerStatusDefaults.useRelativeOffsets then
+                playerStatusFrame.useRelativeOffsets = partyProfile.statusTextUseRelativeOffsets
             end
             partyProfile.statusTextUseRelativeOffsets = nil
         end
 
-        -- Migrate legacy flat status text settings into partyFrame.statusText
-        local statusTextProfile = partyProfile.statusText
-        local statusTextTextDefaults = defaultSettings.partyFrame.statusText or {}
+        -- Migrate legacy flat status text settings into partyFrame.playerStatus
+        local playerStatusProfile = partyProfile.playerStatus
+        local playerStatusTextDefaults = defaultSettings.partyFrame.playerStatus or {}
 
         local legacyStatusTextFontSize = partyProfile.healthTextFontSize
         if legacyStatusTextFontSize == nil then
             legacyStatusTextFontSize = partyProfile.statusTextFontSize
         end
         if legacyStatusTextFontSize ~= nil then
-            if statusTextProfile.fontSize == nil or statusTextProfile.fontSize == statusTextTextDefaults.fontSize then
-                statusTextProfile.fontSize = legacyStatusTextFontSize
+            if playerStatusProfile.fontSize == nil or playerStatusProfile.fontSize == playerStatusTextDefaults.fontSize then
+                playerStatusProfile.fontSize = legacyStatusTextFontSize
             end
         end
         partyProfile.healthTextFontSize = nil
         partyProfile.statusTextFontSize = nil
 
         if partyProfile.statusTextOpacity ~= nil then
-            if statusTextProfile.opacity == nil or statusTextProfile.opacity == statusTextTextDefaults.opacity then
-                statusTextProfile.opacity = partyProfile.statusTextOpacity
+            if playerStatusProfile.opacity == nil or playerStatusProfile.opacity == playerStatusTextDefaults.opacity then
+                playerStatusProfile.opacity = partyProfile.statusTextOpacity
             end
             partyProfile.statusTextOpacity = nil
-        elseif statusTextProfile.opacity == nil and type(partyProfile.statusTextColor) == "table" and partyProfile.statusTextColor.a ~= nil then
-            statusTextProfile.opacity = partyProfile.statusTextColor.a
+        elseif playerStatusProfile.opacity == nil and type(partyProfile.statusTextColor) == "table" and partyProfile.statusTextColor.a ~= nil then
+            playerStatusProfile.opacity = partyProfile.statusTextColor.a
         end
 
         if partyProfile.statusTextUseClassColors ~= nil then
-            if statusTextProfile.useClassColors == nil or statusTextProfile.useClassColors == statusTextTextDefaults.useClassColors then
-                statusTextProfile.useClassColors = partyProfile.statusTextUseClassColors
+            if playerStatusProfile.useClassColors == nil or playerStatusProfile.useClassColors == playerStatusTextDefaults.useClassColors then
+                playerStatusProfile.useClassColors = partyProfile.statusTextUseClassColors
             end
             partyProfile.statusTextUseClassColors = nil
         end
 
         if partyProfile.statusTextColor ~= nil then
-            if rawget(statusTextProfile, "color") == nil then
-                statusTextProfile.color = partyProfile.statusTextColor
+            if rawget(playerStatusProfile, "color") == nil then
+                playerStatusProfile.color = partyProfile.statusTextColor
             end
             partyProfile.statusTextColor = nil
+        end
+
+        -- New schema: alpha belongs only to .opacity, not .color.a.
+        -- If an older profile stored alpha in color.a, migrate it into opacity then strip it.
+        if type(playerStatusProfile.color) == "table" and playerStatusProfile.color.a ~= nil then
+            if playerStatusProfile.opacity == nil then
+                playerStatusProfile.opacity = playerStatusProfile.color.a
+            end
+            playerStatusProfile.color.a = nil
         end
 
         -- Migrate legacy flat frame settings into partyFrame.playerName.frame
@@ -1018,6 +993,14 @@ function Object:MigrateAndSanitizeDB()
                 playerNameProfile.color = partyProfile.playerNameColor
             end
             partyProfile.playerNameColor = nil
+        end
+
+        -- New schema: alpha belongs only to .opacity, not .color.a.
+        if type(playerNameProfile.color) == "table" and playerNameProfile.color.a ~= nil then
+            if playerNameProfile.opacity == nil then
+                playerNameProfile.opacity = playerNameProfile.color.a
+            end
+            playerNameProfile.color.a = nil
         end
 
         -- Migrate legacy buff/debuff cooldown text settings into partyFrame.buffs.cooldownText / partyFrame.debuffs.cooldownText
@@ -1184,7 +1167,6 @@ end
 local db = Object:New()
 db.DEFAULT_SETTINGS = defaultSettings
 db.ANCHOR_POINTS = anchorPoints
-db.SPELL_BAR_ANCHOR_MODES = spellBarAnchorModes
 db.FRAME_ANCHOR_TARGETS = frameAnchorTargets
 db.PLAYER_FRAME_SHOW_TYPES = playerFrameShowTypes
 db.GROWTH_DIRECTIONS = growthDirections
