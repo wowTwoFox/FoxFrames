@@ -89,22 +89,6 @@ function FF:OpenIncomingCastsSettings()
     Settings.OpenToCategory(self._incomingCastsCategory:GetID())
 end
 
-local function PartyFrameProfile()
-    return DB:GetPartyFrameDB()
-end
-
-local function PlayerFrameProfile()
-    return DB:GetPlayerFrameDB()
-end
-
-local function GetIncomingCastBarValue(key)
-    return DB:GetIncomingCastBarValue(key)
-end
-
-local function SetIncomingCastBarValue(key, value)
-    DB:SetIncomingCastBarValue(key, value)
-end
-
 local function EnsureSubTable(parent, key)
     if type(parent) ~= "table" then
         return nil
@@ -577,14 +561,6 @@ local function AddCooldownTextSettings(path, category, keyPrefix, prefix, applyS
     })
 end
 
-local function GetIncomingCastBarIconValue(key)
-    return DB:GetIncomingCastBarIconValue(key)
-end
-
-local function SetIncomingCastBarIconValue(key, value)
-    DB:SetIncomingCastBarIconValue(key, value)
-end
-
 local function CreatePlayerStatusSettings(rootCategory, partyFramePrefix)
     local statusTextCategory = SettingsLib:CreateCategory(rootCategory, "Player Status")
 
@@ -603,6 +579,39 @@ local function CreatePlayerStatusSettings(rootCategory, partyFramePrefix)
     SettingsLib:CreateHeader(statusTextCategory, {
         name = "Placement",
     })
+
+    do
+        local pathParts = NormalizePath("partyFrame.playerStatus")
+        local defaults = GetDefaultsTableAtPath(pathParts)
+        local defaultCustomize = defaults.customizeFrame ~= false
+
+        local function Profile()
+            return GetProfileTableAtPath(pathParts)
+        end
+
+        SettingsLib:CreateCheckbox(statusTextCategory, {
+            key = "PlayerStatusFrameCustomize",
+            name = "Customize",
+            default = defaultCustomize,
+            get = function()
+                local profile = Profile()
+                local value = profile and profile.customizeFrame
+                if value == nil then
+                    return defaultCustomize
+                end
+                return value == true
+            end,
+            set = function(value)
+                local profile = Profile()
+                if profile then
+                    profile.customizeFrame = value == true
+                end
+                FF:UpdatePlayerStatusAnchoring()
+            end,
+            desc = "Toggle FoxFrames placement customization for Player Status.",
+            prefix = partyFramePrefix,
+        })
+    end
 
     AddFrameSettings("partyFrame.playerStatus.frame", statusTextCategory, "PlayerStatusFrame", partyFramePrefix, function(_)
         FF:UpdatePlayerStatusAnchoring()
@@ -627,6 +636,39 @@ local function CreatePlayerNameSettings(rootCategory, partyFramePrefix)
     SettingsLib:CreateHeader(playerNameCategory, {
         name = "Placement",
     })
+
+    do
+        local pathParts = NormalizePath("partyFrame.playerName")
+        local defaults = GetDefaultsTableAtPath(pathParts)
+        local defaultCustomize = defaults.customizeFrame ~= false
+
+        local function Profile()
+            return GetProfileTableAtPath(pathParts)
+        end
+
+        SettingsLib:CreateCheckbox(playerNameCategory, {
+            key = "PlayerNameFrameCustomize",
+            name = "Customize",
+            default = defaultCustomize,
+            get = function()
+                local profile = Profile()
+                local value = profile and profile.customizeFrame
+                if value == nil then
+                    return defaultCustomize
+                end
+                return value == true
+            end,
+            set = function(value)
+                local profile = Profile()
+                if profile then
+                    profile.customizeFrame = value == true
+                end
+                FF:UpdatePlayerNameAnchoring()
+            end,
+            desc = "Toggle FoxFrames placement customization for Player Name.",
+            prefix = partyFramePrefix,
+        })
+    end
 
     AddFrameSettings("partyFrame.playerName.frame", playerNameCategory, "PlayerNameFrame", partyFramePrefix, function(_)
         FF:UpdatePlayerNameAnchoring()
@@ -684,10 +726,10 @@ local function CreateIncomingCastsSettings(rootCategory)
         name = "Track Incoming Casts",
         default = DB.DEFAULT_SETTINGS.partyFrame.trackIncomingCasts,
         get = function()
-            return PartyFrameProfile().trackIncomingCasts
+            return DB:GetPartyFrameDB().trackIncomingCasts
         end,
         set = function(value)
-            PartyFrameProfile().trackIncomingCasts = value
+            DB:GetPartyFrameDB().trackIncomingCasts = value
             if not value then
                 FF:SetIncomingCastIndicatorPreviewEnabled(false)
             end
@@ -710,7 +752,7 @@ local function CreateIncomingCastsSettings(rootCategory)
         prefix = incomingCastsPrefix,
         parent = trackIncomingCastsElement,
         parentCheck = function()
-            return PartyFrameProfile().trackIncomingCasts == true
+            return DB:GetPartyFrameDB().trackIncomingCasts == true
         end,
     })
 
@@ -726,7 +768,7 @@ local function CreateIncomingCastsSettings(rootCategory)
             return DB:GetIncomingCastIndicatorGrowDirection()
         end,
         set = function(value)
-            SetIncomingCastBarValue("growthDirection", value)
+            DB:SetIncomingCastBarValue("growthDirection", value)
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
         end,
@@ -745,14 +787,14 @@ local function CreateIncomingCastsSettings(rootCategory)
             return string.format("%i", Utils:ClampInteger(value, 1, 6, incomingCastBarDefaults.spellCount))
         end,
         get = function()
-            local value = GetIncomingCastBarValue("spellCount")
+            local value = DB:GetIncomingCastBarValue("spellCount")
             if value == nil then
                 value = incomingCastBarDefaults.spellCount
             end
             return value
         end,
         set = function(value)
-            SetIncomingCastBarValue("spellCount", Utils:ClampInteger(value, 1, 6, incomingCastBarDefaults.spellCount))
+            DB:SetIncomingCastBarValue("spellCount", Utils:ClampInteger(value, 1, 6, incomingCastBarDefaults.spellCount))
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
         end,
@@ -774,7 +816,7 @@ local function CreateIncomingCastsSettings(rootCategory)
             )
         end,
         get = function()
-            local value = GetIncomingCastBarIconValue("scale")
+            local value = DB:GetIncomingCastBarIconValue("scale")
             if value ~= nil then
                 return value
             end
@@ -782,7 +824,7 @@ local function CreateIncomingCastsSettings(rootCategory)
             return incomingCastBarIconDefaults.scale
         end,
         set = function(value)
-            SetIncomingCastBarIconValue("scale", value)
+            DB:SetIncomingCastBarIconValue("scale", value)
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
         end,
@@ -801,14 +843,14 @@ local function CreateIncomingCastsSettings(rootCategory)
             return string.format("%i", Utils:ClampInteger(value, -10, 20, incomingCastBarIconDefaults.spacing))
         end,
         get = function()
-            local value = GetIncomingCastBarIconValue("spacing")
+            local value = DB:GetIncomingCastBarIconValue("spacing")
             if value == nil then
                 value = incomingCastBarIconDefaults.spacing
             end
             return value
         end,
         set = function(value)
-            SetIncomingCastBarIconValue("spacing", Utils:ClampInteger(value, -10, 20, incomingCastBarIconDefaults.spacing))
+            DB:SetIncomingCastBarIconValue("spacing", Utils:ClampInteger(value, -10, 20, incomingCastBarIconDefaults.spacing))
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
         end,
@@ -821,14 +863,14 @@ local function CreateIncomingCastsSettings(rootCategory)
         name = "Show Icon Border",
         default = incomingCastBarIconDefaults.showBorder,
         get = function()
-            local value = GetIncomingCastBarIconValue("showBorder")
+            local value = DB:GetIncomingCastBarIconValue("showBorder")
             if value == nil then
                 value = incomingCastBarIconDefaults.showBorder
             end
             return value
         end,
         set = function(value)
-            SetIncomingCastBarIconValue("showBorder", value)
+            DB:SetIncomingCastBarIconValue("showBorder", value)
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
         end,
@@ -845,14 +887,14 @@ local function CreateIncomingCastsSettings(rootCategory)
         name = "Show Cooldown Swipe",
         default = incomingCastBarIconDefaults.showSwipe,
         get = function()
-            local value = GetIncomingCastBarIconValue("showSwipe")
+            local value = DB:GetIncomingCastBarIconValue("showSwipe")
             if value == nil then
                 value = incomingCastBarIconDefaults.showSwipe
             end
             return value
         end,
         set = function(value)
-            SetIncomingCastBarIconValue("showSwipe", value)
+            DB:SetIncomingCastBarIconValue("showSwipe", value)
             FF:SetupIncomingCastIndicators()
             FF:UpdateIncomingCastIndicators()
         end,
@@ -894,9 +936,9 @@ function FF:SetupOptions()
         key = "ShowInSolo",
         name = "Show In Solo",
         default = DB.DEFAULT_SETTINGS.partyFrame.showInSolo,
-        get = function() return PartyFrameProfile().showInSolo end,
+        get = function() return DB:GetPartyFrameDB().showInSolo end,
         set = function(value)
-            PartyFrameProfile().showInSolo = value
+            DB:GetPartyFrameDB().showInSolo = value
             FF:ShowPartyFrameIfNeeded()
         end,
         desc = "Toggle the frame visibility when solo.",
@@ -908,10 +950,10 @@ function FF:SetupOptions()
         name = "Show Title",
         default = DB.DEFAULT_SETTINGS.partyFrame.showTitle,
         get = function() 
-            return PartyFrameProfile().showTitle
+            return DB:GetPartyFrameDB().showTitle
         end,
         set = function(value)
-            PartyFrameProfile().showTitle = value
+            DB:GetPartyFrameDB().showTitle = value
             FF:ShowPartyFrameTitleIfNeeded()
         end,
         desc = "Toggle the title visibility on the frame.",
@@ -936,9 +978,9 @@ function FF:SetupOptions()
         key = "AllowAnyAnchoring",
         name = "Allow Any Anchoring",
         default = DB.DEFAULT_SETTINGS.partyFrame.allowAnyAnchoring,
-        get = function() return PartyFrameProfile().allowAnyAnchoring end,
+        get = function() return DB:GetPartyFrameDB().allowAnyAnchoring end,
         set = function(value)
-            PartyFrameProfile().allowAnyAnchoring = value
+            DB:GetPartyFrameDB().allowAnyAnchoring = value
             FF:SetAllowAnyAnchoring()
         end,
         desc = "By default, Blizzard's party frames will convert anchoring to top-left. This results in always top-left alignment of frames. Enabling this will allow you to use other anchor points such as center, bottom or right. You will need to re-anchor the party frames after changing this setting.",
@@ -964,14 +1006,14 @@ function FF:SetupOptions()
         name = "Use Custom Health Bar Texture",
         default = false,
         get = function()
-            return PartyFrameProfile().useCustomHealthBarTexture == true
+            return DB:GetPartyFrameDB().useCustomHealthBarTexture == true
         end,
         set = function(value)
-            PartyFrameProfile().useCustomHealthBarTexture = value
+            DB:GetPartyFrameDB().useCustomHealthBarTexture = value
             if value then
                 -- Default to first available texture if enabling
-                if not PartyFrameProfile().healthBarTexture and textures[1] then
-                    PartyFrameProfile().healthBarTexture = textures[1].path
+                if not DB:GetPartyFrameDB().healthBarTexture and textures[1] then
+                    DB:GetPartyFrameDB().healthBarTexture = textures[1].path
                 end
             end
             FF:UpdateFrames()
@@ -994,17 +1036,17 @@ function FF:SetupOptions()
         end,
         order = textureOrder,
         get = function()
-            return PartyFrameProfile().healthBarTexture or textures[1].path
+            return DB:GetPartyFrameDB().healthBarTexture or textures[1].path
         end,
         set = function(value)
-            PartyFrameProfile().healthBarTexture = value
+            DB:GetPartyFrameDB().healthBarTexture = value
             FF:UpdateFrames()
         end,
         height = 220, -- scrollable menu
         prefix = PARTY_FRAME_PREFIX,
         parent = useCustomHealthBarTextureElement,
         parentCheck = function()
-            return PartyFrameProfile().useCustomHealthBarTexture == true
+            return DB:GetPartyFrameDB().useCustomHealthBarTexture == true
         end,
     })
 
@@ -1016,9 +1058,9 @@ function FF:SetupOptions()
         key = "ShowTankRoleIcon",
         name = "Show Tank Role Icon",
         default = DB.DEFAULT_SETTINGS.partyFrame.showTankRoleIcon,
-        get = function() return PartyFrameProfile().showTankRoleIcon end,
+        get = function() return DB:GetPartyFrameDB().showTankRoleIcon end,
         set = function(value) 
-            PartyFrameProfile().showTankRoleIcon = value
+            DB:GetPartyFrameDB().showTankRoleIcon = value
             FF:UpdateFrames()
         end,
         desc = "Toggle the Tank role icon visibility on the frame.",
@@ -1029,9 +1071,9 @@ function FF:SetupOptions()
         key = "ShowHealerRoleIcon",
         name = "Show Healer Role Icon",
         default = DB.DEFAULT_SETTINGS.partyFrame.showHealerRoleIcon,
-        get = function() return PartyFrameProfile().showHealerRoleIcon end,
+        get = function() return DB:GetPartyFrameDB().showHealerRoleIcon end,
         set = function(value) 
-            PartyFrameProfile().showHealerRoleIcon = value
+            DB:GetPartyFrameDB().showHealerRoleIcon = value
             FF:UpdateFrames()
         end,
         desc = "Toggle the Healer role icon visibility on the frame.",
@@ -1042,9 +1084,9 @@ function FF:SetupOptions()
         key = "ShowDPSRoleIcon",
         name = "Show DPS Role Icon",
         default = DB.DEFAULT_SETTINGS.partyFrame.showDPSRoleIcon,
-        get = function() return PartyFrameProfile().showDPSRoleIcon end,
+        get = function() return DB:GetPartyFrameDB().showDPSRoleIcon end,
         set = function(value)
-            PartyFrameProfile().showDPSRoleIcon = value
+            DB:GetPartyFrameDB().showDPSRoleIcon = value
             FF:UpdateFrames()
         end,
         desc = "Toggle the DPS role icon visibility on the frame.",
@@ -1061,10 +1103,10 @@ function FF:SetupOptions()
         default = DB.DEFAULT_SETTINGS.playerFrame.showType,
         values = PLAYER_FRAME_SHOW_TYPE_LABELS,
         get = function()
-            return PlayerFrameProfile().showType or DB.DEFAULT_SETTINGS.playerFrame.showType
+            return DB:GetPlayerFrameDB().showType or DB.DEFAULT_SETTINGS.playerFrame.showType
         end,
         set = function(value)
-            PlayerFrameProfile().showType = value
+            DB:GetPlayerFrameDB().showType = value
             self:ShowPlayerFrameIfNeeded()
         end,
         desc = "Control the visibility of the player frame. 'Always' will show the player frame regardless of group status. 'Solo' will only show the player frame when not in a party or raid. 'Never' will hide the player frame regardless of group status.",

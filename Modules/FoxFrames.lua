@@ -203,6 +203,13 @@ function FF:ApplyPlayerStatusAnchorForFrame(frame)
         return
     end
 
+    if not DB:GetPlayerStatusFrameCustomize() then
+        if statusText._ffPointCustomized then
+            Utils:RevertSafeFrameAnchoring(statusText)
+        end
+        return
+    end
+
     local layoutAxis = Blizzard:GetPartyFramesLayoutAxis()
     local point, relativePoint, target, offsetX, offsetY = DB:GetPlayerStatusAnchorsAndOffsets(layoutAxis)
     local relativeTo = frame
@@ -210,8 +217,7 @@ function FF:ApplyPlayerStatusAnchorForFrame(frame)
         relativeTo = frame.healthBar
     end
 
-    statusText:ClearAllPoints()
-    pcall(statusText.SetPoint, statusText, point, relativeTo, relativePoint, offsetX, offsetY)
+    Utils:ApplySafeFrameAnchoring(statusText, point, relativeTo, relativePoint, offsetX, offsetY)
 end
 
 function FF:UpdatePlayerStatusAnchoring()
@@ -297,14 +303,21 @@ function FF:ApplyPlayerNameAnchorForFrame(frame)
         return
     end
 
+    if not DB:GetPlayerNameFrameCustomize() then
+        if nameText._ffPointCustomized then
+            Utils:RevertSafeFrameAnchoring(nameText)
+        end
+        return
+    end
+
     local layoutAxis = Blizzard:GetPartyFramesLayoutAxis()
     local point, relativePoint, target, offsetX, offsetY = DB:GetPlayerNameAnchorsAndOffsets(layoutAxis)
     local relativeTo = frame
     if target == DB.FRAME_ANCHOR_TARGETS.HEALTHBAR and frame.healthBar then
         relativeTo = frame.healthBar
     end
-    pcall(nameText.ClearAllPoints, nameText)
-    pcall(nameText.SetPoint, nameText, point, relativeTo, relativePoint, offsetX, offsetY)
+
+    Utils:ApplySafeFrameAnchoring(nameText, point, relativeTo, relativePoint, offsetX, offsetY)
 end
 
 function FF:UpdatePlayerNameAnchoring()

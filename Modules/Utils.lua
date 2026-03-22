@@ -85,6 +85,184 @@ function Object:GetRect(frame)
     }
 end
 
+local function CapturePointDefaults(frame)
+    if not (frame and frame.GetPoint) then
+        return nil
+    end
+
+    local defaults = {}
+
+    if frame.GetNumPoints then
+        local okNum, numPoints = pcall(frame.GetNumPoints, frame)
+        if okNum and type(numPoints) == "number" and numPoints > 0 then
+            local points = {}
+            for i = 1, numPoints do
+                local okPoint, point, relativeTo, relativePoint, xOfs, yOfs = pcall(frame.GetPoint, frame, i)
+                if okPoint and point then
+                    local args = { n = 5, point, relativeTo, relativePoint, xOfs, yOfs }
+                    points[#points + 1] = args
+                end
+            end
+
+            if #points > 0 then
+                defaults.points = points
+                return defaults
+            end
+        end
+    end
+
+    local okPoint, point, relativeTo, relativePoint, xOfs, yOfs = pcall(frame.GetPoint, frame, 1)
+    if okPoint and point then
+        local args = { n = 5, point, relativeTo, relativePoint, xOfs, yOfs }
+        defaults.points = {
+            args,
+        }
+        return defaults
+    end
+    return nil
+end
+
+local function InstallSafeFrameAnchoringHooks(frame)
+    if type(hooksecurefunc) ~= "function" then
+        return
+    end
+
+    if not (frame and frame.SetPoint and frame.ClearAllPoints) then
+        return
+    end
+
+    if frame._ffSafeAnchoringHooksInstalled == true then
+        return
+    end
+    frame._ffSafeAnchoringHooksInstalled = true
+
+    hooksecurefunc(frame, "ClearAllPoints", function(self)
+        if self._ffSafeAnchoringInternal == true then
+            return
+        end
+
+        local defaults = self._ffPointDefaults
+        if type(defaults) ~= "table" then
+            defaults = {}
+            self._ffPointDefaults = defaults
+        end
+
+        defaults.points = {}
+    end)
+
+    hooksecurefunc(frame, "SetPoint", function(self, ...)
+        if self._ffSafeAnchoringInternal == true then
+            return
+        end
+
+        local defaults = self._ffPointDefaults
+        if type(defaults) ~= "table" then
+            defaults = {}
+            self._ffPointDefaults = defaults
+        end
+
+        if type(defaults.points) ~= "table" then
+            defaults.points = {}
+        end
+
+        local n = select("#", ...)
+        if n <= 0 then
+            return
+        end
+
+        local args = { n = n, ... }
+        local point = args[1]
+        if point == nil then
+            return
+        end
+
+            -- Deduplicate per anchor point, but preserve call order:
+            -- if a point is set again, move it to the end.
+            for i = #defaults.points, 1, -1 do
+                local existing = defaults.points[i]
+                local existingPoint = existing and existing[1]
+                if existingPoint == point then
+                    table.remove(defaults.points, i)
+                end
+            end
+
+            defaults.points[#defaults.points + 1] = args
+
+    end)
+end
+
+function Object:ApplySafeFrameAnchoring(frame, point, relativeTo, relativePoint, offsetX, offsetY)
+    if not (frame and frame.ClearAllPoints and frame.SetPoint) then
+        return false
+    end
+
+    if frame._ffSafeAnchoringHooksInstalled ~= true then
+        local defaults = CapturePointDefaults(frame)
+        if type(defaults) ~= "table" then
+            defaults = {}
+        end
+        if type(defaults.points) ~= "table" then
+            defaults.points = {}
+        end
+        frame._ffPointDefaults = defaults
+        InstallSafeFrameAnchoringHooks(frame)
+    elseif type(frame._ffPointDefaults) ~= "table" then
+        frame._ffPointDefaults = { points = {} }
+    elseif type(frame._ffPointDefaults.points) ~= "table" then
+        frame._ffPointDefaults.points = {}
+    end
+
+    frame._ffPointCustomized = true
+
+    frame._ffSafeAnchoringInternal = true
+    frame:ClearAllPoints()
+
+    local rp = relativePoint or point
+    local x = offsetX or 0
+    local y = offsetY or 0
+
+    if relativeTo ~= nil then
+        frame:SetPoint(point, relativeTo, rp, x, y)
+    else
+        frame:SetPoint(point, x, y)
+    end
+
+    frame._ffSafeAnchoringInternal = false
+
+    return true
+end
+
+function Object:RevertSafeFrameAnchoring(frame)
+    if not (frame and frame.ClearAllPoints and frame.SetPoint) then
+        return false
+    end
+
+    local defaults = frame._ffPointDefaults
+    if defaults == nil then
+        return false
+    end
+
+    local points = type(defaults.points) == "table" and defaults.points or {}
+
+    frame._ffSafeAnchoringInternal = true
+    frame:ClearAllPoints()
+    Object:Log("Reverting to default point for frame", {
+        frame = frame,
+        points = points
+    })
+    for _, args in ipairs(points) do
+        local n = type(args) == "table" and args.n
+        if type(n) == "number" and n > 0 then
+            frame:SetPoint(unpack(args, 1, n))
+        end
+    end
+
+    frame._ffSafeAnchoringInternal = false
+
+    frame._ffPointCustomized = false
+    return true
+end
+
 function Object:ClampNumber(value, minValue, maxValue, fallback)
     local num = value
     if type(num) ~= "number" then

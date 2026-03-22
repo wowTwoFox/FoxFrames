@@ -81,6 +81,7 @@ local defaultSettings = {
                 b = 1,
             },
             useClassColors = false,
+            customizeFrame = true,
             frame = {
                 anchorTarget = frameAnchorTargets.FRAME,
                 position = anchorPoints.CENTER,
@@ -99,6 +100,7 @@ local defaultSettings = {
                 b = 1,
             },
             useClassColors = false,
+            customizeFrame = true,
             frame = {
                 anchorTarget = frameAnchorTargets.FRAME,
                 position = anchorPoints.TOP,
@@ -652,6 +654,21 @@ function Object:GetPlayerStatusAnchorsAndOffsets(layoutAxis)
     return point, relativePoint, target, offsetX, offsetY
 end
 
+function Object:GetPlayerStatusFrameCustomize()
+    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerStatus)
+        or {}
+    local defaultValue = defaults.customizeFrame ~= false
+
+    local profile = self:GetPlayerStatusDB()
+    local value = profile and profile.customizeFrame
+
+    if value == nil then
+        return defaultValue
+    end
+
+    return value == true
+end
+
 function Object:GetPlayerStatusColor()
     local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerStatus) or {}
     local profile = self:GetPlayerStatusDB()
@@ -673,6 +690,21 @@ function Object:GetPlayerNameAnchorsAndOffsets(layoutAxis)
 
     local point, relativePoint, offsetX, offsetY = self:GetFrameAnchorsAndOffsets(profile, defaults, -100, 100, layoutAxis)
     return point, relativePoint, target, offsetX, offsetY
+end
+
+function Object:GetPlayerNameFrameCustomize()
+    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerName)
+        or {}
+    local defaultValue = defaults.customizeFrame ~= false
+
+    local profile = self:GetPlayerNameDB()
+    local value = profile and profile.customizeFrame
+
+    if value == nil then
+        return defaultValue
+    end
+
+    return value == true
 end
 
 function Object:GetPlayerNameColor()
