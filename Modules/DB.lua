@@ -81,7 +81,8 @@ local defaultSettings = {
                 b = 1,
             },
             useClassColors = false,
-            customizeFrame = true,
+            customizeFrame = false,
+            customizeText = false,
             frame = {
                 anchorTarget = frameAnchorTargets.FRAME,
                 position = anchorPoints.CENTER,
@@ -100,7 +101,8 @@ local defaultSettings = {
                 b = 1,
             },
             useClassColors = false,
-            customizeFrame = true,
+            customizeFrame = false,
+            customizeText = false,
             frame = {
                 anchorTarget = frameAnchorTargets.FRAME,
                 position = anchorPoints.TOP,
@@ -669,6 +671,21 @@ function Object:GetPlayerStatusFrameCustomize()
     return value == true
 end
 
+function Object:GetPlayerStatusTextCustomize()
+    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerStatus)
+        or {}
+    local defaultValue = defaults.customizeText ~= false
+
+    local profile = self:GetPlayerStatusDB()
+    local value = profile and profile.customizeText
+
+    if value == nil then
+        return defaultValue
+    end
+
+    return value == true
+end
+
 function Object:GetPlayerStatusColor()
     local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerStatus) or {}
     local profile = self:GetPlayerStatusDB()
@@ -699,6 +716,21 @@ function Object:GetPlayerNameFrameCustomize()
 
     local profile = self:GetPlayerNameDB()
     local value = profile and profile.customizeFrame
+
+    if value == nil then
+        return defaultValue
+    end
+
+    return value == true
+end
+
+function Object:GetPlayerNameTextCustomize()
+    local defaults = (self.DEFAULT_SETTINGS and self.DEFAULT_SETTINGS.partyFrame and self.DEFAULT_SETTINGS.partyFrame.playerName)
+        or {}
+    local defaultValue = defaults.customizeText ~= false
+
+    local profile = self:GetPlayerNameDB()
+    local value = profile and profile.customizeText
 
     if value == nil then
         return defaultValue

@@ -205,7 +205,7 @@ function FF:ApplyPlayerStatusAnchorForFrame(frame)
 
     if not DB:GetPlayerStatusFrameCustomize() then
         if statusText._ffPointCustomized then
-            Utils:RevertSafeFrameAnchoring(statusText)
+            Utils:RevertCustomPoint(statusText)
         end
         return
     end
@@ -217,7 +217,8 @@ function FF:ApplyPlayerStatusAnchorForFrame(frame)
         relativeTo = frame.healthBar
     end
 
-    Utils:ApplySafeFrameAnchoring(statusText, point, relativeTo, relativePoint, offsetX, offsetY)
+    Utils:RevertingClearAllPoints(statusText)
+    Utils:SetRevertingPoint(statusText, point, relativeTo, relativePoint, offsetX, offsetY)
 end
 
 function FF:UpdatePlayerStatusAnchoring()
@@ -237,17 +238,24 @@ function FF:ApplyPlayerStatusColorForFrame(frame)
         return
     end
 
+    if not DB:GetPlayerStatusTextCustomize() then
+        if statusText._ffFontColorCustomized then
+            Utils:RevertCustomFontColor(statusText)
+        end
+        return
+    end
+
     if DB:GetPlayerStatusUseClassColors() then
         local classR, classG, classB = Blizzard:GetClassColorForUnit(frame and frame.unit)
         if classR and classG and classB then
             local _, _, _, alpha = DB:GetPlayerStatusColor()
-            pcall(statusText.SetTextColor, statusText, classR, classG, classB, alpha)
+            Utils:SetRevertingTextColor(statusText, classR, classG, classB, alpha)
             return
         end
     end
 
     local r, g, b, a = DB:GetPlayerStatusColor()
-    pcall(statusText.SetTextColor, statusText, r, g, b, a)
+    Utils:SetRevertingTextColor(statusText, r, g, b, a)
 end
 
 function FF:UpdatePlayerStatusColor()
@@ -305,7 +313,7 @@ function FF:ApplyPlayerNameAnchorForFrame(frame)
 
     if not DB:GetPlayerNameFrameCustomize() then
         if nameText._ffPointCustomized then
-            Utils:RevertSafeFrameAnchoring(nameText)
+            Utils:RevertCustomPoint(nameText)
         end
         return
     end
@@ -317,7 +325,8 @@ function FF:ApplyPlayerNameAnchorForFrame(frame)
         relativeTo = frame.healthBar
     end
 
-    Utils:ApplySafeFrameAnchoring(nameText, point, relativeTo, relativePoint, offsetX, offsetY)
+    Utils:RevertingClearAllPoints(nameText)
+    Utils:SetRevertingPoint(nameText, point, relativeTo, relativePoint, offsetX, offsetY)
 end
 
 function FF:UpdatePlayerNameAnchoring()
@@ -333,17 +342,24 @@ function FF:ApplyPlayerNameColorForFrame(frame)
         return
     end
 
+    if not DB:GetPlayerNameTextCustomize() then
+        if nameText._ffFontColorCustomized then
+            Utils:RevertCustomFontColor(nameText)
+        end
+        return
+    end
+
     if DB:GetPlayerNameUseClassColors() then
         local classR, classG, classB = Blizzard:GetClassColorForUnit(frame and frame.unit)
         if classR and classG and classB then
             local _, _, _, alpha = DB:GetPlayerNameColor()
-            pcall(nameText.SetTextColor, nameText, classR, classG, classB, alpha)
+            Utils:SetRevertingTextColor(nameText, classR, classG, classB, alpha)
             return
         end
     end
 
     local r, g, b, a = DB:GetPlayerNameColor()
-    pcall(nameText.SetTextColor, nameText, r, g, b, a)
+    Utils:SetRevertingTextColor(nameText, r, g, b, a)
 end
 
 function FF:UpdatePlayerNameColor()
@@ -359,11 +375,19 @@ function FF:ApplyPlayerNameFontSizeForFrame(frame)
         return
     end
 
-    local size = DB:GetPlayerNameFontSize()
+    if not DB:GetPlayerNameTextCustomize() then
+        if nameText._ffFontCustomized then
+            Utils:RevertCustomFont(nameText)
+        end
+        return
+    end
 
+    local size = DB:GetPlayerNameFontSize()
     local fontFile, _, flags = nameText:GetFont()
-    if fontFile then
-        pcall(nameText.SetFont, nameText, fontFile, size, flags)
+    if flags ~= nil then
+        Utils:SetRevertingFont(nameText, fontFile, size, flags)
+    else
+        Utils:SetRevertingFont(nameText, fontFile, size)
     end
 end
 
@@ -396,11 +420,19 @@ function FF:ApplyPlayerStatusFontSizeForFrame(frame)
         return
     end
 
-    local size = DB:GetPlayerStatusFontSize()
+    if not DB:GetPlayerStatusTextCustomize() then
+        if fontString._ffFontCustomized then
+            Utils:RevertCustomFont(fontString)
+        end
+        return
+    end
 
+    local size = DB:GetPlayerStatusFontSize()
     local fontFile, _, flags = fontString:GetFont()
-    if fontFile then
-        pcall(fontString.SetFont, fontString, fontFile, size, flags)
+    if flags ~= nil then
+        Utils:SetRevertingFont(fontString, fontFile, size, flags)
+    else
+        Utils:SetRevertingFont(fontString, fontFile, size)
     end
 end
 

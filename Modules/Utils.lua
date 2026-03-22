@@ -176,24 +176,24 @@ local function InstallSafeFrameAnchoringHooks(frame)
             return
         end
 
-            -- Deduplicate per anchor point, but preserve call order:
-            -- if a point is set again, move it to the end.
-            for i = #defaults.points, 1, -1 do
-                local existing = defaults.points[i]
-                local existingPoint = existing and existing[1]
-                if existingPoint == point then
-                    table.remove(defaults.points, i)
-                end
+        -- Deduplicate per anchor point, but preserve call order:
+        -- if a point is set again, move it to the end.
+        for i = #defaults.points, 1, -1 do
+            local existing = defaults.points[i]
+            local existingPoint = existing and existing[1]
+            if existingPoint == point then
+                table.remove(defaults.points, i)
             end
+        end
 
-            defaults.points[#defaults.points + 1] = args
+        defaults.points[#defaults.points + 1] = args
 
     end)
 end
 
-function Object:ApplySafeFrameAnchoring(frame, point, relativeTo, relativePoint, offsetX, offsetY)
-    if not (frame and frame.ClearAllPoints and frame.SetPoint) then
-        return false
+local function EnsureRevertingPointState(frame)
+    if not frame then
+        return
     end
 
     if frame._ffSafeAnchoringHooksInstalled ~= true then
@@ -211,28 +211,247 @@ function Object:ApplySafeFrameAnchoring(frame, point, relativeTo, relativePoint,
     elseif type(frame._ffPointDefaults.points) ~= "table" then
         frame._ffPointDefaults.points = {}
     end
+end
 
-    frame._ffPointCustomized = true
-
-    frame._ffSafeAnchoringInternal = true
-    frame:ClearAllPoints()
-
-    local rp = relativePoint or point
-    local x = offsetX or 0
-    local y = offsetY or 0
-
-    if relativeTo ~= nil then
-        frame:SetPoint(point, relativeTo, rp, x, y)
-    else
-        frame:SetPoint(point, x, y)
+function Object:RevertingClearAllPoints(frame)
+    if not (frame and frame.ClearAllPoints and frame.SetPoint) then
+        return false
     end
 
+    EnsureRevertingPointState(frame)
+
+    frame._ffSafeAnchoringInternal = true
+    local ok = pcall(frame.ClearAllPoints, frame)
     frame._ffSafeAnchoringInternal = false
 
+    if ok then
+        frame._ffPointCustomized = true
+    end
+
+    return ok == true
+end
+
+function Object:SetRevertingPoint(frame, ...)
+    if not (frame and frame.ClearAllPoints and frame.SetPoint) then
+        return false
+    end
+
+    EnsureRevertingPointState(frame)
+
+    frame._ffSafeAnchoringInternal = true
+    local ok = pcall(frame.SetPoint, frame, ...)
+    frame._ffSafeAnchoringInternal = false
+
+    if ok then
+        frame._ffPointCustomized = true
+    end
+
+    return ok == true
+end
+
+local function CaptureFontDefaults(fontString)
+    if not (fontString and fontString.GetFont) then
+        return nil
+    end
+
+    local okFont, fontFile, size, flags = pcall(fontString.GetFont, fontString)
+    if not okFont then
+        return nil
+    end
+
+    local n = flags ~= nil and 3 or 2
+    return { n = n, fontFile, size, flags }
+end
+
+local function CaptureFontColorDefaults(fontString)
+    if not (fontString and fontString.GetTextColor) then
+        return nil
+    end
+
+    local okColor, r, g, b, a = pcall(fontString.GetTextColor, fontString)
+    if not okColor then
+        return nil
+    end
+
+    local n = a ~= nil and 4 or 3
+    return { n = n, r, g, b, a }
+end
+
+local function InstallRevertingFontHooks(fontString)
+    if type(hooksecurefunc) ~= "function" then
+        return
+    end
+
+    if not fontString then
+        return
+    end
+
+    if fontString._ffSafeFontHooksInstalled == true then
+        return
+    end
+    fontString._ffSafeFontHooksInstalled = true
+
+    if not fontString.SetFont then
+        return
+    end
+
+    hooksecurefunc(fontString, "SetFont", function(self, ...)
+        if self._ffSafeFontInternal == true then
+            return
+        end
+        local n = select("#", ...)
+        if n < 2 then
+            return
+        end
+
+        self._ffFontDefaults = { n = n, ... }
+    end)
+
+    hooksecurefunc(fontString, "SetFontHeight", function(self, ...)
+        if self._ffSafeFontInternal == true then
+            return
+        end
+
+        if self.GetFont then
+            local defaults = CaptureFontDefaults(self)
+            if type(defaults) == "table" then
+                self._ffFontDefaults = defaults
+            end
+        end
+    end)
+end
+
+local function InstallRevertingFontColorHooks(fontString)
+    if type(hooksecurefunc) ~= "function" then
+        return
+    end
+
+    if not fontString then
+        return
+    end
+
+    if fontString._ffSafeFontColorHooksInstalled == true then
+        return
+    end
+    fontString._ffSafeFontColorHooksInstalled = true
+
+    if not fontString.SetTextColor then
+        return
+    end
+
+    hooksecurefunc(fontString, "SetTextColor", function(self, ...)
+        if self._ffSafeFontInternal == true then
+            return
+        end
+
+        local n = select("#", ...)
+        if n <= 0 then
+            return
+        end
+
+        self._ffFontColorDefaults = { n = n, ... }
+    end)
+end
+
+function Object:SetRevertingFont(fontString, ...)
+    if not (fontString and fontString.SetFont) then
+        return false
+    end
+
+    if fontString._ffSafeFontHooksInstalled ~= true then
+        if fontString.GetFont then
+            local defaults = CaptureFontDefaults(fontString)
+            if type(defaults) == "table" then
+                fontString._ffFontDefaults = defaults
+            end
+        end
+        InstallRevertingFontHooks(fontString)
+    end
+
+    fontString._ffSafeFontInternal = true
+    local ok = pcall(fontString.SetFont, fontString, ...)
+    fontString._ffSafeFontInternal = false
+
+    if ok then
+        fontString._ffFontCustomized = true
+    end
+
+    return ok == true
+end
+
+function Object:RevertCustomFont(fontString)
+    if not (fontString and fontString.SetFont) then
+        return false
+    end
+
+    local args = fontString._ffFontDefaults
+    if type(args) ~= "table" then
+        return false
+    end
+
+    local n = args.n
+    if type(n) ~= "number" or n <= 0 then
+        return false
+    end
+
+    fontString._ffSafeFontInternal = true
+    pcall(fontString.SetFont, fontString, unpack(args, 1, n))
+    fontString._ffSafeFontInternal = false
+
+    fontString._ffFontCustomized = false
     return true
 end
 
-function Object:RevertSafeFrameAnchoring(frame)
+function Object:SetRevertingTextColor(fontString, ...)
+    if not (fontString and fontString.SetTextColor) then
+        return false
+    end
+
+    if fontString._ffSafeFontColorHooksInstalled ~= true then
+        if fontString.GetTextColor then
+            local defaults = CaptureFontColorDefaults(fontString)
+            if type(defaults) == "table" then
+                fontString._ffFontColorDefaults = defaults
+            end
+        end
+        InstallRevertingFontColorHooks(fontString)
+    end
+
+    fontString._ffSafeFontInternal = true
+    local ok = pcall(fontString.SetTextColor, fontString, ...)
+    fontString._ffSafeFontInternal = false
+
+    if ok then
+        fontString._ffFontColorCustomized = true
+    end
+
+    return ok == true
+end
+
+function Object:RevertCustomFontColor(fontString)
+    if not (fontString and fontString.SetTextColor) then
+        return false
+    end
+
+    local args = fontString._ffFontColorDefaults
+    if type(args) ~= "table" then
+        return false
+    end
+
+    local n = args.n
+    if type(n) ~= "number" or n <= 0 then
+        return false
+    end
+
+    fontString._ffSafeFontInternal = true
+    pcall(fontString.SetTextColor, fontString, unpack(args, 1, n))
+    fontString._ffSafeFontInternal = false
+
+    fontString._ffFontColorCustomized = false
+    return true
+end
+
+function Object:RevertCustomPoint(frame)
     if not (frame and frame.ClearAllPoints and frame.SetPoint) then
         return false
     end

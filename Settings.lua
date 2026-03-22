@@ -568,6 +568,40 @@ local function CreatePlayerStatusSettings(rootCategory, partyFramePrefix)
         name = "Text",
     })
 
+    do
+        local pathParts = NormalizePath("partyFrame.playerStatus")
+        local defaults = GetDefaultsTableAtPath(pathParts)
+        local defaultCustomize = defaults.customizeText ~= false
+
+        local function Profile()
+            return GetProfileTableAtPath(pathParts)
+        end
+
+        SettingsLib:CreateCheckbox(statusTextCategory, {
+            key = "PlayerStatusTextCustomize",
+            name = "Customize",
+            default = defaultCustomize,
+            get = function()
+                local profile = Profile()
+                local value = profile and profile.customizeText
+                if value == nil then
+                    return defaultCustomize
+                end
+                return value == true
+            end,
+            set = function(value)
+                local profile = Profile()
+                if profile then
+                    profile.customizeText = value == true
+                end
+                FF:UpdatePlayerStatusFontSize()
+                FF:UpdatePlayerStatusColor()
+            end,
+            desc = "Toggle FoxFrames text customization for Player Status.",
+            prefix = partyFramePrefix,
+        })
+    end
+
     AddTextSettings("partyFrame.playerStatus", statusTextCategory, "PlayerStatus", partyFramePrefix, function(settingKey)
         if settingKey == "fontSize" then
             FF:UpdatePlayerStatusFontSize()
@@ -624,6 +658,40 @@ local function CreatePlayerNameSettings(rootCategory, partyFramePrefix)
     SettingsLib:CreateHeader(playerNameCategory, {
         name = "Text",
     })
+
+    do
+        local pathParts = NormalizePath("partyFrame.playerName")
+        local defaults = GetDefaultsTableAtPath(pathParts)
+        local defaultCustomize = defaults.customizeText ~= false
+
+        local function Profile()
+            return GetProfileTableAtPath(pathParts)
+        end
+
+        SettingsLib:CreateCheckbox(playerNameCategory, {
+            key = "PlayerNameTextCustomize",
+            name = "Customize",
+            default = defaultCustomize,
+            get = function()
+                local profile = Profile()
+                local value = profile and profile.customizeText
+                if value == nil then
+                    return defaultCustomize
+                end
+                return value == true
+            end,
+            set = function(value)
+                local profile = Profile()
+                if profile then
+                    profile.customizeText = value == true
+                end
+                FF:UpdatePlayerNameFontSize()
+                FF:UpdatePlayerNameColor()
+            end,
+            desc = "Toggle FoxFrames text customization for Player Name.",
+            prefix = partyFramePrefix,
+        })
+    end
 
     AddTextSettings("partyFrame.playerName", playerNameCategory, "PlayerName", partyFramePrefix, function(settingKey)
         if settingKey == "fontSize" then
