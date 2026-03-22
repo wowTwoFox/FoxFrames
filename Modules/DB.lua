@@ -82,7 +82,7 @@ local defaultSettings = {
             },
             useClassColors = false,
             customizeFrame = false,
-            customizeText = false,
+            customizeText = true,
             frame = {
                 anchorTarget = frameAnchorTargets.FRAME,
                 position = anchorPoints.CENTER,
@@ -101,7 +101,7 @@ local defaultSettings = {
                 b = 1,
             },
             useClassColors = false,
-            customizeFrame = false,
+            customizeFrame = true,
             customizeText = false,
             frame = {
                 anchorTarget = frameAnchorTargets.FRAME,
@@ -121,8 +121,8 @@ local defaultSettings = {
             anchorTarget = frameAnchorTargets.HEALTHBAR,
             position = anchorPoints.BOTTOMLEFT,
             anchorMode = anchorModes.INSIDE,
-            offsetX = 2,
-            offsetY = 2,
+            offsetX = 0,
+            offsetY = 0,
             useRelativeOffsets = true,
         },
         growthDirection = growthDirections.RIGHT,
