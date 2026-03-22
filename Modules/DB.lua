@@ -1272,12 +1272,44 @@ function Object:MigrateAndSanitizeDB()
     end
 end
 
-function Object:InitializeDB()
+function Object:SetProfile(profileName)
+    local profiles = self.db:GetProfiles()
+    if type(profiles) ~= "table" then
+        Utils:Log("ERROR: No Profiles")
+        return false
+    end
+
+    local previousProfileName = self.db:GetCurrentProfile()
+    -- Ensure the previous profile exists as an actual stored table so CopyProfile
+    -- can read from it.
+    local _ = self.db.profile
+
+    local profileStore = self.db.profiles
+    local profileAlreadyExists = profileStore and rawget(profileStore, profileName) ~= nil
+
+    self.db:SetProfile(profileName)
+
+    if not profileAlreadyExists then
+        -- Ensure the new profile table is created before we copy into it.
+        local _ = self.db.profile
+        if type(previousProfileName) == "string" and previousProfileName ~= profileName then
+            self.db:CopyProfile(previousProfileName, true)
+        end
+    end
+
+    Utils:Log("Current profile", self.db:GetCurrentProfile())
+    self:MigrateAndSanitizeDB()
+    return true
+end
+
+function Object:InitializeDB(profileName)
     local defaults = {
         profile = self.DEFAULT_SETTINGS or {},
     }
 
-    self.db = LibStub("AceDB-3.0"):New("FoxFramesDB", defaults, true)
+    local resolvedProfileName = profileName or true
+    self.db = LibStub("AceDB-3.0"):New("FoxFramesDB", defaults, resolvedProfileName)
+    Utils:Log("Current profile", self.db:GetCurrentProfile())
     self:MigrateAndSanitizeDB()
 end
 

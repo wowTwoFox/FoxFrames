@@ -1,6 +1,7 @@
 local addonName, addon = ...
 
 local Constants = addon.Constants
+local Utils = addon.Utils
 
 local Object = {}
 Object.__index = Object
@@ -142,6 +143,90 @@ function Object:GetClassColorForUnit(unit)
     end
 
     return nil
+end
+
+local function GetBuiltInEditModeLayoutName(layoutIndex)
+    if layoutIndex == 1 then
+        return rawget(_G, "LAYOUT_STYLE_MODERN") or "Modern"
+    end
+    if layoutIndex == 2 then
+        return rawget(_G, "LAYOUT_STYLE_CLASSIC") or "Classic"
+    end
+    return nil
+end
+
+function Object:GetCurrentEditModeLayoutIndex()
+    if not (C_EditMode and C_EditMode.GetLayouts) then
+        return nil
+    end
+
+    local ok, layouts = pcall(C_EditMode.GetLayouts)
+    if not ok or type(layouts) ~= "table" then
+        return nil
+    end
+
+    local index = layouts.activeLayout
+    if type(index) ~= "number" then
+        return nil
+    end
+
+    return index
+end
+
+function Object:GetEditModeLayout(layoutIndex)
+    if type(layoutIndex) ~= "number" then
+        return nil
+    end
+
+    local builtInName = GetBuiltInEditModeLayoutName(layoutIndex)
+    if builtInName then
+        return {
+            layoutIndex = layoutIndex,
+            layoutName = builtInName,
+        }
+    end
+
+    if not (C_EditMode and C_EditMode.GetLayouts) then
+        return nil
+    end
+
+    local ok, layouts = pcall(C_EditMode.GetLayouts)
+    if not ok or type(layouts) ~= "table" then
+        return nil
+    end
+
+    Utils:Log("Layouts", layouts)
+
+    local customIndex = layoutIndex - 2
+    return layouts.layouts and layouts.layouts[customIndex]
+end
+
+function Object:GetCurrentEditModeLayout()
+    if not (C_EditMode and C_EditMode.GetLayouts) then
+        return nil
+    end
+
+    local ok, layouts = pcall(C_EditMode.GetLayouts)
+    if not ok or type(layouts) ~= "table" then
+        return nil
+    end
+
+    if type(layouts.activeLayout) ~= "number" then
+        return nil
+    end
+
+    local builtInName = GetBuiltInEditModeLayoutName(layouts.activeLayout)
+    if builtInName then
+        return {
+            layoutIndex = layouts.activeLayout,
+            layoutName = builtInName,
+        }
+    end
+
+    Utils:Log("Layouts", layouts)
+
+    local customIndex = layouts.activeLayout - 2
+    return layouts.layouts and layouts.layouts[customIndex]
 end
 
 addon.Blizzard = Object:New()

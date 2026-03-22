@@ -3,6 +3,7 @@ local addonName, addon = ...
 local FF = FoxFrames
 local Utils = addon.Utils
 local DB = addon.DB
+local Blizzard = addon.Blizzard
 
 -- PartyFrame layout updates can end up triggering Blizzard's GridLayout/Layouts while
 -- some values are "secret" (e.g. during combat / edit mode) which then throws inside
@@ -121,6 +122,18 @@ local function GroupChangeEvent(event, ...)
     end
 end
 
+local function GetProfileNameFromLayout(layout)
+    if type(layout) ~= "table" then
+        return nil
+    end
+
+    if type(layout.layoutName) ~= "string" then
+        return nil
+    end
+
+    return "Layout: " .. layout.layoutName
+end
+
 function FF:ADDON_ACTION_BLOCKED(event, blockedAddon, blockedFunction)
     Utils:LogBlockedAddon(event, blockedAddon, blockedFunction)
 end
@@ -142,8 +155,12 @@ function FF:OnInitialize()
     self:RegisterEvent("ADDON_ACTION_BLOCKED")
     self:RegisterEvent("ADDON_ACTION_FORBIDDEN")
 
-    DB:InitializeDB()
+    local layout = Blizzard:GetCurrentEditModeLayout()
+    local profileName = GetProfileNameFromLayout(layout)
+    DB:InitializeDB(profileName)
+
     self.DEFAULT_SETTINGS = DB.DEFAULT_SETTINGS
+    -- DB:SetProfile("Layout: " .. layoutName)
 
     -- Register Custom Textures with LSM if available
     RegisterLSMTextures()
@@ -224,6 +241,9 @@ function FF:OnEnable()
     self:RegisterEvent("PLAYER_FOCUS_CHANGED", ReassertPlayerFrameVisibility)
     self:RegisterEvent("UNIT_ENTERED_VEHICLE", ReassertPlayerFrameVisibility)
     self:RegisterEvent("UNIT_EXITED_VEHICLE", ReassertPlayerFrameVisibility)
+
+    -- Switch DB profiles based on the active Edit Mode layout.
+    self:RegisterEvent("EDIT_MODE_LAYOUTS_UPDATED")
     self:RegisterIncomingCastUnitEvents()
 
     -- Register internal messages
@@ -236,6 +256,20 @@ function FF:OnEnable()
     hooksecurefunc("CompactUnitFrame_UpdateRoleIcon", function(frame)
         self:UpdateRoleIcon(frame)
     end)
+end
+
+function FF:EDIT_MODE_LAYOUTS_UPDATED()
+    local layout = Blizzard:GetCurrentEditModeLayout()
+    local profileName = GetProfileNameFromLayout(layout)
+    if not profileName then
+        Utils:Log("Could not determine profile name from layout, skipping profile switch", {
+            layout = layout,
+        })
+        return
+    end
+
+    DB:SetProfile(profileName)
+    self:SetupFrames()
 end
 
 function FF:PLAYER_REGEN_ENABLED()
