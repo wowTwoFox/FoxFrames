@@ -1272,14 +1272,34 @@ function Object:MigrateAndSanitizeDB()
     end
 end
 
-function Object:SetProfile(profileName)
-    local profiles = self.db:GetProfiles()
-    if type(profiles) ~= "table" then
-        Utils:Log("ERROR: No Profiles")
-        return false
+function Object:SetProfile(profileName, options)
+    local previousProfileName = self.db:GetCurrentProfile()
+    if previousProfileName == profileName then
+        -- Touch the profile table so callers can safely mutate nested fields.
+        local _ = self.db.profile
+
+        -- Keep the profile list clean once we're not using AceDB's "Default" profile.
+        if self.db:GetCurrentProfile() ~= "Default" then
+            local profiles = self.db.profiles
+            if type(profiles) == "table" and rawget(profiles, "Default") ~= nil then
+                self.db:DeleteProfile("Default", true)
+            end
+        end
+        return true
     end
 
-    local previousProfileName = self.db:GetCurrentProfile()
+    local copyOnCreate = true
+    local copyFromProfileName = nil
+    if type(options) == "table" then
+        if options.copyOnCreate ~= nil then
+            copyOnCreate = options.copyOnCreate == true
+        end
+
+        if type(options.copyFromProfileName) == "string" and options.copyFromProfileName ~= "" then
+            copyFromProfileName = options.copyFromProfileName
+        end
+    end
+
     -- Ensure the previous profile exists as an actual stored table so CopyProfile
     -- can read from it.
     local _ = self.db.profile
@@ -1292,24 +1312,94 @@ function Object:SetProfile(profileName)
     if not profileAlreadyExists then
         -- Ensure the new profile table is created before we copy into it.
         local _ = self.db.profile
-        if type(previousProfileName) == "string" and previousProfileName ~= profileName then
-            self.db:CopyProfile(previousProfileName, true)
+
+        if copyOnCreate then
+            local sourceProfileName = copyFromProfileName or previousProfileName
+            if type(sourceProfileName) == "string" and sourceProfileName ~= "" and sourceProfileName ~= profileName then
+                self.db:CopyProfile(sourceProfileName, true)
+            end
         end
     end
 
-    Utils:Log("Current profile", self.db:GetCurrentProfile())
+    Utils:Log("FF_SET_PROFILE", self.db:GetCurrentProfile())
+    self:MigrateAndSanitizeDB()
+
+    -- Layout profiles are created automatically; remove AceDB's "Default" profile to keep
+    -- the profile manager clean once we've switched away from it.
+    if self.db:GetCurrentProfile() ~= "Default" then
+        local profiles = self.db.profiles
+        if type(profiles) == "table" and rawget(profiles, "Default") ~= nil then
+            self.db:DeleteProfile("Default", true)
+        end
+    end
+    return true
+end
+
+function Object:ResetProfile(options)
+    assert(self and self.db, "FoxFrames: DB not initialized")
+
+    local noChildren = nil
+    local noCallbacks = nil
+    if type(options) == "table" then
+        if options.noChildren ~= nil then
+            noChildren = options.noChildren == true
+        end
+        if options.noCallbacks ~= nil then
+            noCallbacks = options.noCallbacks == true
+        end
+    end
+
+    -- Ensure the active profile table exists before AceDB mutates it.
+    local _ = self.db.profile
+
+    self.db:ResetProfile(noChildren, noCallbacks)
+    Utils:Log("FF_RESET_PROFILE", self.db:GetCurrentProfile())
     self:MigrateAndSanitizeDB()
     return true
 end
 
-function Object:InitializeDB(profileName)
+function Object:CopyProfile(sourceProfileName, options)
+    assert(self and self.db, "FoxFrames: DB not initialized")
+
+    if type(sourceProfileName) ~= "string" or sourceProfileName == "" then
+        return false
+    end
+
+    local currentProfileName = self.db:GetCurrentProfile()
+    if sourceProfileName == currentProfileName then
+        return false
+    end
+
+    local silent = true
+    if type(options) == "table" and options.silent ~= nil then
+        silent = options.silent == true
+    end
+
+    -- Avoid AceDB's silent mode resetting to defaults when the source profile doesn't exist.
+    local profileStore = self.db.profiles
+    if not (profileStore and rawget(profileStore, sourceProfileName) ~= nil) then
+        return false
+    end
+
+    -- Ensure the active profile table exists before AceDB resets/copies into it.
+    local _ = self.db.profile
+
+    self.db:CopyProfile(sourceProfileName, silent == true)
+    Utils:Log("FF_COPY_PROFILE", {
+        from = sourceProfileName,
+        to = self.db:GetCurrentProfile(),
+    })
+    self:MigrateAndSanitizeDB()
+    return true
+end
+
+function Object:InitializeDB()
     local defaults = {
         profile = self.DEFAULT_SETTINGS or {},
     }
 
-    local resolvedProfileName = profileName or true
-    self.db = LibStub("AceDB-3.0"):New("FoxFramesDB", defaults, resolvedProfileName)
-    Utils:Log("Current profile", self.db:GetCurrentProfile())
+    self.db = LibStub("AceDB-3.0"):New("FoxFramesDB", defaults, true)
+    Utils:Log("FF_LOADED_PROFILE", self.db:GetCurrentProfile())
     self:MigrateAndSanitizeDB()
 end
 

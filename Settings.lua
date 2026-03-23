@@ -2,10 +2,14 @@ local addonName, addon = ...
 local FF = FoxFrames
 local Utils = addon.Utils
 local DB = addon.DB
+local GlobalsDB = addon.GlobalsDB
+local ProfilesSettings = addon.SettingsProfiles
 local Constants = addon.Constants
 
 local SettingsLib = LibStub("LibEQOLSettingsMode-1.0")
 local SETTINGS_PREFIX = "FoxFrames_"
+
+assert(ProfilesSettings and ProfilesSettings.CreateProfilesSettings, "FoxFrames: SettingsProfiles module missing (load order issue)")
 
 local ANCHOR_POINT_LABELS = {
     [Constants.ANCHOR_POINTS.TOPLEFT] = "Top Left",
@@ -1181,6 +1185,11 @@ function FF:SetupOptions()
         prefix = PARTY_FRAME_PREFIX
     })
 
+    ProfilesSettings:CreateProfilesSettings(rootCategory, {
+        onProfileActivated = function()
+            self:SetupFrames()
+        end,
+    })
     CreatePlayerStatusSettings(rootCategory, PARTY_FRAME_PREFIX)
     CreatePlayerNameSettings(rootCategory, PARTY_FRAME_PREFIX)
     CreateBuffsSettings(rootCategory, PARTY_FRAME_PREFIX)

@@ -3,6 +3,7 @@ local addonName, addon = ...
 local FF = FoxFrames
 local Utils = addon.Utils
 local DB = addon.DB
+local GlobalsDB = addon.GlobalsDB
 local Blizzard = addon.Blizzard
 
 -- PartyFrame layout updates can end up triggering Blizzard's GridLayout/Layouts while
@@ -155,9 +156,11 @@ function FF:OnInitialize()
     self:RegisterEvent("ADDON_ACTION_BLOCKED")
     self:RegisterEvent("ADDON_ACTION_FORBIDDEN")
 
-    local layout = Blizzard:GetCurrentEditModeLayout()
-    local profileName = GetProfileNameFromLayout(layout)
-    DB:InitializeDB(profileName)
+    -- Load the main DB first with its normal/default profile selection.
+    DB:InitializeDB()
+
+    -- Then load GlobalsDB so we can decide whether to apply layout-based profiles.
+    GlobalsDB:InitializeDB()
 
     self.DEFAULT_SETTINGS = DB.DEFAULT_SETTINGS
     -- DB:SetProfile("Layout: " .. layoutName)
@@ -223,8 +226,6 @@ function FF:OnInitialize()
 
     -- Setup options
     self:SetupOptions()
-    self:SetupFrames()
-    -- Utils:Log("FOX_FRAMES_LOADED", FF)
 end
 
 function FF:OnEnable()
@@ -256,6 +257,14 @@ function FF:OnEnable()
     hooksecurefunc("CompactUnitFrame_UpdateRoleIcon", function(frame)
         self:UpdateRoleIcon(frame)
     end)
+
+    -- The active Edit Mode layout can still be stale during OnInitialize().
+    -- Apply the layout-based profile here (PLAYER_LOGIN timing) so the correct
+    -- layout/profile is selected on load even if EDIT_MODE_LAYOUTS_UPDATED fired
+    -- before we registered for it.
+    self:EDIT_MODE_LAYOUTS_UPDATED()
+    self:SetupFrames()
+    -- Utils:Log("FOX_FRAMES_LOADED", FF)
 end
 
 function FF:EDIT_MODE_LAYOUTS_UPDATED()

@@ -464,22 +464,42 @@ function Object:RevertCustomPoint(frame)
     local points = type(defaults.points) == "table" and defaults.points or {}
 
     frame._ffSafeAnchoringInternal = true
-    frame:ClearAllPoints()
+
+    local allOk = true
+    local okClear = pcall(frame.ClearAllPoints, frame)
+    if not okClear then
+        frame._ffSafeAnchoringInternal = false
+        return false
+    end
+
     Object:Log("Reverting to default point for frame", {
         frame = frame,
         points = points
     })
-    for _, args in ipairs(points) do
+
+    for i, args in ipairs(points) do
         local n = type(args) == "table" and args.n
         if type(n) == "number" and n > 0 then
-            frame:SetPoint(unpack(args, 1, n))
+            local okPoint, err = pcall(frame.SetPoint, frame, unpack(args, 1, n))
+            if not okPoint then
+                allOk = false
+                Object:Log("ERROR: SetPoint", {
+                    frame = frame,
+                    index = i,
+                    args = args,
+                    error = err,
+                })
+            end
         end
     end
 
     frame._ffSafeAnchoringInternal = false
 
-    frame._ffPointCustomized = false
-    return true
+    if allOk then
+        frame._ffPointCustomized = false
+    end
+
+    return allOk
 end
 
 function Object:ClampNumber(value, minValue, maxValue, fallback)

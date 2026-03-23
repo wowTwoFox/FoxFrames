@@ -1,0 +1,11 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+	<Frame name="FoxFrames_SettingsRowTemplate"
+		inherits="SettingsListElementTemplate"
+		mixin="FoxFrames_SettingsRowMixin"
+		virtual="true">
+		<Size x="1" y="26"/>
+		<Scripts>
+			<OnLoad method="OnLoad"/>
+		</Scripts>
+	</Frame>
+</Ui>

@@ -223,8 +223,6 @@ function Object:GetCurrentEditModeLayout()
         }
     end
 
-    Utils:Log("Layouts", layouts)
-
     local customIndex = layouts.activeLayout - 2
     return layouts.layouts and layouts.layouts[customIndex]
 end

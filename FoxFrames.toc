@@ -4,7 +4,7 @@
 ## Author: Fantastifox
 ## Version: 1.0.8
 ## IconTexture: Interface\AddOns\FoxFrames\icon.png
-## SavedVariables: FoxFramesDB
+## SavedVariables: FoxFramesDB, FoxFramesGlobalsDB
 ## OptionalDeps: Ace3, LibEQOL, LibSharedMedia-3.0
 ## X-Embeds: Ace3, LibEQOL, LibSharedMedia-3.0
 ## X-Curse-Project-ID: 1482279
@@ -32,10 +32,18 @@ Modules\Utils.lua
 Modules\BlizzardSettings.lua
 Modules\Blizzard.lua
 Modules\DB.lua
+Modules\GlobalsDB.lua
 Modules\FoxFrames.lua
 Modules\IncomingCasts.lua
 Modules\SpellIcon.lua
 Modules\SpellBar.lua
 Modules\IncomingCastsPreview.lua
-Core.lua
+Modules\Settings\Profiles.lua
+Modules\Settings\SettingsButton.lua
+Modules\Settings\SettingsButton.xml
+Modules\Settings\SettingsComponentBuilder.lua
+Modules\Settings\SettingsFlow.lua
+Modules\Settings\SettingsRow.lua
+Modules\Settings\SettingsRow.xml
 Settings.lua
+Core.lua
