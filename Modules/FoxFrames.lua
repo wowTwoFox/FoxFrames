@@ -5,33 +5,6 @@ local FF = FoxFrames
 local Utils = addon.Utils
 local Blizzard = addon.Blizzard
 local DB = addon.DB
-local Constants = addon.Constants
-
-local function GetStatusBarTexturePath(healthBar)
-    if not (healthBar and healthBar.GetStatusBarTexture) then
-        return nil
-    end
-
-    local textureObject = healthBar:GetStatusBarTexture()
-    if not (textureObject and textureObject.GetTexture) then
-        return nil
-    end
-
-    local ok, textureRef = pcall(textureObject.GetTexture, textureObject)
-    if not ok then
-        return nil
-    end
-
-    if type(textureRef) == "number" then
-        return textureRef
-    end
-
-    if type(textureRef) == "string" and textureRef ~= "" then
-        return textureRef
-    end
-
-    return nil
-end
 
 function FF:InAllowedGroup()
     if Blizzard:InRaidGroup() then return true end
@@ -117,7 +90,7 @@ function FF:ApplyAuraCountdownFontSizeToCooldown(cooldown, fontSize)
 
     local size = fontSize
     if type(size) ~= "number" then
-        size = DB:GetAuraCountdownFontSize()
+        return
     end
 
     pcall(fontString.SetFont, fontString, fontFile, size, flags)
@@ -198,27 +171,35 @@ function FF:UpdateAuraCountdownColor()
 end
 
 function FF:ApplyPlayerStatusAnchorForFrame(frame)
-    local statusText = frame and frame.statusText
-    if not (statusText and statusText.ClearAllPoints and statusText.SetPoint) then
+    local fontString = Utils:EnsureFontString(frame and frame.statusText)
+    if not (fontString and fontString.ClearAllPoints and fontString.SetPoint) then
         return
     end
 
-    if not DB:GetPlayerStatusFrameCustomize() then
-        if statusText._ffPointCustomized then
-            Utils:RevertCustomPoint(statusText)
+    local useRaidOverride = Blizzard:InRaidGroup() and DB:GetRaidPlayerStatusFrameOverrideEnabled()
+
+    if not (useRaidOverride or DB:GetPlayerStatusFrameCustomize()) then
+        if fontString._ffPointCustomized then
+            Utils:RevertCustomPoint(fontString)
         end
         return
     end
 
     local layoutAxis = Blizzard:GetPartyFramesLayoutAxis()
-    local point, relativePoint, target, offsetX, offsetY = DB:GetPlayerStatusAnchorsAndOffsets(layoutAxis)
+    local point, relativePoint, target, offsetX, offsetY
+    if useRaidOverride then
+        point, relativePoint, target, offsetX, offsetY = DB:GetRaidPlayerStatusAnchorsAndOffsets(layoutAxis)
+    else
+        point, relativePoint, target, offsetX, offsetY = DB:GetPlayerStatusAnchorsAndOffsets(layoutAxis)
+    end
+
     local relativeTo = frame
     if target == DB.FRAME_ANCHOR_TARGETS.HEALTHBAR and frame.healthBar then
         relativeTo = frame.healthBar
     end
 
-    Utils:RevertingClearAllPoints(statusText)
-    Utils:SetRevertingPoint(statusText, point, relativeTo, relativePoint, offsetX, offsetY)
+    Utils:RevertingClearAllPoints(fontString)
+    Utils:SetRevertingPoint(fontString, point, relativeTo, relativePoint, offsetX, offsetY)
 end
 
 function FF:UpdatePlayerStatusAnchoring()
@@ -228,30 +209,43 @@ function FF:UpdatePlayerStatusAnchoring()
 end
 
 function FF:ApplyPlayerStatusColorForFrame(frame)
-    local statusText = frame and frame.statusText
-
-    if not (statusText and statusText.SetTextColor) then
+    local fontString = Utils:EnsureFontString(frame and frame.statusText)
+    if not (fontString and fontString.SetTextColor) then
         return
     end
 
-    if not DB:GetPlayerStatusTextCustomize() then
-        if statusText._ffFontColorCustomized then
-            Utils:RevertCustomFontColor(statusText)
+    local useRaidOverride = Blizzard:InRaidGroup() and DB:GetRaidPlayerStatusTextOverrideEnabled()
+    local customizeText = useRaidOverride or DB:GetPlayerStatusTextCustomize()
+
+    if not customizeText then
+        if fontString._ffFontColorCustomized then
+            Utils:RevertCustomFontColor(fontString)
         end
         return
     end
 
-    if DB:GetPlayerStatusUseClassColors() then
+    local useClassColors = useRaidOverride and DB:GetRaidPlayerStatusUseClassColors() or DB:GetPlayerStatusUseClassColors()
+    if useClassColors then
         local classR, classG, classB = Blizzard:GetClassColorForUnit(frame and frame.unit)
         if classR and classG and classB then
-            local _, _, _, alpha = DB:GetPlayerStatusColor()
-            Utils:SetRevertingTextColor(statusText, classR, classG, classB, alpha)
+            local _, _, _, alpha
+            if useRaidOverride then
+                _, _, _, alpha = DB:GetRaidPlayerStatusColor()
+            else
+                _, _, _, alpha = DB:GetPlayerStatusColor()
+            end
+            Utils:SetRevertingTextColor(fontString, classR, classG, classB, alpha)
             return
         end
     end
 
-    local r, g, b, a = DB:GetPlayerStatusColor()
-    Utils:SetRevertingTextColor(statusText, r, g, b, a)
+    local r, g, b, a
+    if useRaidOverride then
+        r, g, b, a = DB:GetRaidPlayerStatusColor()
+    else
+        r, g, b, a = DB:GetPlayerStatusColor()
+    end
+    Utils:SetRevertingTextColor(fontString, r, g, b, a)
 end
 
 function FF:UpdatePlayerStatusColor()
@@ -272,53 +266,37 @@ function FF:ApplyPlayerStatusSettings()
     end
 end
 
-function FF:GetPlayerNameFontString(frame)
-    local nameText = frame and frame.name
-    if not nameText then
-        return nil
-    end
-
-    if nameText.IsObjectType then
-        local ok, isFontString = pcall(nameText.IsObjectType, nameText, "FontString")
-        if ok and isFontString then
-            return nameText
-        end
-
-        return nil
-    end
-
-    if nameText.GetObjectType then
-        local ok, objectType = pcall(nameText.GetObjectType, nameText)
-        if ok and objectType == "FontString" then
-            return nameText
-        end
-    end
-
-    return nil
-end
-
 function FF:ApplyPlayerNameAnchorForFrame(frame)
-    local nameText = self:GetPlayerNameFontString(frame)
-    if not (nameText and nameText.ClearAllPoints and nameText.SetPoint) then
+    local fontString = Utils:EnsureFontString(frame and frame.name)
+    if not (fontString and fontString.ClearAllPoints and fontString.SetPoint) then
+        Utils:Log("ERROR: NOT_VALID_FRAME", frame)
         return
     end
 
-    if not DB:GetPlayerNameFrameCustomize() then
-        if nameText._ffPointCustomized then
-            Utils:RevertCustomPoint(nameText)
+    local useRaidOverride = Blizzard:InRaidGroup() and DB:GetRaidPlayerNameFrameOverrideEnabled()
+
+    if not (useRaidOverride or DB:GetPlayerNameFrameCustomize()) then
+        if fontString._ffPointCustomized then
+            Utils:RevertCustomPoint(fontString)
         end
         return
     end
 
     local layoutAxis = Blizzard:GetPartyFramesLayoutAxis()
-    local point, relativePoint, target, offsetX, offsetY = DB:GetPlayerNameAnchorsAndOffsets(layoutAxis)
+    local point, relativePoint, target, offsetX, offsetY
+    if useRaidOverride then
+        point, relativePoint, target, offsetX, offsetY = DB:GetRaidPlayerNameAnchorsAndOffsets(layoutAxis)
+    else
+        point, relativePoint, target, offsetX, offsetY = DB:GetPlayerNameAnchorsAndOffsets(layoutAxis)
+    end
+
     local relativeTo = frame
     if target == DB.FRAME_ANCHOR_TARGETS.HEALTHBAR and frame.healthBar then
         relativeTo = frame.healthBar
     end
 
-    Utils:RevertingClearAllPoints(nameText)
-    Utils:SetRevertingPoint(nameText, point, relativeTo, relativePoint, offsetX, offsetY)
+    Utils:RevertingClearAllPoints(fontString)
+    Utils:SetRevertingPoint(fontString, point, relativeTo, relativePoint, offsetX, offsetY)
 end
 
 function FF:UpdatePlayerNameAnchoring()
@@ -328,30 +306,43 @@ function FF:UpdatePlayerNameAnchoring()
 end
 
 function FF:ApplyPlayerNameColorForFrame(frame)
-    local nameText = self:GetPlayerNameFontString(frame)
-
-    if not (nameText and nameText.SetTextColor) then
+    local fontString = Utils:EnsureFontString(frame and frame.name)
+    if not (fontString and fontString.SetTextColor) then
         return
     end
 
-    if not DB:GetPlayerNameTextCustomize() then
-        if nameText._ffFontColorCustomized then
-            Utils:RevertCustomFontColor(nameText)
+    local useRaidOverride = Blizzard:InRaidGroup() and DB:GetRaidPlayerNameTextOverrideEnabled()
+    local customizeText = useRaidOverride or DB:GetPlayerNameTextCustomize()
+
+    if not customizeText then
+        if fontString._ffFontColorCustomized then
+            Utils:RevertCustomFontColor(fontString)
         end
         return
     end
 
-    if DB:GetPlayerNameUseClassColors() then
+    local useClassColors = useRaidOverride and DB:GetRaidPlayerNameUseClassColors() or DB:GetPlayerNameUseClassColors()
+    if useClassColors then
         local classR, classG, classB = Blizzard:GetClassColorForUnit(frame and frame.unit)
         if classR and classG and classB then
-            local _, _, _, alpha = DB:GetPlayerNameColor()
-            Utils:SetRevertingTextColor(nameText, classR, classG, classB, alpha)
+            local _, _, _, alpha
+            if useRaidOverride then
+                _, _, _, alpha = DB:GetRaidPlayerNameColor()
+            else
+                _, _, _, alpha = DB:GetPlayerNameColor()
+            end
+            Utils:SetRevertingTextColor(fontString, classR, classG, classB, alpha)
             return
         end
     end
 
-    local r, g, b, a = DB:GetPlayerNameColor()
-    Utils:SetRevertingTextColor(nameText, r, g, b, a)
+    local r, g, b, a
+    if useRaidOverride then
+        r, g, b, a = DB:GetRaidPlayerNameColor()
+    else
+        r, g, b, a = DB:GetPlayerNameColor()
+    end
+    Utils:SetRevertingTextColor(fontString, r, g, b, a)
 end
 
 function FF:UpdatePlayerNameColor()
@@ -361,25 +352,27 @@ function FF:UpdatePlayerNameColor()
 end
 
 function FF:ApplyPlayerNameFontSizeForFrame(frame)
-    local nameText = self:GetPlayerNameFontString(frame)
-
-    if not (nameText and nameText.GetFont and nameText.SetFont) then
+    local fontString = Utils:EnsureFontString(frame and frame.name)
+    if not (fontString and fontString.GetFont and fontString.SetFont) then
         return
     end
 
-    if not DB:GetPlayerNameTextCustomize() then
-        if nameText._ffFontCustomized then
-            Utils:RevertCustomFont(nameText)
+    local useRaidOverride = Blizzard:InRaidGroup() and DB:GetRaidPlayerNameTextOverrideEnabled()
+    local customizeText = useRaidOverride or DB:GetPlayerNameTextCustomize()
+
+    if not customizeText then
+        if fontString._ffFontCustomized then
+            Utils:RevertCustomFont(fontString)
         end
         return
     end
 
-    local size = DB:GetPlayerNameFontSize()
-    local fontFile, _, flags = nameText:GetFont()
+    local size = useRaidOverride and DB:GetRaidPlayerNameFontSize() or DB:GetPlayerNameFontSize()
+    local fontFile, _, flags = fontString:GetFont()
     if flags ~= nil then
-        Utils:SetRevertingFont(nameText, fontFile, size, flags)
+        Utils:SetRevertingFont(fontString, fontFile, size, flags)
     else
-        Utils:SetRevertingFont(nameText, fontFile, size)
+        Utils:SetRevertingFont(fontString, fontFile, size)
     end
 end
 
@@ -402,20 +395,22 @@ function FF:ApplyPlayerNameSettings()
 end
 
 function FF:ApplyPlayerStatusFontSizeForFrame(frame)
-    local fontString = frame and frame.statusText
-
+    local fontString = Utils:EnsureFontString(frame and frame.statusText)
     if not (fontString and fontString.GetFont and fontString.SetFont) then
         return
     end
 
-    if not DB:GetPlayerStatusTextCustomize() then
+    local useRaidOverride = Blizzard:InRaidGroup() and DB:GetRaidPlayerStatusTextOverrideEnabled()
+    local customizeText = useRaidOverride or DB:GetPlayerStatusTextCustomize()
+
+    if not customizeText then
         if fontString._ffFontCustomized then
             Utils:RevertCustomFont(fontString)
         end
         return
     end
 
-    local size = DB:GetPlayerStatusFontSize()
+    local size = useRaidOverride and DB:GetRaidPlayerStatusFontSize() or DB:GetPlayerStatusFontSize()
     local fontFile, _, flags = fontString:GetFont()
     if flags ~= nil then
         Utils:SetRevertingFont(fontString, fontFile, size, flags)
@@ -535,7 +530,7 @@ function FF:UpdateHealthBarTexture(healthBar)
     end
 
     if not healthBar._ffOriginalTexturePath then
-        local currentTexture = GetStatusBarTexturePath(healthBar)
+        local currentTexture = Utils:EnsureTexturePath(healthBar)
         if currentTexture and currentTexture ~= texture then
             healthBar._ffOriginalTexturePath = currentTexture
         end

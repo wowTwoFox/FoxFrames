@@ -11,22 +11,42 @@ function Object:New()
     return instance
 end
 
+local function IsManagedUnitFrame(frame)
+    if frame == nil or type(frame) == "string" then
+        return false
+    end
+
+    if type(frame.unit) == "string" and frame.unit ~= "" then
+        return true
+    end
+
+    if frame.frameType == "raid" then
+        return true
+    end
+
+    return type(frame.GetObjectType) == "function"
+end
+
 local function NormalizeMemberUnitFrames(frames)
     if type(frames) ~= "table" then
         return {}
     end
 
-    -- Most Blizzard unit frame containers use a 1-indexed array.
-    -- If not, normalize into an array for consistent iteration.
+    local normalized = {}
+
+    -- Most Blizzard unit frame containers use a 1-indexed array. Preserve order
+    -- for those containers but still filter out non-frame sentinel entries.
     if rawget(frames, 1) ~= nil then
-        -- return frames
+        for _, frame in ipairs(frames) do
+            if IsManagedUnitFrame(frame) then
+                normalized[#normalized + 1] = frame
+            end
+        end
+        return normalized
     end
 
-    local normalized = {}
     for _, frame in pairs(frames) do
-        -- Raid frames also contain strings 'linebreak' in the array
-        -- We need to filter out only raid frame objects
-        if frame and frame.frameType and frame.frameType == "raid" then
+        if IsManagedUnitFrame(frame) then
             normalized[#normalized + 1] = frame
         end
     end
@@ -47,8 +67,7 @@ local function GetRaidMemberUnitFrames()
         return {}
     end
 
-    local frames = NormalizeMemberUnitFrames(CompactRaidFrameContainer.flowFrames)
-    return frames
+    return NormalizeMemberUnitFrames(CompactRaidFrameContainer.flowFrames)
 end
 
 function Object:GetFrames()

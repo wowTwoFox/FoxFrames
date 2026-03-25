@@ -59,13 +59,13 @@ function Object:CreateProfilesSettings(rootCategory, callbacks)
             return selectedProfileName
         end
 
-        return DB.db:GetCurrentProfile()
+        return DB.storage:GetCurrentProfile()
     end
 
     SettingsLib:CreateDropdown(profilesCategory, {
         key = "SelectedProfile",
         name = "Selected Profile",
-        default = DB.db:GetCurrentProfile(),
+        default = DB.storage:GetCurrentProfile(),
         get = function()
             return GetSelectedProfileName()
         end,
@@ -140,12 +140,12 @@ function Object:CreateProfilesSettings(rootCategory, callbacks)
             flow:AddButton("Copy", {
                 isEnabled = function()
                     local selectedName = GetSelectedProfileName()
-                    local currentName = DB.db:GetCurrentProfile()
+                    local currentName = DB.storage:GetCurrentProfile()
                     return type(selectedName) == "string" and selectedName ~= "" and selectedName ~= currentName
                 end,
             }, function()
                 local selectedName = GetSelectedProfileName()
-                local currentName = DB.db:GetCurrentProfile()
+                local currentName = DB.storage:GetCurrentProfile()
                 if type(selectedName) ~= "string" or selectedName == "" or selectedName == currentName then
                     return
                 end

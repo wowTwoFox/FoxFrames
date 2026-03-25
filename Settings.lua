@@ -23,7 +23,7 @@ local ANCHOR_POINT_LABELS = {
     [Constants.ANCHOR_POINTS.BOTTOMRIGHT] = "Bottom Right",
 }
 local FRAME_ANCHOR_TARGET_LABELS = {
-    [DB.FRAME_ANCHOR_TARGETS.FRAME] = "Party Frame",
+    [DB.FRAME_ANCHOR_TARGETS.FRAME] = "Unit Frame",
     [DB.FRAME_ANCHOR_TARGETS.HEALTHBAR] = "Health Bar",
 }
 local PLAYER_FRAME_SHOW_TYPE_LABELS = {
@@ -93,81 +93,17 @@ function FF:OpenIncomingCastsSettings()
     Settings.OpenToCategory(self._incomingCastsCategory:GetID())
 end
 
-local function EnsureSubTable(parent, key)
-    if type(parent) ~= "table" then
-        return nil
-    end
-
-    local value = parent[key]
-    if type(value) ~= "table" then
-        value = {}
-        parent[key] = value
-    end
-
-    return value
+local function ValidateSettingsPath(path)
+    return DB.storage and DB.storage:ValidatePathExists(path) == true
 end
 
-local function NormalizePath(path)
-    if type(path) == "table" then
-        return path
-    end
-
-    if type(path) ~= "string" or path == "" then
-        return nil
-    end
-
-    local parts = {}
-    for part in string.gmatch(path, "[^%.]+") do
-        table.insert(parts, part)
-    end
-    return parts
-end
-
-local function GetTableAtPath(root, pathParts)
-    local current = root
-    for _, key in ipairs(pathParts) do
-        if type(current) ~= "table" then
-            return nil
-        end
-        current = current[key]
-    end
-    return current
-end
-
-local function EnsureTableAtPath(root, pathParts)
-    local current = root
-    for _, key in ipairs(pathParts) do
-        current = EnsureSubTable(current, key)
-        if not current then
-            return nil
-        end
-    end
-    return current
-end
-
-local function GetProfileTableAtPath(pathParts)
-    local profile = DB:GetDBProfile()
-    return EnsureTableAtPath(profile, pathParts)
-end
-
-local function GetDefaultsTableAtPath(pathParts)
-    local defaults = GetTableAtPath(DB.DEFAULT_SETTINGS, pathParts)
-    if type(defaults) ~= "table" then
-        defaults = {}
-    end
-    return defaults
-end
-
-local function AddFrameSettings(path, category, keyPrefix, prefix, applySetting)
-    local pathParts = NormalizePath(path)
-    if not (pathParts and category and keyPrefix) then
+local function AddFrameSettings(path, category, keyPrefix, prefix, parent, parentCheck, applySetting)
+    assert(type(applySetting) == "function", "FoxFrames: AddFrameSettings requires applySetting callback")
+    if not ValidateSettingsPath(path) then
         return
     end
 
-    assert(type(applySetting) == "function", "FoxFrames: AddFrameSettings requires applySetting callback")
-
-    local defaults = GetDefaultsTableAtPath(pathParts)
-
+    local _, defaults = DB.storage:GetTableAtPath(path)
     local defaultAnchorTarget = Utils:SanitizeOption(defaults.anchorTarget, DB.FRAME_ANCHOR_TARGETS) or DB.FRAME_ANCHOR_TARGETS.FRAME
     local defaultPosition = Utils:SanitizeAnchorPoint(defaults.position, Constants.ANCHOR_POINTS.CENTER)
     local defaultAnchorMode = Utils:SanitizeAnchorMode(defaults.anchorMode, Constants.ANCHOR_MODES.INSIDE)
@@ -175,20 +111,12 @@ local function AddFrameSettings(path, category, keyPrefix, prefix, applySetting)
     local defaultOffsetY = Utils:ClampInteger(defaults.offsetY, -40, 40, 0)
     local defaultUseRelativeOffsets = defaults.useRelativeOffsets ~= false
 
-    local function Profile()
-        return GetProfileTableAtPath(pathParts)
-    end
-
     local function GetValue(key)
-        local profile = Profile()
-        return profile and profile[key]
+        return DB.storage:GetValue(path .. "." .. key)
     end
 
     local function SetValue(key, value)
-        local profile = Profile()
-        if profile then
-            profile[key] = value
-        end
+        DB.storage:SetValue(path .. "." .. key, value)
     end
 
     local function OnChanged(settingKey)
@@ -207,8 +135,10 @@ local function AddFrameSettings(path, category, keyPrefix, prefix, applySetting)
             SetValue("anchorTarget", Utils:SanitizeOption(value, DB.FRAME_ANCHOR_TARGETS) or defaultAnchorTarget)
             OnChanged("anchorTarget")
         end,
-        desc = "Choose whether this element is anchored to the party frame or to the health bar.",
+        desc = "Choose whether this element is anchored to the unit frame or to the health bar.",
         prefix = prefix,
+        parent = parent,
+        parentCheck = parentCheck,
     })
 
     SettingsLib:CreateDropdown(category, {
@@ -225,6 +155,8 @@ local function AddFrameSettings(path, category, keyPrefix, prefix, applySetting)
         end,
         desc = "Anchor point used for this element.",
         prefix = prefix,
+        parent = parent,
+        parentCheck = parentCheck,
     })
 
     SettingsLib:CreateDropdown(category, {
@@ -241,6 +173,8 @@ local function AddFrameSettings(path, category, keyPrefix, prefix, applySetting)
         end,
         desc = "Inside uses the same anchor point as Position.\nOutside (Vertical) flips Top <-> Bottom.\nOutside (Horizontal) flips Left <-> Right.\nOutside (Auto) picks Vertical/Horizontal based on the party frame orientation (horizontal vs vertical layout).\nExample: party frames stacked top-to-bottom -> Auto uses Outside (Horizontal).",
         prefix = prefix,
+        parent = parent,
+        parentCheck = parentCheck,
     })
 
     SettingsLib:CreateSlider(category, {
@@ -266,6 +200,8 @@ local function AddFrameSettings(path, category, keyPrefix, prefix, applySetting)
         end,
         desc = "Horizontal offset for anchoring.",
         prefix = prefix,
+        parent = parent,
+        parentCheck = parentCheck,
     })
 
     SettingsLib:CreateSlider(category, {
@@ -291,6 +227,8 @@ local function AddFrameSettings(path, category, keyPrefix, prefix, applySetting)
         end,
         desc = "Vertical offset for anchoring.",
         prefix = prefix,
+        parent = parent,
+        parentCheck = parentCheck,
     })
 
     SettingsLib:CreateCheckbox(category, {
@@ -310,38 +248,29 @@ local function AddFrameSettings(path, category, keyPrefix, prefix, applySetting)
         end,
         desc = "When enabled, X/Y offsets are flipped based on anchor point.",
         prefix = prefix,
+        parent = parent,
+        parentCheck = parentCheck,
     })
 end
 
-local function AddTextSettings(path, category, keyPrefix, prefix, applySetting)
-    local pathParts = NormalizePath(path)
-    if not (pathParts and category and keyPrefix) then
+local function AddTextSettings(path, category, keyPrefix, prefix, applySetting, parent, parentCheck)
+    assert(type(applySetting) == "function", "FoxFrames: AddTextSettings requires applySetting callback")
+    if not ValidateSettingsPath(path) then
         return
     end
 
-    assert(type(applySetting) == "function", "FoxFrames: AddTextSettings requires applySetting callback")
-
-    local defaults = GetDefaultsTableAtPath(pathParts)
-
+    local _, defaults = DB.storage:GetTableAtPath(path)
     local defaultFontSize = Utils:ClampInteger(defaults.fontSize, 8, 32, 10)
     local defaultColor = Utils:SanitizeColor(defaults.color, { r = 1, g = 1, b = 1 })
     local defaultOpacity = Utils:SanitizeOpacity(defaults.opacity, 1)
     local defaultUseClassColors = defaults.useClassColors == true
 
-    local function Profile()
-        return GetProfileTableAtPath(pathParts)
-    end
-
     local function GetValue(key)
-        local profile = Profile()
-        return profile and profile[key]
+        return DB.storage:GetValue(path .. "." .. key)
     end
 
     local function SetValue(key, value)
-        local profile = Profile()
-        if profile then
-            profile[key] = value
-        end
+        DB.storage:SetValue(path .. "." .. key, value)
     end
 
     local function OnChanged(settingKey)
@@ -369,8 +298,10 @@ local function AddTextSettings(path, category, keyPrefix, prefix, applySetting)
             SetValue("fontSize", Utils:ClampInteger(value, 8, 32, defaultFontSize))
             OnChanged("fontSize")
         end,
-        desc = "Adjust the text size on party frames.",
+        desc = "Adjust the text size on frames.",
         prefix = prefix,
+        parent = parent,
+        parentCheck = parentCheck,
     })
 
     SettingsLib:CreateSlider(category, {
@@ -394,8 +325,10 @@ local function AddTextSettings(path, category, keyPrefix, prefix, applySetting)
             SetValue("opacity", opacity)
             OnChanged("opacity")
         end,
-        desc = "Adjust opacity for text on party frames.",
+        desc = "Adjust opacity for text on frames.",
         prefix = prefix,
+        parent = parent,
+        parentCheck = parentCheck,
     })
 
     local useClassColorsElement = SettingsLib:CreateCheckbox(category, {
@@ -415,6 +348,8 @@ local function AddTextSettings(path, category, keyPrefix, prefix, applySetting)
         end,
         desc = "Use class colors instead of the configured static text color.",
         prefix = prefix,
+        parent = parent,
+        parentCheck = parentCheck,
     })
 
     SettingsLib:CreateColorOverrides(category, {
@@ -435,11 +370,11 @@ local function AddTextSettings(path, category, keyPrefix, prefix, applySetting)
             return color.r, color.g, color.b
         end,
         hasOpacity = false,
-        isEnabled = function()
-            return GetValue("useClassColors") ~= true
-        end,
         parent = useClassColorsElement,
         parentCheck = function()
+            if type(parentCheck) == "function" and parentCheck() ~= true then
+                return false
+            end
             return GetValue("useClassColors") ~= true
         end,
         minHeight = 36,
@@ -447,33 +382,23 @@ local function AddTextSettings(path, category, keyPrefix, prefix, applySetting)
 end
 
 local function AddCooldownTextSettings(path, category, keyPrefix, prefix, applySetting)
-    local pathParts = NormalizePath(path)
-    if not (pathParts and category and keyPrefix) then
+    assert(type(applySetting) == "function", "FoxFrames: AddCooldownTextSettings requires applySetting callback")
+    if not ValidateSettingsPath(path) then
         return
     end
 
-    assert(type(applySetting) == "function", "FoxFrames: AddCooldownTextSettings requires applySetting callback")
-
-    local defaults = GetDefaultsTableAtPath(pathParts)
+    local defaults = DB.storage:GetDefaultsTableAtPath(path)
 
     local defaultShow = defaults.show == true
     local defaultFontSize = Utils:ClampInteger(defaults.fontSize, 8, 32, 12)
     local defaultColor = Utils:SanitizeColor(defaults.color, { r = 1, g = 1, b = 1 })
 
-    local function Profile()
-        return GetProfileTableAtPath(pathParts)
-    end
-
     local function GetValue(key)
-        local profile = Profile()
-        return profile and profile[key]
+        return DB.storage:GetValue(path .. "." .. key)
     end
 
     local function SetValue(key, value)
-        local profile = Profile()
-        if profile then
-            profile[key] = value
-        end
+        DB.storage:SetValue(path .. "." .. key, value)
     end
 
     local function OnChanged(settingKey)
@@ -565,185 +490,180 @@ local function AddCooldownTextSettings(path, category, keyPrefix, prefix, applyS
     })
 end
 
-local function CreatePlayerStatusSettings(rootCategory, partyFramePrefix)
-    local statusTextCategory = SettingsLib:CreateCategory(rootCategory, "Player Status")
+local function CreateBooleanSettings(category, prefix, options)
+    local opts = type(options) == "table" and options or {}
+    local key = (type(opts.key) == "string" and opts.key ~= "" and opts.key)
+    local path = (type(opts.path) == "string" and opts.path ~= "" and opts.path)
+    local name = (type(opts.name) == "string" and opts.name ~= "" and opts.name)
+    local desc = (type(opts.desc) == "string" and opts.desc ~= "" and opts.desc)
+    local onChanged = type(opts.onChanged) == "function" and opts.onChanged or nil
+    local defaultValue = opts.default == true
 
-    SettingsLib:CreateHeader(statusTextCategory, {
+    if not (key and path and name) then
+        return nil
+    end
+
+    if not ValidateSettingsPath(path) then
+        return nil
+    end
+
+    return SettingsLib:CreateCheckbox(category, {
+        key = key,
+        name = name,
+        default = defaultValue,
+        get = function()
+            local value = DB.storage:GetValue(path)
+            if value == nil then
+                return defaultValue
+            end
+            return value == true
+        end,
+        set = function(value)
+            if DB.storage:SetValue(path, value == true) and onChanged then
+                onChanged(value == true)
+            end
+        end,
+        desc = desc,
+        prefix = prefix,
+        parent = opts.parent,
+        parentCheck = opts.parentCheck,
+    })
+end
+
+local function CreatePlayerTextElementSettings(category, framePrefix, options, applySetting)
+    local opts = type(options) == "table" and options or {}
+    local path = (type(opts.path) == "string" and opts.path ~= "" and opts.path)
+    local framePath = path and (path .. ".frame") or nil
+    local textCustomizePath = path and (path .. ".customizeText") or nil
+    local frameCustomizePath = path and (path .. ".customizeFrame") or nil
+    local keyPrefix = (type(opts.keyPrefix) == "string" and opts.keyPrefix ~= "" and opts.keyPrefix)
+    local toggleName = (type(opts.toggleName) == "string" and opts.toggleName ~= "" and opts.toggleName) or "Customize"
+    local textCustomizeDesc = (type(opts.textCustomizeDesc) == "string" and opts.textCustomizeDesc ~= "" and opts.textCustomizeDesc)
+    local frameCustomizeDesc = (type(opts.frameCustomizeDesc) == "string" and opts.frameCustomizeDesc ~= "" and opts.frameCustomizeDesc)
+
+    if not (category and path and keyPrefix) then
+        return
+    end
+
+    if not ValidateSettingsPath(path) then
+        return
+    end
+
+    local _, defaults = DB.storage:GetTableAtPath(path)
+
+    SettingsLib:CreateHeader(category, {
         name = "Text",
     })
 
-    do
-        local pathParts = NormalizePath("partyFrame.playerStatus")
-        local defaults = GetDefaultsTableAtPath(pathParts)
-        local defaultCustomize = defaults.customizeText ~= false
-
-        local function Profile()
-            return GetProfileTableAtPath(pathParts)
+    local defaultCustomize = defaults.customizeText ~= false
+    local function IsTextCustomized()
+        local value = DB.storage:GetValue(textCustomizePath)
+        if value == nil then
+            return defaultCustomize
         end
-
-        SettingsLib:CreateCheckbox(statusTextCategory, {
-            key = "PlayerStatusTextCustomize",
-            name = "Customize",
-            default = defaultCustomize,
-            get = function()
-                local profile = Profile()
-                local value = profile and profile.customizeText
-                if value == nil then
-                    return defaultCustomize
-                end
-                return value == true
-            end,
-            set = function(value)
-                local profile = Profile()
-                if profile then
-                    profile.customizeText = value == true
-                end
-                FF:UpdatePlayerStatusFontSize()
-                FF:UpdatePlayerStatusColor()
-            end,
-            desc = "Toggle FoxFrames text customization for Player Status.",
-            prefix = partyFramePrefix,
-        })
+        return value == true
     end
 
-    AddTextSettings("partyFrame.playerStatus", statusTextCategory, "PlayerStatus", partyFramePrefix, function(settingKey)
-        if settingKey == "fontSize" then
-            FF:UpdatePlayerStatusFontSize()
-        else
-            FF:UpdatePlayerStatusColor()
-        end
-    end)
+    local textCustomizeElement = CreateBooleanSettings(category, framePrefix, {
+        key = keyPrefix .. "TextCustomize",
+        path = textCustomizePath,
+        name = toggleName,
+        default = defaultCustomize,
+        onChanged = function()
+            applySetting("customizeText")
+        end,
+        desc = textCustomizeDesc,
+    })
 
-    SettingsLib:CreateHeader(statusTextCategory, {
+    AddTextSettings(path, category, keyPrefix, framePrefix, function(settingKey)
+        applySetting(settingKey)
+    end, textCustomizeElement, IsTextCustomized)
+
+    if not ValidateSettingsPath(framePath) then
+        return
+    end
+
+    SettingsLib:CreateHeader(category, {
         name = "Placement",
     })
 
-    do
-        local pathParts = NormalizePath("partyFrame.playerStatus")
-        local defaults = GetDefaultsTableAtPath(pathParts)
-        local defaultCustomize = defaults.customizeFrame ~= false
-
-        local function Profile()
-            return GetProfileTableAtPath(pathParts)
+    local function IsFrameCustomized()
+        local value = DB.storage:GetValue(frameCustomizePath)
+        if value == nil then
+            return defaultCustomize
         end
-
-        SettingsLib:CreateCheckbox(statusTextCategory, {
-            key = "PlayerStatusFrameCustomize",
-            name = "Customize",
-            default = defaultCustomize,
-            get = function()
-                local profile = Profile()
-                local value = profile and profile.customizeFrame
-                if value == nil then
-                    return defaultCustomize
-                end
-                return value == true
-            end,
-            set = function(value)
-                local profile = Profile()
-                if profile then
-                    profile.customizeFrame = value == true
-                end
-                FF:UpdatePlayerStatusAnchoring()
-            end,
-            desc = "Toggle FoxFrames placement customization for Player Status.",
-            prefix = partyFramePrefix,
-        })
+        return value == true
     end
 
-    AddFrameSettings("partyFrame.playerStatus.frame", statusTextCategory, "PlayerStatusFrame", partyFramePrefix, function(_)
-        FF:UpdatePlayerStatusAnchoring()
+    local frameCustomizeElement = CreateBooleanSettings(category, framePrefix, {
+        key = keyPrefix .. "FrameCustomize",
+        path = frameCustomizePath,
+        name = toggleName,
+        default = defaultCustomize,
+        onChanged = function()
+            applySetting("customizeFrame")
+        end,
+        desc = frameCustomizeDesc,
+    })
+
+    AddFrameSettings(framePath, category, keyPrefix .. "Frame", framePrefix, frameCustomizeElement, IsFrameCustomized, function(settingKey)
+        applySetting(settingKey)
     end)
 end
 
-local function CreatePlayerNameSettings(rootCategory, partyFramePrefix)
-    local playerNameCategory = SettingsLib:CreateCategory(rootCategory, "Player Name")
-
-    SettingsLib:CreateHeader(playerNameCategory, {
-        name = "Text",
-    })
-
-    do
-        local pathParts = NormalizePath("partyFrame.playerName")
-        local defaults = GetDefaultsTableAtPath(pathParts)
-        local defaultCustomize = defaults.customizeText ~= false
-
-        local function Profile()
-            return GetProfileTableAtPath(pathParts)
-        end
-
-        SettingsLib:CreateCheckbox(playerNameCategory, {
-            key = "PlayerNameTextCustomize",
-            name = "Customize",
-            default = defaultCustomize,
-            get = function()
-                local profile = Profile()
-                local value = profile and profile.customizeText
-                if value == nil then
-                    return defaultCustomize
-                end
-                return value == true
-            end,
-            set = function(value)
-                local profile = Profile()
-                if profile then
-                    profile.customizeText = value == true
-                end
-                FF:UpdatePlayerNameFontSize()
-                FF:UpdatePlayerNameColor()
-            end,
-            desc = "Toggle FoxFrames text customization for Player Name.",
-            prefix = partyFramePrefix,
-        })
+local function CreatePartyPlayerSettings(rootCategory, framePrefix, basePath)
+    if type(basePath) ~= "string" or basePath == "" then
+        return
     end
 
-    AddTextSettings("partyFrame.playerName", playerNameCategory, "PlayerName", partyFramePrefix, function(settingKey)
-        if settingKey == "fontSize" then
-            FF:UpdatePlayerNameFontSize()
-        else
-            FF:UpdatePlayerNameColor()
-        end
+    local playerNameCategory = SettingsLib:CreateCategory(rootCategory, "Player Name")
+    CreatePlayerTextElementSettings(playerNameCategory, framePrefix .. "PlayerName_", {
+        path = basePath .. ".playerName",
+        keyPrefix = "PlayerName",
+        toggleName = "Customize",
+        textCustomizeDesc = "Toggle FoxFrames text customization for Player Name.",
+        frameCustomizeDesc = "Toggle FoxFrames placement customization for Player Name.",
+    }, function(settingKey)
+        FF:ApplyPlayerNameSettings()
     end)
 
-    SettingsLib:CreateHeader(playerNameCategory, {
-        name = "Placement",
-    })
+    local playerStatusCategory = SettingsLib:CreateCategory(rootCategory, "Player Status")
+    CreatePlayerTextElementSettings(playerStatusCategory, framePrefix .. "PlayerStatus_", {
+        path = basePath .. ".playerStatus",
+        keyPrefix = "PlayerStatus",
+        toggleName = "Customize",
+        textCustomizeDesc = "Toggle FoxFrames text customization for Player Status.",
+        frameCustomizeDesc = "Toggle FoxFrames placement customization for Player Status.",
+    }, function(settingKey)
+        FF:ApplyPlayerStatusSettings()
+    end)
+end
 
-    do
-        local pathParts = NormalizePath("partyFrame.playerName")
-        local defaults = GetDefaultsTableAtPath(pathParts)
-        local defaultCustomize = defaults.customizeFrame ~= false
-
-        local function Profile()
-            return GetProfileTableAtPath(pathParts)
-        end
-
-        SettingsLib:CreateCheckbox(playerNameCategory, {
-            key = "PlayerNameFrameCustomize",
-            name = "Customize",
-            default = defaultCustomize,
-            get = function()
-                local profile = Profile()
-                local value = profile and profile.customizeFrame
-                if value == nil then
-                    return defaultCustomize
-                end
-                return value == true
-            end,
-            set = function(value)
-                local profile = Profile()
-                if profile then
-                    profile.customizeFrame = value == true
-                end
-                FF:UpdatePlayerNameAnchoring()
-            end,
-            desc = "Toggle FoxFrames placement customization for Player Name.",
-            prefix = partyFramePrefix,
-        })
+local function CreateRaidPlayerSettings(rootCategory, framePrefix, basePath)
+    if type(basePath) ~= "string" or basePath == "" then
+        return
     end
 
-    AddFrameSettings("partyFrame.playerName.frame", playerNameCategory, "PlayerNameFrame", partyFramePrefix, function(_)
-        FF:UpdatePlayerNameAnchoring()
+    local raidPlayerNameCategory = SettingsLib:CreateCategory(rootCategory, "Raid Player Name")
+    CreatePlayerTextElementSettings(raidPlayerNameCategory, framePrefix .. "PlayerName_", {
+        path = basePath .. ".playerName",
+        keyPrefix = "RaidPlayerName",
+        toggleName = "Override",
+        textCustomizeDesc = "Override text settings for Raid Player Name when in a raid. When disabled, uses Party settings.",
+        frameCustomizeDesc = "Override placement settings for Raid Player Name when in a raid. When disabled, uses Party settings.",
+    }, function(settingKey)
+        FF:ApplyPlayerNameSettings()
+    end)
+
+    local raidPlayerStatusCategory = SettingsLib:CreateCategory(rootCategory, "Raid Player Status")
+    CreatePlayerTextElementSettings(raidPlayerStatusCategory, framePrefix .. "PlayerStatus_", {
+        path = basePath .. ".playerStatus",
+        keyPrefix = "RaidPlayerStatus",
+        toggleName = "Override",
+        textCustomizeDesc = "Override text settings for Raid Player Status when in a raid. When disabled, uses Party settings.",
+        frameCustomizeDesc = "Override placement settings for Raid Player Status when in a raid. When disabled, uses Party settings.",
+    }, function(settingKey)
+        FF:ApplyPlayerStatusSettings()
     end)
 end
 
@@ -754,7 +674,7 @@ local function CreateBuffsSettings(rootCategory, partyFramePrefix)
         name = "Cooldown",
     })
 
-    AddCooldownTextSettings("partyFrame.buffs.cooldownText", buffsCategory, "Buff", partyFramePrefix, function(settingKey)
+    AddCooldownTextSettings("profile.partyFrame.buffs.cooldownText", buffsCategory, "Buff", partyFramePrefix, function(settingKey)
         if settingKey == "show" then
             FF:ShowBuffCountdownIfNeeded()
         elseif settingKey == "fontSize" then
@@ -772,7 +692,7 @@ local function CreateDebuffsSettings(rootCategory, partyFramePrefix)
         name = "Cooldown",
     })
 
-    AddCooldownTextSettings("partyFrame.debuffs.cooldownText", debuffsCategory, "Debuff", partyFramePrefix, function(settingKey)
+    AddCooldownTextSettings("profile.partyFrame.debuffs.cooldownText", debuffsCategory, "Debuff", partyFramePrefix, function(settingKey)
         if settingKey == "show" then
             FF:ShowDebuffCountdownIfNeeded()
         elseif settingKey == "fontSize" then
@@ -974,7 +894,7 @@ local function CreateIncomingCastsSettings(rootCategory)
         prefix = incomingCastsPrefix,
     })
 
-    AddCooldownTextSettings("incomingCastBar.icon.cooldownText", incomingCastsCategory, "IncomingCastIcon", incomingCastsPrefix, function(_)
+    AddCooldownTextSettings("profile.incomingCastBar.icon.cooldownText", incomingCastsCategory, "IncomingCastIcon", incomingCastsPrefix, function(_)
         FF:SetupIncomingCastIndicators()
         FF:UpdateIncomingCastIndicators()
     end)
@@ -983,7 +903,7 @@ local function CreateIncomingCastsSettings(rootCategory)
         name = "Placement",
     })
 
-    AddFrameSettings("incomingCastBar.frame", incomingCastsCategory, "IncomingCastFrame", incomingCastsPrefix, function(_)
+    AddFrameSettings("profile.incomingCastBar.frame", incomingCastsCategory, "IncomingCastFrame", incomingCastsPrefix, nil, nil, function(_)
         FF:SetupIncomingCastIndicators()
         FF:UpdateIncomingCastIndicators()
     end)
@@ -992,6 +912,7 @@ end
 function FF:SetupOptions()
     -- Build the options using LibEQOL
     local PARTY_FRAME_PREFIX = SETTINGS_PREFIX .. "PartyFrame_"
+    local RAID_FRAME_PREFIX = SETTINGS_PREFIX .. "RaidFrame_"
     local rootCategory = SettingsLib:CreateRootCategory("Fox Frames")
     self._rootCategory = rootCategory
 
@@ -1135,6 +1056,7 @@ function FF:SetupOptions()
             DB:GetPartyFrameDB().showTankRoleIcon = value
             FF:UpdateFrames()
         end,
+        
         desc = "Toggle the Tank role icon visibility on the frame.",
         prefix = PARTY_FRAME_PREFIX,
     })
@@ -1190,8 +1112,10 @@ function FF:SetupOptions()
             self:SetupFrames()
         end,
     })
-    CreatePlayerStatusSettings(rootCategory, PARTY_FRAME_PREFIX)
-    CreatePlayerNameSettings(rootCategory, PARTY_FRAME_PREFIX)
+
+    CreatePartyPlayerSettings(rootCategory, PARTY_FRAME_PREFIX, "profile.partyFrame")
+    CreateRaidPlayerSettings(rootCategory, RAID_FRAME_PREFIX, "profile.raidFrame")
+
     CreateBuffsSettings(rootCategory, PARTY_FRAME_PREFIX)
     CreateDebuffsSettings(rootCategory, PARTY_FRAME_PREFIX)
     CreateIncomingCastsSettings(rootCategory)

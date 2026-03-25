@@ -31,7 +31,9 @@ Libs\LibSharedMedia-3.0\LibSharedMedia-3.0.lua
 Modules\Utils.lua
 Modules\BlizzardSettings.lua
 Modules\Blizzard.lua
+Modules\Storage.lua
 Modules\DB.lua
+Modules\DBMigrations.lua
 Modules\GlobalsDB.lua
 Modules\FoxFrames.lua
 Modules\IncomingCasts.lua

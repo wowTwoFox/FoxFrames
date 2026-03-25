@@ -4,6 +4,8 @@ assert(addon and addon.Constants, "FoxFrames: addon table or Constants missing (
 
 local Constants = addon.Constants
 local anchorPoints = Constants.ANCHOR_POINTS
+local flipVerticalAnchorPoints = Constants.FLIP_VERTICAL_ANCHOR_POINTS
+local flipHorizontalAnchorPoints = Constants.FLIP_HORIZONTAL_ANCHOR_POINTS
 
 local Object = {}
 Object.__index = Object -- When a key is missing, look in BlizzardSettings
@@ -651,6 +653,22 @@ function Object:IsAnchorHorizontalAligned(point)
     return point == anchorPoints.TOP or point == anchorPoints.CENTER or point == anchorPoints.BOTTOM
 end
 
+local function FlipVerticalAnchorPoint(point)
+    return flipVerticalAnchorPoints[point] or point
+end
+
+local function FlipHorizontalAnchorPoint(point)
+    return flipHorizontalAnchorPoints[point] or point
+end
+
+function Object:FlipVerticalAnchorPoint(point)
+    return FlipVerticalAnchorPoint(point)
+end
+
+function Object:FlipHorizontalAnchorPoint(point)
+    return FlipHorizontalAnchorPoint(point)
+end
+
 function Object:FlipToRelativeOffsets(offsetX, offsetY, point)
     local x = offsetX
     local y = offsetY
@@ -664,6 +682,57 @@ function Object:FlipToRelativeOffsets(offsetX, offsetY, point)
     end
 
     return x, y
+end
+
+function Object:EnsureFontString(region)
+    if not region then
+        return nil
+    end
+
+    local isObjectType = region.IsObjectType
+    if type(isObjectType) == "function" then
+        local ok, isFontString = pcall(isObjectType, region, "FontString")
+        if ok and isFontString then
+            return region
+        end
+        return nil
+    end
+
+    local getObjectType = region.GetObjectType
+    if type(getObjectType) == "function" then
+        local ok, objectType = pcall(getObjectType, region)
+        if ok and objectType == "FontString" then
+            return region
+        end
+    end
+
+    return nil
+end
+
+function Object:EnsureTexturePath(statusBar)
+    if not (statusBar and statusBar.GetStatusBarTexture) then
+        return nil
+    end
+
+    local textureObject = statusBar:GetStatusBarTexture()
+    if not (textureObject and textureObject.GetTexture) then
+        return nil
+    end
+
+    local ok, textureRef = pcall(textureObject.GetTexture, textureObject)
+    if not ok then
+        return nil
+    end
+
+    if type(textureRef) == "number" then
+        return textureRef
+    end
+
+    if type(textureRef) == "string" and textureRef ~= "" then
+        return textureRef
+    end
+
+    return nil
 end
 
 function Object:GetCooldownCountdownFontString(cooldown)
