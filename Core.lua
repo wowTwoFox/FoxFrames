@@ -163,7 +163,6 @@ function FF:OnInitialize()
     GlobalsDB:InitializeDB()
 
     self.DEFAULT_SETTINGS = DB.DEFAULT_SETTINGS
-    -- DB:SetProfile("Layout: " .. layoutName)
 
     -- Register Custom Textures with LSM if available
     RegisterLSMTextures()

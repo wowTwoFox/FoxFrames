@@ -11,12 +11,63 @@ function Object:New()
     return instance
 end
 
-function Object:GetFrames()
+local function NormalizeMemberUnitFrames(frames)
+    if type(frames) ~= "table" then
+        return {}
+    end
+
+    -- Most Blizzard unit frame containers use a 1-indexed array.
+    -- If not, normalize into an array for consistent iteration.
+    if rawget(frames, 1) ~= nil then
+        -- return frames
+    end
+
+    local normalized = {}
+    for _, frame in pairs(frames) do
+        -- Raid frames also contain strings 'linebreak' in the array
+        -- We need to filter out only raid frame objects
+        if frame and frame.frameType and frame.frameType == "raid" then
+            normalized[#normalized + 1] = frame
+        end
+    end
+    return normalized
+end
+
+local function GetPartyMemberUnitFrames()
     if not (CompactPartyFrame and CompactPartyFrame.memberUnitFrames) then
         return {}
     end
 
-    return CompactPartyFrame.memberUnitFrames
+    return NormalizeMemberUnitFrames(CompactPartyFrame.memberUnitFrames)
+end
+
+local function GetRaidMemberUnitFrames()
+    if not (CompactRaidFrameContainer and CompactRaidFrameContainer.flowFrames) then
+        Utils:Log("ERROR: Raid frames not found", CompactRaidFrameContainer)
+        return {}
+    end
+
+    local frames = NormalizeMemberUnitFrames(CompactRaidFrameContainer.flowFrames)
+    return frames
+end
+
+function Object:GetFrames()
+    if self:InRaidGroup() then
+        return GetRaidMemberUnitFrames()
+    end
+
+    if self:InPartyGroup() then
+        local settings = BlizzardSettings
+        local useRaidStylePartyFrames = settings and settings.GetUseRaidStylePartyFrames and settings:GetUseRaidStylePartyFrames()
+        if useRaidStylePartyFrames then
+            return GetRaidMemberUnitFrames()
+        end
+
+        return GetPartyMemberUnitFrames()
+    end
+
+    -- Solo: default to party frames (they can optionally be shown in solo).
+    return GetPartyMemberUnitFrames()
 end
 
 local function GetFrameCenterSafe(frame)
@@ -38,10 +89,13 @@ end
 
 function Object:GetPartyFramesLayoutAxis()
     local settings = BlizzardSettings
-    if settings and settings.GetPartyFramesUseHorizontalGroups then
-        local isHorizontal = settings:GetPartyFramesUseHorizontalGroups()
-        if isHorizontal ~= nil then
-            return isHorizontal and Constants.LAYOUT_AXIS.HORIZONTAL or Constants.LAYOUT_AXIS.VERTICAL
+    if settings and settings.GetPartyFramesUseHorizontalGroups and (not self:InRaidGroup()) then
+        local useRaidStylePartyFrames = settings.GetUseRaidStylePartyFrames and settings:GetUseRaidStylePartyFrames()
+        if not useRaidStylePartyFrames then
+            local isHorizontal = settings:GetPartyFramesUseHorizontalGroups()
+            if isHorizontal ~= nil then
+                return isHorizontal and Constants.LAYOUT_AXIS.HORIZONTAL or Constants.LAYOUT_AXIS.VERTICAL
+            end
         end
     end
 
@@ -107,9 +161,21 @@ function Object:IsManagedPartyFrame(frame)
         return false
     end
 
-    for _, memberFrame in ipairs(self:GetFrames()) do
-        if frame == memberFrame then
-            return true
+    local partyFrames = CompactPartyFrame and CompactPartyFrame.memberUnitFrames
+    if type(partyFrames) == "table" then
+        for _, memberFrame in pairs(partyFrames) do
+            if frame == memberFrame then
+                return true
+            end
+        end
+    end
+
+    local raidFrames = CompactRaidFrameContainer and CompactRaidFrameContainer.memberUnitFrames
+    if type(raidFrames) == "table" then
+        for _, memberFrame in pairs(raidFrames) do
+            if frame == memberFrame then
+                return true
+            end
         end
     end
 

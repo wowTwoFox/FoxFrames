@@ -51,8 +51,16 @@ function FF:IsPlayerFrame(frame)
 end
 
 function FF:SetAllowAnyAnchoring()
-    if not PartyFrame then return end
-    PartyFrame.alwaysUseTopLeftAnchor = not DB:GetAllowAnyAnchoring()
+    local alwaysUseTopLeftAnchor = not DB:GetAllowAnyAnchoring()
+
+    if PartyFrame then
+        PartyFrame.alwaysUseTopLeftAnchor = alwaysUseTopLeftAnchor
+    end
+
+    -- Raid-style party frames / raid frames use CompactRaidFrameContainer.
+    if CompactRaidFrameContainer and CompactRaidFrameContainer.alwaysUseTopLeftAnchor ~= nil then
+        CompactRaidFrameContainer.alwaysUseTopLeftAnchor = alwaysUseTopLeftAnchor
+    end
 end
 
 function FF:ShowPartyFrameIfNeeded()
@@ -189,15 +197,7 @@ function FF:UpdateAuraCountdownColor()
     end
 end
 
-function FF:IsManagedPartyFrame(frame)
-    return Blizzard:IsManagedPartyFrame(frame)
-end
-
 function FF:ApplyPlayerStatusAnchorForFrame(frame)
-    if not self:IsManagedPartyFrame(frame) then
-        return
-    end
-
     local statusText = frame and frame.statusText
     if not (statusText and statusText.ClearAllPoints and statusText.SetPoint) then
         return
@@ -228,10 +228,6 @@ function FF:UpdatePlayerStatusAnchoring()
 end
 
 function FF:ApplyPlayerStatusColorForFrame(frame)
-    if not self:IsManagedPartyFrame(frame) then
-        return
-    end
-
     local statusText = frame and frame.statusText
 
     if not (statusText and statusText.SetTextColor) then
@@ -277,10 +273,6 @@ function FF:ApplyPlayerStatusSettings()
 end
 
 function FF:GetPlayerNameFontString(frame)
-    if not self:IsManagedPartyFrame(frame) then
-        return nil
-    end
-
     local nameText = frame and frame.name
     if not nameText then
         return nil
@@ -410,10 +402,6 @@ function FF:ApplyPlayerNameSettings()
 end
 
 function FF:ApplyPlayerStatusFontSizeForFrame(frame)
-    if not self:IsManagedPartyFrame(frame) then
-        return
-    end
-
     local fontString = frame and frame.statusText
 
     if not (fontString and fontString.GetFont and fontString.SetFont) then
@@ -493,8 +481,12 @@ function FF:ShowDebuffCountdownIfNeeded()
 end
 
 function FF:UpdateRoleIcon(frame)
+    if not (frame and type(frame.unit) == "string" and frame.unit ~= "") then
+        return
+    end
+
     local role = UnitGroupRolesAssigned(frame.unit)
-    if not frame.roleIcon and role then
+    if not frame.roleIcon then
         return
     end
 
@@ -557,6 +549,7 @@ function FF:UpdateTextures(frame)
 end
 
 function FF:UpdateFrame(frame)
+    -- Utils:Log("FF_UPDATE_FRAME", frame)
     if frame:IsShown() then
         self:UpdateRoleIcon(frame)
     end
@@ -572,7 +565,7 @@ end
 
 function FF:UpdateFrames()
     local partyFrames = self:GetFrames()
-    -- Utils:Log("FF:UpdateFrames", partyFrames)
+    Utils:Log("FF:UpdateFrames", partyFrames)
 
     for _, frame in ipairs(partyFrames) do
         self:UpdateFrame(frame)

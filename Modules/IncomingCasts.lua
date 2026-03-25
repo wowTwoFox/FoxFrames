@@ -642,14 +642,14 @@ function FF:PLAYER_REGEN_ENABLED()
 end
 
 function FF:UpdateIncomingCastIndicators()
-    if not (CompactPartyFrame and CompactPartyFrame.memberUnitFrames) then
+    local frames = self:GetFrames()
+    if type(frames) ~= "table" or next(frames) == nil then
         return
     end
 
     if not self.GetIncomingCasts then return end
 
     local config = GetIncomingCastIndicatorConfig()
-    local frames = self:GetFrames()
     local castList = {}
     local inCombat = InCombatLockdown and InCombatLockdown()
 
