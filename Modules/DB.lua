@@ -36,14 +36,16 @@ local raidIncomingCastsEnabledTypes = {
 }
 
 local defaultPlayerStatus = {
-    fontSize = 17,
-    opacity = 1,
-    color = {
-        r = 1,
-        g = 1,
-        b = 1,
+    text = {
+        fontSize = 17,
+        opacity = 1,
+        color = {
+            r = 1,
+            g = 1,
+            b = 1,
+        },
+        useClassColors = false,
     },
-    useClassColors = false,
     customizeFrame = true,
     customizeText = true,
     frame = {
@@ -57,14 +59,16 @@ local defaultPlayerStatus = {
 }
 
 local defaultPlayerName = {
-    fontSize = 8,
-    opacity = 1,
-    color = {
-        r = 1,
-        g = 1,
-        b = 1,
+    text = {
+        fontSize = 8,
+        opacity = 1,
+        color = {
+            r = 1,
+            g = 1,
+            b = 1,
+        },
+        useClassColors = false,
     },
-    useClassColors = false,
     customizeFrame = true,
     customizeText = true,
     frame = {
@@ -249,6 +253,20 @@ local function GetTextColorAndOpacity(profile)
     local b = Utils:ClampNumber(color and color.b, 0, 1, 1)
     local a = Utils:ClampNumber(profile.opacity, 0, 1, 1)
     return r, g, b, a
+end
+
+local function GetTextProfile(parentProfile)
+    local profile = parentProfile
+    if type(profile) ~= "table" then
+        profile = {}
+    end
+
+    local textProfile = profile.text
+    if type(textProfile) ~= "table" then
+        textProfile = {}
+    end
+
+    return textProfile
 end
 
 local function GetTextUseClassColors(textProfile)
@@ -487,22 +505,22 @@ end
 
 function Object:GetPlayerStatusColor()
     local profile = self.storage:GetValuesTableAtPath("profile.partyFrame.playerStatus")
-    return GetTextColorAndOpacity(profile)
+    return GetTextColorAndOpacity(GetTextProfile(profile))
 end
 
 function Object:GetRaidPlayerStatusColor()
     local profile = self.storage:GetValuesTableAtPath("profile.raidFrame.playerStatus")
-    return GetTextColorAndOpacity(profile)
+    return GetTextColorAndOpacity(GetTextProfile(profile))
 end
 
 function Object:GetPlayerStatusUseClassColors()
     local profile = self.storage:GetValuesTableAtPath("profile.partyFrame.playerStatus")
-    return GetTextUseClassColors(profile)
+    return GetTextUseClassColors(GetTextProfile(profile))
 end
 
 function Object:GetRaidPlayerStatusUseClassColors()
     local profile = self.storage:GetValuesTableAtPath("profile.raidFrame.playerStatus")
-    return GetTextUseClassColors(profile)
+    return GetTextUseClassColors(GetTextProfile(profile))
 end
 
 function Object:GetPlayerNameAnchorsAndOffsets(layoutAxis)
@@ -549,42 +567,42 @@ end
 
 function Object:GetPlayerNameColor()
     local profile = self.storage:GetValuesTableAtPath("profile.partyFrame.playerName")
-    return GetTextColorAndOpacity(profile)
+    return GetTextColorAndOpacity(GetTextProfile(profile))
 end
 
 function Object:GetRaidPlayerNameColor()
     local profile = self.storage:GetValuesTableAtPath("profile.raidFrame.playerName")
-    return GetTextColorAndOpacity(profile)
+    return GetTextColorAndOpacity(GetTextProfile(profile))
 end
 
 function Object:GetPlayerNameUseClassColors()
     local profile = self.storage:GetValuesTableAtPath("profile.partyFrame.playerName")
-    return GetTextUseClassColors(profile)
+    return GetTextUseClassColors(GetTextProfile(profile))
 end
 
 function Object:GetRaidPlayerNameUseClassColors()
     local profile = self.storage:GetValuesTableAtPath("profile.raidFrame.playerName")
-    return GetTextUseClassColors(profile)
+    return GetTextUseClassColors(GetTextProfile(profile))
 end
 
 function Object:GetPlayerNameFontSize()
     local profile = self.storage:GetValuesTableAtPath("profile.partyFrame.playerName")
-    return GetTextFontSize(profile, 8, 32)
+    return GetTextFontSize(GetTextProfile(profile), 8, 32)
 end
 
 function Object:GetRaidPlayerNameFontSize()
     local profile = self.storage:GetValuesTableAtPath("profile.raidFrame.playerName")
-    return GetTextFontSize(profile, 8, 32)
+    return GetTextFontSize(GetTextProfile(profile), 8, 32)
 end
 
 function Object:GetPlayerStatusFontSize()
     local profile = self.storage:GetValuesTableAtPath("profile.partyFrame.playerStatus")
-    return GetTextFontSize(profile, 8, 32)
+    return GetTextFontSize(GetTextProfile(profile), 8, 32)
 end
 
 function Object:GetRaidPlayerStatusFontSize()
     local profile = self.storage:GetValuesTableAtPath("profile.raidFrame.playerStatus")
-    return GetTextFontSize(profile, 8, 32)
+    return GetTextFontSize(GetTextProfile(profile), 8, 32)
 end
 
 function Object:GetRaidPlayerStatusTextOverrideEnabled()

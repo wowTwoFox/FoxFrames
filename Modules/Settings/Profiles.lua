@@ -36,7 +36,7 @@ function Object:CreateProfilesSettings(rootCategory, callbacks)
     local onProfileActivated = callbacks.onProfileActivated
 
     local profilesPrefix = SETTINGS_PREFIX .. "Profiles_"
-    local profilesCategory = SettingsLib:CreateCategory(rootCategory, "Profiles")
+    local profilesCategory = rootCategory
 
     SettingsLib:CreateHeader(profilesCategory, {
         name = "Manage Profiles",

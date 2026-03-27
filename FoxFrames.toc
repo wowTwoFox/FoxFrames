@@ -47,5 +47,6 @@ Modules\Settings\SettingsComponentBuilder.lua
 Modules\Settings\SettingsFlow.lua
 Modules\Settings\SettingsRow.lua
 Modules\Settings\SettingsRow.xml
+Modules\SettingsCommon.lua
 Settings.lua
 Core.lua
