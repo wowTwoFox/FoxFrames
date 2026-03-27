@@ -97,8 +97,19 @@ local function ValidateSettingsPath(path)
     return DB.storage and DB.storage:ValidatePathExists(path) == true
 end
 
-local function AddFrameSettings(path, category, keyPrefix, prefix, parent, parentCheck, applySetting)
-    assert(type(applySetting) == "function", "FoxFrames: AddFrameSettings requires applySetting callback")
+local function AddFrameSettings(category, options)
+    local opts = type(options) == "table" and options or {}
+    local path = (type(opts.path) == "string" and opts.path ~= "" and opts.path)
+    local keyPrefix = (type(opts.keyPrefix) == "string" and opts.keyPrefix ~= "" and opts.keyPrefix) or nil
+    local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil
+    local onChanged = type(opts.onChanged) == "function" and opts.onChanged or nil
+
+    assert(type(onChanged) == "function", "FoxFrames: AddFrameSettings requires onChanged callback")
+
+    if not (category and path and keyPrefix) then
+        return
+    end
+
     if not ValidateSettingsPath(path) then
         return
     end
@@ -120,7 +131,7 @@ local function AddFrameSettings(path, category, keyPrefix, prefix, parent, paren
     end
 
     local function OnChanged(settingKey)
-        applySetting(settingKey)
+        onChanged(settingKey)
     end
 
     SettingsLib:CreateDropdown(category, {
@@ -137,8 +148,6 @@ local function AddFrameSettings(path, category, keyPrefix, prefix, parent, paren
         end,
         desc = "Choose whether this element is anchored to the unit frame or to the health bar.",
         prefix = prefix,
-        parent = parent,
-        parentCheck = parentCheck,
     })
 
     SettingsLib:CreateDropdown(category, {
@@ -155,8 +164,6 @@ local function AddFrameSettings(path, category, keyPrefix, prefix, parent, paren
         end,
         desc = "Anchor point used for this element.",
         prefix = prefix,
-        parent = parent,
-        parentCheck = parentCheck,
     })
 
     SettingsLib:CreateDropdown(category, {
@@ -173,8 +180,6 @@ local function AddFrameSettings(path, category, keyPrefix, prefix, parent, paren
         end,
         desc = "Inside uses the same anchor point as Position.\nOutside (Vertical) flips Top <-> Bottom.\nOutside (Horizontal) flips Left <-> Right.\nOutside (Auto) picks Vertical/Horizontal based on the party frame orientation (horizontal vs vertical layout).\nExample: party frames stacked top-to-bottom -> Auto uses Outside (Horizontal).",
         prefix = prefix,
-        parent = parent,
-        parentCheck = parentCheck,
     })
 
     SettingsLib:CreateSlider(category, {
@@ -200,8 +205,6 @@ local function AddFrameSettings(path, category, keyPrefix, prefix, parent, paren
         end,
         desc = "Horizontal offset for anchoring.",
         prefix = prefix,
-        parent = parent,
-        parentCheck = parentCheck,
     })
 
     SettingsLib:CreateSlider(category, {
@@ -227,8 +230,6 @@ local function AddFrameSettings(path, category, keyPrefix, prefix, parent, paren
         end,
         desc = "Vertical offset for anchoring.",
         prefix = prefix,
-        parent = parent,
-        parentCheck = parentCheck,
     })
 
     SettingsLib:CreateCheckbox(category, {
@@ -248,13 +249,22 @@ local function AddFrameSettings(path, category, keyPrefix, prefix, parent, paren
         end,
         desc = "When enabled, X/Y offsets are flipped based on anchor point.",
         prefix = prefix,
-        parent = parent,
-        parentCheck = parentCheck,
     })
 end
 
-local function AddTextSettings(path, category, keyPrefix, prefix, applySetting, parent, parentCheck)
-    assert(type(applySetting) == "function", "FoxFrames: AddTextSettings requires applySetting callback")
+local function AddTextSettings(category, options)
+    local opts = type(options) == "table" and options or {}
+    local path = (type(opts.path) == "string" and opts.path ~= "" and opts.path)
+    local keyPrefix = (type(opts.keyPrefix) == "string" and opts.keyPrefix ~= "" and opts.keyPrefix) or nil
+    local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil
+    local onChanged = type(opts.onChanged) == "function" and opts.onChanged or nil
+
+    assert(type(onChanged) == "function", "FoxFrames: AddTextSettings requires onChanged callback")
+
+    if not (category and path and keyPrefix) then
+        return
+    end
+
     if not ValidateSettingsPath(path) then
         return
     end
@@ -274,7 +284,7 @@ local function AddTextSettings(path, category, keyPrefix, prefix, applySetting, 
     end
 
     local function OnChanged(settingKey)
-        applySetting(settingKey)
+        onChanged(settingKey)
     end
 
     SettingsLib:CreateSlider(category, {
@@ -300,8 +310,6 @@ local function AddTextSettings(path, category, keyPrefix, prefix, applySetting, 
         end,
         desc = "Adjust the text size on frames.",
         prefix = prefix,
-        parent = parent,
-        parentCheck = parentCheck,
     })
 
     SettingsLib:CreateSlider(category, {
@@ -327,8 +335,6 @@ local function AddTextSettings(path, category, keyPrefix, prefix, applySetting, 
         end,
         desc = "Adjust opacity for text on frames.",
         prefix = prefix,
-        parent = parent,
-        parentCheck = parentCheck,
     })
 
     local useClassColorsElement = SettingsLib:CreateCheckbox(category, {
@@ -348,8 +354,6 @@ local function AddTextSettings(path, category, keyPrefix, prefix, applySetting, 
         end,
         desc = "Use class colors instead of the configured static text color.",
         prefix = prefix,
-        parent = parent,
-        parentCheck = parentCheck,
     })
 
     SettingsLib:CreateColorOverrides(category, {
@@ -372,17 +376,25 @@ local function AddTextSettings(path, category, keyPrefix, prefix, applySetting, 
         hasOpacity = false,
         parent = useClassColorsElement,
         parentCheck = function()
-            if type(parentCheck) == "function" and parentCheck() ~= true then
-                return false
-            end
             return GetValue("useClassColors") ~= true
         end,
         minHeight = 36,
     })
 end
 
-local function AddCooldownTextSettings(path, category, keyPrefix, prefix, applySetting)
-    assert(type(applySetting) == "function", "FoxFrames: AddCooldownTextSettings requires applySetting callback")
+local function AddCooldownTextSettings(category, options)
+    local opts = type(options) == "table" and options or {}
+    local path = (type(opts.path) == "string" and opts.path ~= "" and opts.path)
+    local keyPrefix = (type(opts.keyPrefix) == "string" and opts.keyPrefix ~= "" and opts.keyPrefix) or nil
+    local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil
+    local onChanged = type(opts.onChanged) == "function" and opts.onChanged or nil
+
+    assert(type(onChanged) == "function", "FoxFrames: AddCooldownTextSettings requires onChanged callback")
+
+    if not (category and path and keyPrefix) then
+        return
+    end
+
     if not ValidateSettingsPath(path) then
         return
     end
@@ -402,7 +414,7 @@ local function AddCooldownTextSettings(path, category, keyPrefix, prefix, applyS
     end
 
     local function OnChanged(settingKey)
-        applySetting(settingKey)
+        onChanged(settingKey)
     end
 
     local showElement = SettingsLib:CreateCheckbox(category, {
@@ -490,12 +502,275 @@ local function AddCooldownTextSettings(path, category, keyPrefix, prefix, applyS
     })
 end
 
-local function CreateBooleanSettings(category, prefix, options)
+local function AddIncomingCastsIconSettings(category, options)
+    local opts = type(options) == "table" and options or {}
+    local iconPath = (type(opts.iconPath) == "string" and opts.iconPath ~= "" and opts.iconPath)
+    local barPath = (type(opts.barPath) == "string" and opts.barPath ~= "" and opts.barPath)
+    local keyPrefix = (type(opts.keyPrefix) == "string" and opts.keyPrefix ~= "" and opts.keyPrefix) or nil
+    local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil
+    local onChanged = type(opts.onChanged) == "function" and opts.onChanged or nil
+    -- NOTE: Intentionally no parent/parentCheck gating here.
+    -- LibEQOL/Settings gating requires a proper parent initializer and can be fragile.
+
+    assert(type(onChanged) == "function", "FoxFrames: AddIncomingCastsIconSettings requires onChanged callback")
+
+    if not (category and iconPath and barPath and keyPrefix) then
+        return
+    end
+
+    if not ValidateSettingsPath(iconPath) then
+        return
+    end
+
+    if not ValidateSettingsPath(barPath) then
+        return
+    end
+
+    SettingsLib:CreateHeader(category, {
+        name = "Icons",
+    })
+
+    local iconDefaults = DB.storage:GetDefaultsTableAtPath(iconPath) or {}
+    local barDefaults = DB.storage:GetDefaultsTableAtPath(barPath) or {}
+
+    local defaultGrowthDirection = Utils:SanitizeOption(barDefaults.growthDirection, Constants.GROWTH_DIRECTIONS) or Constants.GROWTH_DIRECTIONS.RIGHT
+    local defaultSpellCount = Utils:ClampInteger(barDefaults.spellCount, 1, 6, 3)
+
+    local defaultScale = Utils:ClampNumber(iconDefaults.scale, 0.5, 2, 1)
+
+    local defaultSpacing = Utils:ClampInteger(iconDefaults.spacing, -10, 20, 0)
+    local defaultShowBorder = iconDefaults.showBorder ~= false
+
+    local function GetValue(key)
+        return DB.storage:GetValue(iconPath .. "." .. key)
+    end
+
+    local function SetValue(key, value)
+        DB.storage:SetValue(iconPath .. "." .. key, value)
+    end
+
+    local function GetBarValue(key)
+        return DB.storage:GetValue(barPath .. "." .. key)
+    end
+
+    local function SetBarValue(key, value)
+        DB.storage:SetValue(barPath .. "." .. key, value)
+    end
+
+    local function OnChanged(settingKey)
+        onChanged(settingKey)
+    end
+
+    SettingsLib:CreateDropdown(category, {
+        key = keyPrefix .. "GrowDirection",
+        name = "Grow Direction",
+        default = defaultGrowthDirection,
+        values = GROWTH_DIRECTION_LABELS,
+        get = function()
+            return Utils:SanitizeOption(GetBarValue("growthDirection"), Constants.GROWTH_DIRECTIONS) or defaultGrowthDirection
+        end,
+        set = function(value)
+            SetBarValue("growthDirection", Utils:SanitizeOption(value, Constants.GROWTH_DIRECTIONS) or defaultGrowthDirection)
+            OnChanged("growthDirection")
+        end,
+        desc = "Direction targeted spell icons grow when multiple are shown.",
+        prefix = prefix,
+    })
+
+    SettingsLib:CreateSlider(category, {
+        key = keyPrefix .. "Count",
+        name = "Icon Count",
+        default = defaultSpellCount,
+        min = 1,
+        max = 6,
+        step = 1,
+        formatter = function(value)
+            return string.format("%i", Utils:ClampInteger(value, 1, 6, defaultSpellCount))
+        end,
+        get = function()
+            local value = GetBarValue("spellCount")
+            if value == nil then
+                value = defaultSpellCount
+            end
+            return Utils:ClampInteger(value, 1, 6, defaultSpellCount)
+        end,
+        set = function(value)
+            SetBarValue("spellCount", Utils:ClampInteger(value, 1, 6, defaultSpellCount))
+            OnChanged("spellCount")
+        end,
+        desc = "How many targeted spell icons to show per party member.",
+        prefix = prefix,
+    })
+
+    SettingsLib:CreateSlider(category, {
+        key = keyPrefix .. "Scale",
+        name = "Icon Scale",
+        default = defaultScale,
+        min = 0.5,
+        max = 2,
+        step = 0.10,
+        formatter = function(value)
+            return string.format(
+                "%d%%",
+                Utils:ClampInteger((value and (value * 100) or nil), 50, 200, defaultScale * 100)
+            )
+        end,
+        get = function()
+            local value = GetValue("scale")
+            if value == nil then
+                value = defaultScale
+            end
+            return Utils:ClampNumber(value, 0.5, 2, defaultScale)
+        end,
+        set = function(value)
+            SetValue("scale", Utils:ClampNumber(value, 0.5, 2, defaultScale))
+            OnChanged("scale")
+        end,
+        desc = "Scales each targeted spell icon without distorting borders/overlays.",
+        prefix = prefix,
+    })
+
+    SettingsLib:CreateSlider(category, {
+        key = keyPrefix .. "Spacing",
+        name = "Icon Spacing",
+        default = defaultSpacing,
+        min = -10,
+        max = 20,
+        step = 1,
+        formatter = function(value)
+            return string.format("%i", Utils:ClampInteger(value, -10, 20, defaultSpacing))
+        end,
+        get = function()
+            local value = GetValue("spacing")
+            if value == nil then
+                value = defaultSpacing
+            end
+            return Utils:ClampInteger(value, -10, 20, defaultSpacing)
+        end,
+        set = function(value)
+            SetValue("spacing", Utils:ClampInteger(value, -10, 20, defaultSpacing))
+            OnChanged("spacing")
+        end,
+        desc = "Space (in pixels) between targeted spell icons. Negative values allow overlap.",
+        prefix = prefix,
+    })
+
+    SettingsLib:CreateCheckbox(category, {
+        key = keyPrefix .. "Border",
+        name = "Show Icon Border",
+        default = defaultShowBorder,
+        get = function()
+            local value = GetValue("showBorder")
+            if value == nil then
+                return defaultShowBorder
+            end
+            return value == true
+        end,
+        set = function(value)
+            SetValue("showBorder", value == true)
+            OnChanged("showBorder")
+        end,
+        desc = "Toggle the border around targeted spell icons.",
+        prefix = prefix,
+    })
+
+end
+
+local function AddIncomingCastsCooldownSettings(category, options)
+    local opts = type(options) == "table" and options or {}
+    local iconPath = (type(opts.path) == "string" and opts.path ~= "" and opts.path)
+    local keyPrefix = (type(opts.keyPrefix) == "string" and opts.keyPrefix ~= "" and opts.keyPrefix) or nil
+    local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil
+    local onChanged = type(opts.onChanged) == "function" and opts.onChanged or nil
+
+    assert(type(onChanged) == "function", "FoxFrames: AddIncomingCastsCooldownSettings requires onChanged callback")
+
+    if not (category and iconPath and keyPrefix) then
+        return
+    end
+
+    if not ValidateSettingsPath(iconPath) then
+        return
+    end
+
+    local iconDefaults = DB.storage:GetDefaultsTableAtPath(iconPath) or {}
+    local defaultShowSwipe = iconDefaults.showSwipe ~= false
+
+    local function GetValue(key)
+        return DB.storage:GetValue(iconPath .. "." .. key)
+    end
+
+    local function SetValue(key, value)
+        DB.storage:SetValue(iconPath .. "." .. key, value)
+    end
+
+    SettingsLib:CreateHeader(category, {
+        name = "Cooldown",
+    })
+
+    SettingsLib:CreateCheckbox(category, {
+        key = keyPrefix .. "Swipe",
+        name = "Show Cooldown Swipe",
+        default = defaultShowSwipe,
+        get = function()
+            local value = GetValue("showSwipe")
+            if value == nil then
+                return defaultShowSwipe
+            end
+            return value == true
+        end,
+        set = function(value)
+            SetValue("showSwipe", value == true)
+            onChanged("showSwipe")
+        end,
+        desc = "Toggle the cooldown swipe overlay on targeted spell icons.",
+        prefix = prefix,
+    })
+
+    AddCooldownTextSettings(category, {
+        path = iconPath .. ".cooldownText",
+        keyPrefix = keyPrefix,
+        prefix = prefix,
+        onChanged = function(settingKey)
+            onChanged(settingKey)
+        end,
+    })
+end
+
+local function AddIncomingCastsPlacementSettings(category, options)
+    local opts = type(options) == "table" and options or {}
+    local framePath = (type(opts.path) == "string" and opts.path ~= "" and opts.path)
+    local keyPrefix = (type(opts.keyPrefix) == "string" and opts.keyPrefix ~= "" and opts.keyPrefix) or nil
+    local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil
+    local onChanged = type(opts.onChanged) == "function" and opts.onChanged or nil
+
+    assert(type(onChanged) == "function", "FoxFrames: AddIncomingCastsPlacementSettings requires onChanged callback")
+
+    if not (category and framePath and keyPrefix) then
+        return
+    end
+
+    SettingsLib:CreateHeader(category, {
+        name = "Placement",
+    })
+
+    AddFrameSettings(category, {
+        path = framePath,
+        keyPrefix = keyPrefix .. "Frame",
+        prefix = prefix,
+        onChanged = function(settingKey)
+            onChanged(settingKey)
+        end,
+    })
+end
+
+local function CreateBooleanSettings(category, options)
     local opts = type(options) == "table" and options or {}
     local key = (type(opts.key) == "string" and opts.key ~= "" and opts.key)
     local path = (type(opts.path) == "string" and opts.path ~= "" and opts.path)
     local name = (type(opts.name) == "string" and opts.name ~= "" and opts.name)
     local desc = (type(opts.desc) == "string" and opts.desc ~= "" and opts.desc)
+    local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil
     local onChanged = type(opts.onChanged) == "function" and opts.onChanged or nil
     local defaultValue = opts.default == true
 
@@ -530,9 +805,11 @@ local function CreateBooleanSettings(category, prefix, options)
     })
 end
 
-local function CreatePlayerTextElementSettings(category, framePrefix, options, applySetting)
+local function CreatePlayerTextElementSettings(category, options)
     local opts = type(options) == "table" and options or {}
     local path = (type(opts.path) == "string" and opts.path ~= "" and opts.path)
+    local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil
+    local onChanged = type(opts.onChanged) == "function" and opts.onChanged or nil
     local framePath = path and (path .. ".frame") or nil
     local textCustomizePath = path and (path .. ".customizeText") or nil
     local frameCustomizePath = path and (path .. ".customizeFrame") or nil
@@ -541,7 +818,9 @@ local function CreatePlayerTextElementSettings(category, framePrefix, options, a
     local textCustomizeDesc = (type(opts.textCustomizeDesc) == "string" and opts.textCustomizeDesc ~= "" and opts.textCustomizeDesc)
     local frameCustomizeDesc = (type(opts.frameCustomizeDesc) == "string" and opts.frameCustomizeDesc ~= "" and opts.frameCustomizeDesc)
 
-    if not (category and path and keyPrefix) then
+    assert(type(onChanged) == "function", "FoxFrames: CreatePlayerTextElementSettings requires onChanged callback")
+
+    if not (category and path and keyPrefix and prefix) then
         return
     end
 
@@ -556,28 +835,27 @@ local function CreatePlayerTextElementSettings(category, framePrefix, options, a
     })
 
     local defaultCustomize = defaults.customizeText ~= false
-    local function IsTextCustomized()
-        local value = DB.storage:GetValue(textCustomizePath)
-        if value == nil then
-            return defaultCustomize
-        end
-        return value == true
-    end
 
-    local textCustomizeElement = CreateBooleanSettings(category, framePrefix, {
+    CreateBooleanSettings(category, {
         key = keyPrefix .. "TextCustomize",
         path = textCustomizePath,
         name = toggleName,
         default = defaultCustomize,
+        prefix = prefix,
         onChanged = function()
-            applySetting("customizeText")
+            onChanged("customizeText")
         end,
         desc = textCustomizeDesc,
     })
 
-    AddTextSettings(path, category, keyPrefix, framePrefix, function(settingKey)
-        applySetting(settingKey)
-    end, textCustomizeElement, IsTextCustomized)
+    AddTextSettings(category, {
+        path = path,
+        keyPrefix = keyPrefix,
+        prefix = prefix,
+        onChanged = function(settingKey)
+            onChanged(settingKey)
+        end,
+    })
 
     if not ValidateSettingsPath(framePath) then
         return
@@ -587,28 +865,26 @@ local function CreatePlayerTextElementSettings(category, framePrefix, options, a
         name = "Placement",
     })
 
-    local function IsFrameCustomized()
-        local value = DB.storage:GetValue(frameCustomizePath)
-        if value == nil then
-            return defaultCustomize
-        end
-        return value == true
-    end
-
-    local frameCustomizeElement = CreateBooleanSettings(category, framePrefix, {
+    CreateBooleanSettings(category, {
         key = keyPrefix .. "FrameCustomize",
         path = frameCustomizePath,
         name = toggleName,
         default = defaultCustomize,
+        prefix = prefix,
         onChanged = function()
-            applySetting("customizeFrame")
+            onChanged("customizeFrame")
         end,
         desc = frameCustomizeDesc,
     })
 
-    AddFrameSettings(framePath, category, keyPrefix .. "Frame", framePrefix, frameCustomizeElement, IsFrameCustomized, function(settingKey)
-        applySetting(settingKey)
-    end)
+    AddFrameSettings(category, {
+        path = framePath,
+        keyPrefix = keyPrefix .. "Frame",
+        prefix = prefix,
+        onChanged = function(settingKey)
+            onChanged(settingKey)
+        end,
+    })
 end
 
 local function CreatePartyPlayerSettings(rootCategory, framePrefix, basePath)
@@ -617,114 +893,225 @@ local function CreatePartyPlayerSettings(rootCategory, framePrefix, basePath)
     end
 
     local playerNameCategory = SettingsLib:CreateCategory(rootCategory, "Player Name")
-    CreatePlayerTextElementSettings(playerNameCategory, framePrefix .. "PlayerName_", {
+    CreatePlayerTextElementSettings(playerNameCategory, {
+        prefix = framePrefix .. "PlayerName_",
         path = basePath .. ".playerName",
         keyPrefix = "PlayerName",
         toggleName = "Customize",
         textCustomizeDesc = "Toggle FoxFrames text customization for Player Name.",
         frameCustomizeDesc = "Toggle FoxFrames placement customization for Player Name.",
-    }, function(settingKey)
-        FF:ApplyPlayerNameSettings()
-    end)
+        onChanged = function(_)
+            FF:ApplyPlayerNameSettings()
+        end,
+    })
 
     local playerStatusCategory = SettingsLib:CreateCategory(rootCategory, "Player Status")
-    CreatePlayerTextElementSettings(playerStatusCategory, framePrefix .. "PlayerStatus_", {
+    CreatePlayerTextElementSettings(playerStatusCategory, {
+        prefix = framePrefix .. "PlayerStatus_",
         path = basePath .. ".playerStatus",
         keyPrefix = "PlayerStatus",
         toggleName = "Customize",
         textCustomizeDesc = "Toggle FoxFrames text customization for Player Status.",
         frameCustomizeDesc = "Toggle FoxFrames placement customization for Player Status.",
-    }, function(settingKey)
-        FF:ApplyPlayerStatusSettings()
-    end)
+        onChanged = function(_)
+            FF:ApplyPlayerStatusSettings()
+        end,
+    })
 end
 
-local function CreateRaidPlayerSettings(rootCategory, framePrefix, basePath)
-    if type(basePath) ~= "string" or basePath == "" then
-        return
-    end
+local function CreateRaidPlayerSettings(rootCategory, framePrefix)
+    local basePath = "profile.raidFrame"
 
     local raidPlayerNameCategory = SettingsLib:CreateCategory(rootCategory, "Raid Player Name")
-    CreatePlayerTextElementSettings(raidPlayerNameCategory, framePrefix .. "PlayerName_", {
+    CreatePlayerTextElementSettings(raidPlayerNameCategory, {
+        prefix = framePrefix .. "PlayerName_",
         path = basePath .. ".playerName",
         keyPrefix = "RaidPlayerName",
         toggleName = "Override",
         textCustomizeDesc = "Override text settings for Raid Player Name when in a raid. When disabled, uses Party settings.",
         frameCustomizeDesc = "Override placement settings for Raid Player Name when in a raid. When disabled, uses Party settings.",
-    }, function(settingKey)
-        FF:ApplyPlayerNameSettings()
-    end)
+        onChanged = function(_)
+            FF:ApplyPlayerNameSettings()
+        end,
+    })
 
     local raidPlayerStatusCategory = SettingsLib:CreateCategory(rootCategory, "Raid Player Status")
-    CreatePlayerTextElementSettings(raidPlayerStatusCategory, framePrefix .. "PlayerStatus_", {
+    CreatePlayerTextElementSettings(raidPlayerStatusCategory, {
+        prefix = framePrefix .. "PlayerStatus_",
         path = basePath .. ".playerStatus",
         keyPrefix = "RaidPlayerStatus",
         toggleName = "Override",
         textCustomizeDesc = "Override text settings for Raid Player Status when in a raid. When disabled, uses Party settings.",
         frameCustomizeDesc = "Override placement settings for Raid Player Status when in a raid. When disabled, uses Party settings.",
-    }, function(settingKey)
-        FF:ApplyPlayerStatusSettings()
-    end)
+        onChanged = function(_)
+            FF:ApplyPlayerStatusSettings()
+        end,
+    })
 end
 
-local function CreateBuffsSettings(rootCategory, partyFramePrefix)
+local function CreateBuffsSettings(rootCategory, options)
+    local opts = type(options) == "table" and options or {}
+    local path = (type(opts.path) == "string" and opts.path ~= "" and opts.path)
+    local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil
+    local keyPrefix = (type(opts.keyPrefix) == "string" and opts.keyPrefix ~= "" and opts.keyPrefix)
+
+    if not (rootCategory and path and keyPrefix) then
+        return
+    end
+
+    local cooldownTextPath = path .. ".cooldownText"
+    local cooldownKeyPrefix = keyPrefix .. "CooldownText"
+
     local buffsCategory = SettingsLib:CreateCategory(rootCategory, "Buffs")
 
     SettingsLib:CreateHeader(buffsCategory, {
         name = "Cooldown",
     })
 
-    AddCooldownTextSettings("profile.partyFrame.buffs.cooldownText", buffsCategory, "Buff", partyFramePrefix, function(settingKey)
-        if settingKey == "show" then
-            FF:ShowBuffCountdownIfNeeded()
-        elseif settingKey == "fontSize" then
-            FF:UpdateAuraCountdownFontSize()
-        else
-            FF:UpdateAuraCountdownColor()
-        end
-    end)
+    AddCooldownTextSettings(buffsCategory, {
+        path = cooldownTextPath,
+        keyPrefix = cooldownKeyPrefix,
+        prefix = prefix,
+        onChanged = function(settingKey)
+            if settingKey == "show" then
+                FF:ShowBuffCountdownIfNeeded()
+            elseif settingKey == "fontSize" then
+                FF:UpdateAuraCountdownFontSize()
+            else
+                FF:UpdateAuraCountdownColor()
+            end
+        end,
+    })
 end
 
-local function CreateDebuffsSettings(rootCategory, partyFramePrefix)
+local function CreateDebuffsSettings(rootCategory, options)
+    local opts = type(options) == "table" and options or {}
+    local path = (type(opts.path) == "string" and opts.path ~= "" and opts.path)
+    local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil
+    local keyPrefix = (type(opts.keyPrefix) == "string" and opts.keyPrefix ~= "" and opts.keyPrefix)
+
+    if not (rootCategory and path and keyPrefix) then
+        return
+    end
+
+    local cooldownTextPath = path .. ".cooldownText"
+    local cooldownKeyPrefix = keyPrefix .. "CooldownText"
+
     local debuffsCategory = SettingsLib:CreateCategory(rootCategory, "Debuffs")
 
     SettingsLib:CreateHeader(debuffsCategory, {
         name = "Cooldown",
     })
 
-    AddCooldownTextSettings("profile.partyFrame.debuffs.cooldownText", debuffsCategory, "Debuff", partyFramePrefix, function(settingKey)
-        if settingKey == "show" then
-            FF:ShowDebuffCountdownIfNeeded()
-        elseif settingKey == "fontSize" then
-            FF:UpdateAuraCountdownFontSize()
-        else
-            FF:UpdateAuraCountdownColor()
-        end
-    end)
+    AddCooldownTextSettings(debuffsCategory, {
+        path = cooldownTextPath,
+        keyPrefix = cooldownKeyPrefix,
+        prefix = prefix,
+        onChanged = function(settingKey)
+            if settingKey == "show" then
+                FF:ShowDebuffCountdownIfNeeded()
+            elseif settingKey == "fontSize" then
+                FF:UpdateAuraCountdownFontSize()
+            else
+                FF:UpdateAuraCountdownColor()
+            end
+        end,
+    })
 end
 
-local function CreateIncomingCastsSettings(rootCategory)
+local function CreateGlobalIncomingCastsSettings(category, options)
+    local opts = type(options) == "table" and options or {}
+    local basePath = (type(opts.basePath) == "string" and opts.basePath ~= "" and opts.basePath)
+    local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil
+    local onChanged = type(opts.onChanged) == "function" and opts.onChanged or nil
+
+    assert(type(onChanged) == "function", "FoxFrames: CreateGlobalIncomingCastsSettings requires onChanged callback")
+
+    if not (category and basePath) then
+        return
+    end
+
+    if not ValidateSettingsPath(basePath) then
+        return
+    end
+
+    local iconPath = basePath .. ".icon"
+
+    AddIncomingCastsIconSettings(category, {
+        iconPath = iconPath,
+        barPath = basePath,
+        keyPrefix = "IncomingCastIcon",
+        prefix = prefix,
+        onChanged = function(_)
+            onChanged("icons")
+        end,
+    })
+
+    AddIncomingCastsCooldownSettings(category, {
+        path = iconPath,
+        keyPrefix = "IncomingCastIcon",
+        prefix = prefix,
+        onChanged = function(_)
+            onChanged("cooldown")
+        end,
+    })
+
+    AddIncomingCastsPlacementSettings(category, {
+        path = basePath .. ".frame",
+        keyPrefix = "IncomingCast",
+        prefix = prefix,
+        onChanged = function(_)
+            onChanged("placement")
+        end,
+    })
+end
+
+local function CreatePartyIncomingCastsSettings(rootCategory)
+    if not rootCategory then
+        return
+    end
+
+    local trackIncomingCastsPath = "profile.partyFrame.incomingCasts.enabled"
+    local incomingCastsBasePath = "profile.partyFrame.incomingCasts"
+
     local incomingCastsPrefix = SETTINGS_PREFIX .. "IncomingCasts_"
     local incomingCastsCategory = SettingsLib:CreateCategory(rootCategory, "Incoming Casts")
     FF._incomingCastsCategory = incomingCastsCategory
+
+    local function OnChanged(_)
+        FF:SetupIncomingCastIndicators()
+        FF:UpdateIncomingCastIndicators()
+    end
 
     SettingsLib:CreateText(
         incomingCastsCategory,
         "Incoming casts are spells that are targetting you or your teamates.\nThis is not a perfect solution as it's difficult to work around Blizzard's secrets.\nSo it won't show everything."
     )
 
+    local trackIncomingCastsDefaults = DB.storage:GetDefaultsTableAtPath(trackIncomingCastsPath)
+    local defaultTrackIncomingCasts = trackIncomingCastsDefaults == true
+
+    local function IsTrackingEnabled()
+        local value = DB.storage:GetValue(trackIncomingCastsPath)
+        if value == nil then
+            return defaultTrackIncomingCasts
+        end
+        return value == true
+    end
+
     local trackIncomingCastsElement = SettingsLib:CreateCheckbox(incomingCastsCategory, {
         key = "TrackIncomingCasts",
         name = "Track Incoming Casts",
-        default = DB.DEFAULT_SETTINGS.partyFrame.trackIncomingCasts,
+        default = defaultTrackIncomingCasts,
         get = function()
-            return DB:GetPartyFrameDB().trackIncomingCasts
+            return IsTrackingEnabled()
         end,
         set = function(value)
-            DB:GetPartyFrameDB().trackIncomingCasts = value
+            DB.storage:SetValue(trackIncomingCastsPath, value == true)
             if not value then
                 FF:SetIncomingCastIndicatorPreviewEnabled(false)
             end
+            OnChanged("trackIncomingCasts")
         end,
         prefix = incomingCastsPrefix,
         desc = "Track incoming enemy casts for party frame indicators.",
@@ -742,171 +1129,99 @@ local function CreateIncomingCastsSettings(rootCategory)
         end,
         desc = "Show preview incoming cast icons for layout tuning.",
         prefix = incomingCastsPrefix,
-        parent = trackIncomingCastsElement,
-        parentCheck = function()
-            return DB:GetPartyFrameDB().trackIncomingCasts == true
-        end,
     })
 
-    local incomingCastBarDefaults = DB.DEFAULT_SETTINGS.incomingCastBar or {}
-    local incomingCastBarIconDefaults = incomingCastBarDefaults.icon or {}
+    CreateGlobalIncomingCastsSettings(incomingCastsCategory, {
+        basePath = incomingCastsBasePath,
+        prefix = incomingCastsPrefix,
+        onChanged = OnChanged,
+    })
+end
 
-    SettingsLib:CreateDropdown(incomingCastsCategory, {
-        key = "IncomingCastIconGrowDirection",
-        name = "Grow Direction",
-        default = incomingCastBarDefaults.growthDirection,
-        values = GROWTH_DIRECTION_LABELS,
+local function CreateRaidIncomingCastsSettings(rootCategory, options)
+    local opts = type(options) == "table" and options or {}
+    local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil
+
+    local enabledTypePath = "profile.raidFrame.incomingCasts.enabledType"
+    local incomingCastsBasePath = "profile.raidFrame.incomingCasts"
+    local incomingCastsPrefix = prefix and (prefix .. "IncomingCasts_") or nil
+    local incomingCastsCategory = SettingsLib:CreateCategory(rootCategory, "Incoming Casts")
+
+    if not prefix then
+        return
+    end
+
+    local function OnChanged(_)
+        FF:SetupIncomingCastIndicators()
+        FF:UpdateIncomingCastIndicators()
+    end
+
+    SettingsLib:CreateText(
+        incomingCastsCategory,
+        "Incoming casts are spells that are targetting you or your teamates.\nThis is not a perfect solution as it's difficult to work around Blizzard's secrets.\nSo it won't show everything."
+    )
+
+    local enabledTypeDefaults = DB.storage:GetDefaultsTableAtPath(enabledTypePath)
+    local defaultEnabledType = type(enabledTypeDefaults) == "string" and enabledTypeDefaults or "PARTY"
+
+    local function GetEnabledType()
+        local value = DB.storage:GetValue(enabledTypePath)
+        if value == nil then
+            return defaultEnabledType
+        end
+
+        value = Utils:SanitizeOption(value, { ENABLED = "ENABLED", DISABLED = "DISABLED", PARTY = "PARTY" })
+        return value or defaultEnabledType
+    end
+
+    local function IsEnabledForRaid()
+        local enabledType = GetEnabledType()
+        return enabledType == "ENABLED"
+    end
+
+    local trackIncomingCastsElement = SettingsLib:CreateDropdown(incomingCastsCategory, {
+        key = "IncomingCastsEnabledType",
+        name = "Incoming Casts",
+        default = defaultEnabledType,
+        values = {
+            ENABLED = "Enabled",
+            DISABLED = "Disabled",
+            PARTY = "Use Party Settings",
+        },
         get = function()
-            return DB:GetIncomingCastIndicatorGrowDirection()
+            return GetEnabledType()
         end,
         set = function(value)
-            DB:SetIncomingCastBarValue("growthDirection", value)
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "Direction targeted spell icons grow when multiple are shown.",
-        prefix = incomingCastsPrefix,
-    })
-
-    SettingsLib:CreateSlider(incomingCastsCategory, {
-        key = "IncomingCastIconCount",
-        name = "Targeted Spell Icon Count",
-        default = incomingCastBarDefaults.spellCount,
-        min = 1,
-        max = 6,
-        step = 1,
-        formatter = function(value)
-            return string.format("%i", Utils:ClampInteger(value, 1, 6, incomingCastBarDefaults.spellCount))
-        end,
-        get = function()
-            local value = DB:GetIncomingCastBarValue("spellCount")
-            if value == nil then
-                value = incomingCastBarDefaults.spellCount
+            value = Utils:SanitizeOption(value, { ENABLED = "ENABLED", DISABLED = "DISABLED", PARTY = "PARTY" }) or defaultEnabledType
+            DB.storage:SetValue(enabledTypePath, value)
+            if value == "DISABLED" then
+                FF:SetIncomingCastIndicatorPreviewEnabled(false)
             end
-            return value
+            OnChanged("enabledType")
         end,
-        set = function(value)
-            DB:SetIncomingCastBarValue("spellCount", Utils:ClampInteger(value, 1, 6, incomingCastBarDefaults.spellCount))
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "How many targeted spell icons to show per party member.",
         prefix = incomingCastsPrefix,
-    })
-
-    SettingsLib:CreateSlider(incomingCastsCategory, {
-        key = "IncomingCastIconScale",
-        name = "Icon Scale",
-        default = incomingCastBarIconDefaults.scale,
-        min = 0.5,
-        max = 2,
-        step = 0.10,
-        formatter = function(value)
-            return string.format(
-                "%d%%",
-                Utils:ClampInteger((value and (value * 100) or nil), 50, 200, (incomingCastBarIconDefaults.scale or 1) * 100)
-            )
-        end,
-        get = function()
-            local value = DB:GetIncomingCastBarIconValue("scale")
-            if value ~= nil then
-                return value
-            end
-
-            return incomingCastBarIconDefaults.scale
-        end,
-        set = function(value)
-            DB:SetIncomingCastBarIconValue("scale", value)
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "Scales each targeted spell icon without distorting borders/overlays.",
-        prefix = incomingCastsPrefix,
-    })
-
-    SettingsLib:CreateSlider(incomingCastsCategory, {
-        key = "IncomingCastIconSpacing",
-        name = "Icon Spacing",
-        default = incomingCastBarIconDefaults.spacing,
-        min = -10,
-        max = 20,
-        step = 1,
-        formatter = function(value)
-            return string.format("%i", Utils:ClampInteger(value, -10, 20, incomingCastBarIconDefaults.spacing))
-        end,
-        get = function()
-            local value = DB:GetIncomingCastBarIconValue("spacing")
-            if value == nil then
-                value = incomingCastBarIconDefaults.spacing
-            end
-            return value
-        end,
-        set = function(value)
-            DB:SetIncomingCastBarIconValue("spacing", Utils:ClampInteger(value, -10, 20, incomingCastBarIconDefaults.spacing))
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "Space (in pixels) between targeted spell icons. Negative values allow overlap.",
-        prefix = incomingCastsPrefix,
+        desc = "Enable raid incoming casts, disable them, or reuse Party settings.",
     })
 
     SettingsLib:CreateCheckbox(incomingCastsCategory, {
-        key = "IncomingCastIconBorder",
-        name = "Show Icon Border",
-        default = incomingCastBarIconDefaults.showBorder,
+        key = "IncomingCastPreview",
+        name = "Preview Incoming Casts",
+        default = false,
         get = function()
-            local value = DB:GetIncomingCastBarIconValue("showBorder")
-            if value == nil then
-                value = incomingCastBarIconDefaults.showBorder
-            end
-            return value
+            return FF._ffIncomingCastIndicatorPreviewEnabled == true
         end,
         set = function(value)
-            DB:SetIncomingCastBarIconValue("showBorder", value)
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
+            FF:SetIncomingCastIndicatorPreviewEnabled(value)
         end,
-        desc = "Toggle the border around targeted spell icons.",
+        desc = "Show preview incoming cast icons for layout tuning.",
         prefix = incomingCastsPrefix,
     })
 
-    SettingsLib:CreateHeader(incomingCastsCategory, {
-        name = "Cooldown",
-    })
-
-    SettingsLib:CreateCheckbox(incomingCastsCategory, {
-        key = "IncomingCastIconSwipe",
-        name = "Show Cooldown Swipe",
-        default = incomingCastBarIconDefaults.showSwipe,
-        get = function()
-            local value = DB:GetIncomingCastBarIconValue("showSwipe")
-            if value == nil then
-                value = incomingCastBarIconDefaults.showSwipe
-            end
-            return value
-        end,
-        set = function(value)
-            DB:SetIncomingCastBarIconValue("showSwipe", value)
-            FF:SetupIncomingCastIndicators()
-            FF:UpdateIncomingCastIndicators()
-        end,
-        desc = "Toggle the cooldown swipe overlay on targeted spell icons.",
+    CreateGlobalIncomingCastsSettings(incomingCastsCategory, {
+        basePath = incomingCastsBasePath,
         prefix = incomingCastsPrefix,
+        onChanged = OnChanged,
     })
-
-    AddCooldownTextSettings("profile.incomingCastBar.icon.cooldownText", incomingCastsCategory, "IncomingCastIcon", incomingCastsPrefix, function(_)
-        FF:SetupIncomingCastIndicators()
-        FF:UpdateIncomingCastIndicators()
-    end)
-
-    SettingsLib:CreateHeader(incomingCastsCategory, {
-        name = "Placement",
-    })
-
-    AddFrameSettings("profile.incomingCastBar.frame", incomingCastsCategory, "IncomingCastFrame", incomingCastsPrefix, nil, nil, function(_)
-        FF:SetupIncomingCastIndicators()
-        FF:UpdateIncomingCastIndicators()
-    end)
 end
 
 function FF:SetupOptions()
@@ -1114,9 +1429,24 @@ function FF:SetupOptions()
     })
 
     CreatePartyPlayerSettings(rootCategory, PARTY_FRAME_PREFIX, "profile.partyFrame")
-    CreateRaidPlayerSettings(rootCategory, RAID_FRAME_PREFIX, "profile.raidFrame")
 
-    CreateBuffsSettings(rootCategory, PARTY_FRAME_PREFIX)
-    CreateDebuffsSettings(rootCategory, PARTY_FRAME_PREFIX)
-    CreateIncomingCastsSettings(rootCategory)
+    CreateBuffsSettings(rootCategory, {
+        path = "profile.partyFrame.buffs",
+        prefix = PARTY_FRAME_PREFIX,
+        keyPrefix = "Buff",
+    })
+
+    CreateDebuffsSettings(rootCategory, {
+        path = "profile.partyFrame.debuffs",
+        prefix = PARTY_FRAME_PREFIX,
+        keyPrefix = "Debuff",
+    })
+
+    CreatePartyIncomingCastsSettings(rootCategory)
+
+    local raidCategory = SettingsLib:CreateCategory(rootCategory, "Raid")
+    CreateRaidIncomingCastsSettings(raidCategory, {
+        prefix = RAID_FRAME_PREFIX,
+    })
+    CreateRaidPlayerSettings(raidCategory, RAID_FRAME_PREFIX)
 end

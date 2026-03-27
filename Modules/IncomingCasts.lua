@@ -59,6 +59,23 @@ local function ShouldTrackIncomingCasts()
     return DB:GetTrackIncomingCasts()
 end
 
+local function ShouldTrackIncomingCastsForCurrentGroup()
+    if FF and FF._ffIncomingCastIndicatorPreviewEnabled == true then
+        return true
+    end
+    if Blizzard and Blizzard.IsInRaid and Blizzard:IsInRaid() then
+        return DB:GetRaidTrackIncomingCasts()
+    end
+    return DB:GetTrackIncomingCasts()
+end
+
+local function ShouldUseRaidIncomingCastsSettings()
+    if Blizzard and Blizzard.IsInRaid and Blizzard:IsInRaid() then
+        return DB:ShouldUsePartyIncomingCastsSettingsForRaid() ~= true
+    end
+    return false
+end
+
 function FF:InitIncomingCasts()
     if self._incomingCastsInitialized then
         return
@@ -81,7 +98,7 @@ function FF:RebuildIncomingCastUnitMap()
     -- Kept for compatibility with Core.lua call-sites.
     self:InitIncomingCasts()
 
-    if not ShouldTrackIncomingCasts() then
+    if not ShouldTrackIncomingCastsForCurrentGroup() then
         self:ClearIncomingCasts()
     end
 end
@@ -101,7 +118,7 @@ end
 function FF:_IncomingCast_ExtractCast(casterUnit, isChannel, spellIdFromEvent)
     self:InitIncomingCasts()
 
-    if not ShouldTrackIncomingCasts() then
+    if not ShouldTrackIncomingCastsForCurrentGroup() then
         return nil
     end
 
@@ -195,7 +212,7 @@ end
 
 function FF:_IncomingCast_ProcessCast(casterUnit, isChannel, spellIdFromEvent)
     self:InitIncomingCasts()
-    if not ShouldTrackIncomingCasts() then
+    if not ShouldTrackIncomingCastsForCurrentGroup() then
         return
     end
 
@@ -286,7 +303,7 @@ end
 function FF:ScanAllEnemyCasts()
     self:InitIncomingCasts()
 
-    if not ShouldTrackIncomingCasts() then
+    if not ShouldTrackIncomingCastsForCurrentGroup() then
         return
     end
 
@@ -406,11 +423,11 @@ function FF:PLAYER_FOCUS_CHANGED()
     return self:ScanAllEnemyCasts()
 end
 
-local function GetIncomingCastIndicatorIconConfig(relativeAnchor)
-    local incomingCastDefaults = (DB.DEFAULT_SETTINGS and DB.DEFAULT_SETTINGS.incomingCastBar) or {}
+local function GetIncomingCastIndicatorIconConfig(relativeAnchor, useRaid)
+    local incomingCastDefaults = (DB.DEFAULT_SETTINGS and DB.DEFAULT_SETTINGS.partyFrame and DB.DEFAULT_SETTINGS.partyFrame.incomingCasts) or {}
     local iconDefaults = incomingCastDefaults.icon or {}
 
-    local profile = DB:GetIncomingCastBarDB()
+    local profile = useRaid == true and DB:GetRaidIncomingCastsDB() or DB:GetIncomingCastBarDB()
     local iconProfile = profile and profile.icon
 
     local spellIconMixin = addon and addon.SpellIconMixin
@@ -426,8 +443,8 @@ local function GetIncomingCastIndicatorIconConfig(relativeAnchor)
     local size = baseSize * scale
 
     local spacing = Utils:ClampInteger(iconProfile and iconProfile.spacing, -10, 50, iconDefaults.spacing)
-    local cooldownFontSize = DB:GetIncomingCastIndicatorIconCooldownTextFontSize()
-    local cooldownTextR, cooldownTextG, cooldownTextB = DB:GetIncomingCastIndicatorIconCooldownTextColor()
+    local cooldownFontSize = DB:GetIncomingCastIndicatorIconCooldownTextFontSize(useRaid)
+    local cooldownTextR, cooldownTextG, cooldownTextB = DB:GetIncomingCastIndicatorIconCooldownTextColor(useRaid)
 
     local showBorder = iconProfile and iconProfile.showBorder
     if showBorder == nil then
@@ -443,11 +460,11 @@ local function GetIncomingCastIndicatorIconConfig(relativeAnchor)
         showSwipe = showSwipe == true
     end
 
-    local showCooldownText = DB:GetIncomingCastIndicatorIconCooldownTextShow()
+    local showCooldownText = DB:GetIncomingCastIndicatorIconCooldownTextShow(useRaid)
 
-    local count = DB:GetIncomingCastIndicatorCount()
-    local growDirection = DB:GetIncomingCastIndicatorGrowDirection(relativeAnchor)
-    local anchorTarget = DB:GetIncomingCastIndicatorAnchorFrame()
+    local count = DB:GetIncomingCastIndicatorCount(useRaid)
+    local growDirection = DB:GetIncomingCastIndicatorGrowDirection(relativeAnchor, useRaid)
+    local anchorTarget = DB:GetIncomingCastIndicatorAnchorFrame(useRaid)
 
     local hash = string.format(
         "%d:%.2f:%d:%d:%d:%d:%d:%s:%s",
@@ -487,9 +504,11 @@ end
 local function GetIncomingCastIndicatorConfig()
     local layoutAxis = Blizzard:GetPartyFramesLayoutAxis()
 
-    local relativeAnchor, frameAnchor, offsetX, offsetY = DB:GetIncomingCastIndicatorAnchorsAndOffsets(layoutAxis)
+    local useRaid = ShouldUseRaidIncomingCastsSettings()
 
-    local iconConfig, anchorTarget = GetIncomingCastIndicatorIconConfig(relativeAnchor)
+    local relativeAnchor, frameAnchor, offsetX, offsetY = DB:GetIncomingCastIndicatorAnchorsAndOffsets(layoutAxis, useRaid)
+
+    local iconConfig, anchorTarget = GetIncomingCastIndicatorIconConfig(relativeAnchor, useRaid)
 
     return {
         icon = iconConfig,
@@ -650,6 +669,19 @@ function FF:UpdateIncomingCastIndicators()
     if not self.GetIncomingCasts then return end
 
     local config = GetIncomingCastIndicatorConfig()
+    if not ShouldTrackIncomingCastsForCurrentGroup() then
+        -- Hide indicators if disabled for current group context.
+        local framesToHide = self:GetFrames()
+        if type(framesToHide) == "table" then
+            for _, frame in ipairs(framesToHide) do
+                local hostFrame = frame and GetIncomingCastHostFrame(frame, config)
+                SetSpellBarContainerEnabled(hostFrame, false)
+                local alt = GetInactiveIncomingCastHostFrame(frame, hostFrame)
+                SetSpellBarContainerEnabled(alt, false)
+            end
+        end
+        return
+    end
     local castList = {}
     local inCombat = InCombatLockdown and InCombatLockdown()
 

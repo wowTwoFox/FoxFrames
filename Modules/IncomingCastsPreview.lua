@@ -295,6 +295,10 @@ function FF:SetIncomingCastIndicatorPreviewEnabled(enabled)
 
     self._ffIncomingCastIndicatorPreviewEnabled = wantEnabled
 
+    if DB and DB.SetIncomingCastsPreviewEnabled then
+        DB:SetIncomingCastsPreviewEnabled(wantEnabled)
+    end
+
     if wantEnabled then
         self:StartIncomingCastIndicatorPreviewStream()
     else

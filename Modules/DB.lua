@@ -1,3 +1,7 @@
+
+-- Runtime-only flags (not stored in saved variables)
+Object.runtime = Object.runtime or {}
+Object.runtime.incomingCastsPreviewEnabled = Object.runtime.incomingCastsPreviewEnabled == true
 local addonName, addon = ...
 
 assert(addon and addon.Utils and addon.Constants, "FoxFrames: addon table, Constants, or Utils missing (load order issue)")
@@ -23,6 +27,12 @@ local playerFrameShowTypes = {
     ALWAYS = "ALWAYS",
     SOLO = "SOLO",
     NEVER = "NEVER",
+}
+
+local raidIncomingCastsEnabledTypes = {
+    ENABLED = "ENABLED",
+    DISABLED = "DISABLED",
+    PARTY = "PARTY",
 }
 
 local defaultPlayerStatus = {
@@ -95,6 +105,22 @@ local defaultIncomingCastBar = {
     },
 }
 
+local defaultRaidIncomingCasts = {
+    enabledType = "PARTY",
+    spellCount = defaultIncomingCastBar.spellCount,
+    frame = defaultIncomingCastBar.frame,
+    growthDirection = defaultIncomingCastBar.growthDirection,
+    icon = defaultIncomingCastBar.icon,
+}
+
+local defaultPartyIncomingCasts = {
+    enabled = false,
+    spellCount = defaultIncomingCastBar.spellCount,
+    frame = defaultIncomingCastBar.frame,
+    growthDirection = defaultIncomingCastBar.growthDirection,
+    icon = defaultIncomingCastBar.icon,
+}
+
 local defaultAura = {
     cooldownText = {
         show = true,
@@ -122,13 +148,13 @@ local defaultSettings = {
         playerStatus = defaultPlayerStatus,
         playerName = defaultPlayerName,
         allowAnyAnchoring = true,
-        trackIncomingCasts = false,
+        incomingCasts = defaultPartyIncomingCasts,
     },
     raidFrame = {
         playerStatus = defaultPlayerStatus,
         playerName = defaultPlayerName,
+        incomingCasts = defaultRaidIncomingCasts,
     },
-    incomingCastBar = defaultIncomingCastBar,
 }
 
 local function GetFrameAnchorsAndOffsets(frameProfile, defaults, offsetMin, offsetMax, layoutAxis)
@@ -272,11 +298,15 @@ function Object:GetPlayerFrameDB()
 end
 
 function Object:GetIncomingCastBarDB()
-    return self.storage:GetValuesTableAtPath("profile.incomingCastBar")
+    return self.storage:GetValuesTableAtPath("profile.partyFrame.incomingCasts")
+end
+
+function Object:GetRaidIncomingCastsDB()
+    return self.storage:GetValuesTableAtPath("profile.raidFrame.incomingCasts")
 end
 
 function Object:GetIncomingCastBarIconDB()
-    return self.storage:GetValuesTableAtPath("profile.incomingCastBar.icon")
+    return self.storage:GetValuesTableAtPath("profile.partyFrame.incomingCasts.icon")
 end
 
 function Object:GetIncomingCastBarValue(key)
@@ -303,8 +333,9 @@ function Object:SetIncomingCastBarIconValue(key, value)
     end
 end
 
-function Object:GetIncomingCastIndicatorAnchorsAndOffsets(layoutAxis)
-    local profile, defaults = self.storage:GetTableAtPath("profile.incomingCastBar.frame")
+function Object:GetIncomingCastIndicatorAnchorsAndOffsets(layoutAxis, useRaid)
+    local path = useRaid == true and "profile.raidFrame.incomingCasts.frame" or "profile.partyFrame.incomingCasts.frame"
+    local profile, defaults = self.storage:GetTableAtPath(path)
     local spellBarAnchor, relativeAnchor, offsetX, offsetY = GetFrameAnchorsAndOffsets(
         profile,
         defaults,
@@ -316,41 +347,47 @@ function Object:GetIncomingCastIndicatorAnchorsAndOffsets(layoutAxis)
     return relativeAnchor, spellBarAnchor, offsetX, offsetY
 end
 
-function Object:GetIncomingCastIndicatorAnchorFrame()
-    local profile, defaults = self.storage:GetTableAtPath("profile.incomingCastBar.frame")
+function Object:GetIncomingCastIndicatorAnchorFrame(useRaid)
+    local path = useRaid == true and "profile.raidFrame.incomingCasts.frame" or "profile.partyFrame.incomingCasts.frame"
+    local profile, defaults = self.storage:GetTableAtPath(path)
     local fallback = defaults.anchorTarget or frameAnchorTargets.HEALTHBAR
     return Utils:SanitizeOption(profile and profile.anchorTarget, frameAnchorTargets) or fallback
 end
 
-function Object:GetIncomingCastIndicatorCount()
-    local profile, defaults = self.storage:GetTableAtPath("profile.incomingCastBar")
+function Object:GetIncomingCastIndicatorCount(useRaid)
+    local path = useRaid == true and "profile.raidFrame.incomingCasts" or "profile.partyFrame.incomingCasts"
+    local profile, defaults = self.storage:GetTableAtPath(path)
     return Utils:ClampInteger(profile and profile.spellCount, 1, 6, defaults.spellCount)
 end
 
-function Object:GetIncomingCastIndicatorIconCooldownTextShow()
-    local profile = self.storage:GetTableAtPath("profile.incomingCastBar.icon.cooldownText")
+function Object:GetIncomingCastIndicatorIconCooldownTextShow(useRaid)
+    local path = useRaid == true and "profile.raidFrame.incomingCasts.icon.cooldownText" or "profile.partyFrame.incomingCasts.icon.cooldownText"
+    local profile = self.storage:GetTableAtPath(path)
     return GetCooldownTextShow(profile)
 end
 
-function Object:GetIncomingCastIndicatorIconCooldownTextFontSize()
-    local profile = self.storage:GetValuesTableAtPath("profile.incomingCastBar.icon.cooldownText")
+function Object:GetIncomingCastIndicatorIconCooldownTextFontSize(useRaid)
+    local path = useRaid == true and "profile.raidFrame.incomingCasts.icon.cooldownText" or "profile.partyFrame.incomingCasts.icon.cooldownText"
+    local profile = self.storage:GetValuesTableAtPath(path)
     return GetTextFontSize(profile, 8, 32)
 end
 
-function Object:GetIncomingCastIndicatorIconCooldownTextColor()
-    local profile, defaults = self.storage:GetTableAtPath("profile.incomingCastBar.icon.cooldownText")
+function Object:GetIncomingCastIndicatorIconCooldownTextColor(useRaid)
+    local path = useRaid == true and "profile.raidFrame.incomingCasts.icon.cooldownText" or "profile.partyFrame.incomingCasts.icon.cooldownText"
+    local profile, defaults = self.storage:GetTableAtPath(path)
     return GetCooldownTextColor(profile)
 end
 
-function Object:GetIncomingCastIndicatorGrowDirection(relativeAnchor)
-    local profile, defaults = self.storage:GetTableAtPath("profile.incomingCastBar")
+function Object:GetIncomingCastIndicatorGrowDirection(relativeAnchor, useRaid)
+    local path = useRaid == true and "profile.raidFrame.incomingCasts" or "profile.partyFrame.incomingCasts"
+    local profile, defaults = self.storage:GetTableAtPath(path)
     local fallback = defaults.growthDirection or growthDirections.RIGHT
     local explicitValue = profile and rawget(profile, "growthDirection")
 
     if explicitValue == nil then
         local anchor = relativeAnchor
         if anchor == nil then
-            anchor = self:GetIncomingCastIndicatorAnchorsAndOffsets()
+            anchor = self:GetIncomingCastIndicatorAnchorsAndOffsets(nil, useRaid)
         end
 
         if Utils:IsAnchorRightAligned(anchor) then
@@ -361,6 +398,29 @@ function Object:GetIncomingCastIndicatorGrowDirection(relativeAnchor)
     end
 
     return Utils:SanitizeGrowthDirection(explicitValue, fallback)
+end
+
+function Object:GetRaidIncomingCastsEnabledType()
+    local profile, defaults = self.storage:GetTableAtPath("profile.raidFrame.incomingCasts")
+    local defaultValue = defaults.enabledType or raidIncomingCastsEnabledTypes.PARTY
+    local value = profile and profile.enabledType
+    return Utils:SanitizeOption(value, raidIncomingCastsEnabledTypes) or defaultValue
+end
+
+function Object:GetRaidTrackIncomingCasts()
+    local enabledType = self:GetRaidIncomingCastsEnabledType()
+    if enabledType == raidIncomingCastsEnabledTypes.DISABLED then
+        return false
+    end
+    if enabledType == raidIncomingCastsEnabledTypes.PARTY then
+        return self:GetTrackIncomingCasts()
+    end
+    return true
+end
+
+function Object:ShouldUsePartyIncomingCastsSettingsForRaid()
+    local enabledType = self:GetRaidIncomingCastsEnabledType()
+    return enabledType == raidIncomingCastsEnabledTypes.PARTY
 end
 
 function Object:GetBuffCountdownFontSize()
@@ -649,15 +709,24 @@ function Object:GetHealthBarTexture()
 end
 
 function Object:GetTrackIncomingCasts()
-    local profile, defaults = self.storage:GetTableAtPath("profile.partyFrame")
-    local defaultValue = defaults.trackIncomingCasts == true
-    local value = profile and profile.trackIncomingCasts
+    local profile, defaults = self.storage:GetTableAtPath("profile.partyFrame.incomingCasts")
+    local defaultValue = defaults.enabled == true
+    local value = profile and profile.enabled
 
     if value == nil then
         return defaultValue
     end
 
     return value == true
+end
+
+function Object:IsIncomingCastsPreviewEnabled()
+    return self.runtime and self.runtime.incomingCastsPreviewEnabled == true
+end
+
+function Object:SetIncomingCastsPreviewEnabled(enabled)
+    self.runtime = self.runtime or {}
+    self.runtime.incomingCastsPreviewEnabled = enabled == true
 end
 
 function Object:SetProfile(profileName, options)
