@@ -36,11 +36,12 @@ Modules\DB.lua
 Modules\DBMigrations.lua
 Modules\GlobalsDB.lua
 Modules\FoxFrames.lua
+Modules\RaidFrames.lua
 Modules\IncomingCasts.lua
 Modules\SpellIcon.lua
 Modules\SpellBar.lua
 Modules\IncomingCastsPreview.lua
-Modules\Settings\Profiles.lua
+Modules\SettingsProfiles.lua
 Modules\Settings\SettingsButton.lua
 Modules\Settings\SettingsButton.xml
 Modules\Settings\SettingsComponentBuilder.lua

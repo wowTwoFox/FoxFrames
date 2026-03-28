@@ -6,9 +6,6 @@ local ComponentBuilder = addon.SettingsComponentBuilder
 
 assert(ComponentBuilder, "FoxFrames: SettingsComponentBuilder missing (load order issue)")
 assert(type(ComponentBuilder.CreateButton) == "function", "FoxFrames: SettingsComponentBuilder missing CreateButton")
-assert(type(ComponentBuilder.CreateInput) == "function", "FoxFrames: SettingsComponentBuilder missing CreateInput")
-assert(type(ComponentBuilder.CreateToggle) == "function", "FoxFrames: SettingsComponentBuilder missing CreateToggle")
-assert(type(ComponentBuilder.CreateDropdown) == "function", "FoxFrames: SettingsComponentBuilder missing CreateDropdown")
 
 local DEFAULT_CHILD_X_PADDING = 4
 local DEFAULT_CHILD_Y_PADDING = 0
@@ -293,30 +290,6 @@ function FoxFrames_SettingsFlowMixin:AddButton(text, options, click)
 	local button = ComponentBuilder:CreateButton(self, text, options, click, existing)
 	self:AddFrame(button)
 	return button
-end
-
-function FoxFrames_SettingsFlowMixin:AddInput(value, options, onChanged)
-	local nextIndex = (tonumber(self._ffFlowCount) or 0) + 1
-	local existing = self._ffFlowFrames and self._ffFlowFrames[nextIndex]
-	local input = ComponentBuilder:CreateInput(self, value, options, onChanged, existing)
-	self:AddFrame(input)
-	return input
-end
-
-function FoxFrames_SettingsFlowMixin:AddToggle(checked, options, onChanged)
-	local nextIndex = (tonumber(self._ffFlowCount) or 0) + 1
-	local existing = self._ffFlowFrames and self._ffFlowFrames[nextIndex]
-	local toggle = ComponentBuilder:CreateToggle(self, checked, options, onChanged, existing)
-	self:AddFrame(toggle)
-	return toggle
-end
-
-function FoxFrames_SettingsFlowMixin:AddDropdown(value, options, onChanged)
-	local nextIndex = (tonumber(self._ffFlowCount) or 0) + 1
-	local existing = self._ffFlowFrames and self._ffFlowFrames[nextIndex]
-	local control, dropdown = ComponentBuilder:CreateDropdown(self, value, options, onChanged, existing)
-	self:AddFrame(control)
-	return dropdown
 end
 
 function FoxFrames_SettingsFlowMixin:AddFlow(options, callback)

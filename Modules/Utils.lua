@@ -623,6 +623,22 @@ function Object:SanitizeBoolean(value, fallback)
     return value == true
 end
 
+function Object:SanitizeString(value, fallback, allowEmpty)
+    if value == nil then
+        return fallback
+    end
+
+    if type(value) ~= "string" then
+        return fallback
+    end
+
+    if allowEmpty ~= true and value == "" then
+        return fallback
+    end
+
+    return value
+end
+
 function Object:SanitizeOpacity(value, fallback)
     local sanitizedFallback = self:ClampNumber(fallback, 0, 1, 1)
     local opacity = self:ClampNumber(value, 0, 1, sanitizedFallback)

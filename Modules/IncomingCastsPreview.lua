@@ -3,6 +3,7 @@ local addonName, addon = ...
 local FF = FoxFrames
 local Utils = addon.Utils
 local DB = addon.DB
+local Blizzard = addon.Blizzard
 
 -- Preview-specific constants
 local INCOMING_CAST_PREVIEW_STREAM_INTERVAL_SECONDS = 10
@@ -169,7 +170,7 @@ function FF:StartIncomingCastIndicatorPreviewStream()
     -- Get target units (party frames or fallback to player)
     local GetCurrentTargetUnits = function()
         local units = {}
-        local frames = self.GetFrames and self:GetFrames()
+        local frames = Blizzard:GetFrames()
         if frames then
             for _, frame in ipairs(frames) do
                 if frame and type(frame.unit) == "string" and frame.unit ~= "" then

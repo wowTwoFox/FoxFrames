@@ -463,7 +463,7 @@ local function GetIncomingCastIndicatorIconConfig(relativeAnchor, useRaid)
     local showCooldownText = DB:GetIncomingCastIndicatorIconCooldownTextShow(useRaid)
 
     local count = DB:GetIncomingCastIndicatorCount(useRaid)
-    local growDirection = DB:GetIncomingCastIndicatorGrowDirection(relativeAnchor, useRaid)
+    local growDirection = DB:GetIncomingCastIndicatorGrowDirection(useRaid)
     local anchorTarget = DB:GetIncomingCastIndicatorAnchorFrame(useRaid)
 
     local hash = string.format(
@@ -631,7 +631,7 @@ function FF:SetupIncomingCastIndicators()
 
     local config = GetIncomingCastIndicatorConfig()
 
-    local frames = self:GetFrames()
+    local frames = Blizzard:GetFrames()
     for _, frame in ipairs(frames) do
         local hostFrame = GetIncomingCastHostFrame(frame, config)
         local container = EnsureSpellBarForFrame(hostFrame, config)
@@ -661,7 +661,7 @@ function FF:PLAYER_REGEN_ENABLED()
 end
 
 function FF:UpdateIncomingCastIndicators()
-    local frames = self:GetFrames()
+    local frames = Blizzard:GetFrames()
     if type(frames) ~= "table" or next(frames) == nil then
         return
     end
@@ -671,7 +671,7 @@ function FF:UpdateIncomingCastIndicators()
     local config = GetIncomingCastIndicatorConfig()
     if not ShouldTrackIncomingCastsForCurrentGroup() then
         -- Hide indicators if disabled for current group context.
-        local framesToHide = self:GetFrames()
+        local framesToHide = Blizzard:GetFrames()
         if type(framesToHide) == "table" then
             for _, frame in ipairs(framesToHide) do
                 local hostFrame = frame and GetIncomingCastHostFrame(frame, config)

@@ -28,6 +28,9 @@ function Object:CreateProfilesSettings(rootCategory, callbacks)
         return
     end
 
+    local SettingsCommon = addon and addon.SettingsCommon
+    assert(SettingsCommon and type(SettingsCommon.CreateDropdown) == "function", "FoxFrames: SettingsCommon missing CreateDropdown (load order issue)")
+
     assert(addon and type(addon.CreateSettingsButton) == "function", "FoxFrames: CreateSettingsButton missing (load order issue)")
     assert(addon and type(addon.RefreshSettingsLayout) == "function", "FoxFrames: RefreshSettingsLayout missing (load order issue)")
     assert(addon and type(addon.CreateSettingsFlow) == "function", "FoxFrames: CreateSettingsFlow missing (load order issue)")
@@ -44,15 +47,26 @@ function Object:CreateProfilesSettings(rootCategory, callbacks)
 
     SettingsLib:CreateText(
         profilesCategory,
-        "Profiles are automatically created and set based on your current Edit Mode layout.\n\nYou can reset the current layout's profile to defaults, or copy settings from another layout's profile into the current one."
+        "Profiles are automatically created and set based on your current Edit Mode layout.\n\nBut you can copy settings from another layout's profile into the current one."
     )
 
     local profileOrder = {}
+    local options = {}
+    local profiles = DB.db:GetProfiles()
+    if type(profiles) ~= "table" then
+        return options
+    end
+
+    table.sort(profiles)
+    for i, profileName in ipairs(profiles) do
+        if type(profileName) == "string" and profileName ~= "" then
+            options[profileName] = profileName
+            profileOrder[i] = profileName
+        end
+    end
 
     -- Selected profile should be local-only (not persisted).
     local selectedProfileName = nil
-
-    local selectedProfileActionsFlow = nil
 
     local function GetSelectedProfileName()
         if type(selectedProfileName) == "string" and selectedProfileName ~= "" then
@@ -62,7 +76,7 @@ function Object:CreateProfilesSettings(rootCategory, callbacks)
         return DB.storage:GetCurrentProfile()
     end
 
-    SettingsLib:CreateDropdown(profilesCategory, {
+    local selectProfile = SettingsLib:CreateDropdown(profilesCategory, {
         key = "SelectedProfile",
         name = "Selected Profile",
         default = DB.storage:GetCurrentProfile(),
@@ -70,35 +84,10 @@ function Object:CreateProfilesSettings(rootCategory, callbacks)
             return GetSelectedProfileName()
         end,
         set = function(value)
-            if type(value) == "string" and value ~= "" then
-                selectedProfileName = value
-            else
-                selectedProfileName = nil
-            end
-
-            if selectedProfileActionsFlow and type(selectedProfileActionsFlow.SetEnabled) == "function" then
-                selectedProfileActionsFlow:SetEnabled(selectedProfileActionsFlow._ffEnabled ~= false)
-            end
-
+            selectedProfileName = Utils:SanitizeString(value)
             addon:RefreshSettingsLayout()
         end,
         optionfunc = function()
-            WipeTable(profileOrder)
-
-            local options = {}
-            local profiles = DB.db:GetProfiles()
-            if type(profiles) ~= "table" then
-                return options
-            end
-
-            table.sort(profiles)
-            for i, profileName in ipairs(profiles) do
-                if type(profileName) == "string" and profileName ~= "" then
-                    options[profileName] = profileName
-                    profileOrder[i] = profileName
-                end
-            end
-
             return options
         end,
         order = profileOrder,
@@ -110,34 +99,22 @@ function Object:CreateProfilesSettings(rootCategory, callbacks)
         key = "SelectedProfileActions",
         label = "Actions",
         searchTags = "Actions",
+        parent = selectProfile,
+        isEnabled = function()
+            local selectedName = GetSelectedProfileName()
+            return selectedName ~= DB.storage:GetCurrentProfile()
+        end,
         createContent = function(parent, existing)
             local flow = existing
-            if not flow then
-                flow = addon:CreateSettingsFlow(parent, {
-                    direction = "horizontal",
-                    fillParent = false,
-                    autoSize = true,
-                })
-
-                flow._ffProfilesActionsKind = "profilesActions"
-            end
-
-            selectedProfileActionsFlow = flow
-
-            flow:ResetFlow()
-
-            flow:AddButton("Reset Current", {
-            }, function()
-                DB:ResetProfile()
-
-                if type(onProfileActivated) == "function" then
-                    onProfileActivated()
-                end
-
-                addon:RefreshSettingsLayout()
-            end)
+            if flow then return nil end
+            flow = addon:CreateSettingsFlow(parent, {
+                direction = "horizontal",
+                fillParent = false,
+                autoSize = true,
+            })
 
             flow:AddButton("Copy", {
+                tooltip = "Copy settings from the selected profile into the current profile.",
                 isEnabled = function()
                     local selectedName = GetSelectedProfileName()
                     local currentName = DB.storage:GetCurrentProfile()

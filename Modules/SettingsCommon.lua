@@ -82,13 +82,12 @@ end
 function SettingsCommon:AddFrameSettings(category, options)
     local opts = type(options) == "table" and options or {}
     local path = (type(opts.path) == "string" and opts.path ~= "" and opts.path)
-    local keyPrefix = (type(opts.keyPrefix) == "string" and opts.keyPrefix ~= "" and opts.keyPrefix) or nil
     local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil
     local onChanged = type(opts.onChanged) == "function" and opts.onChanged or nil
 
     assert(type(onChanged) == "function", "FoxFrames: AddFrameSettings requires onChanged callback")
 
-    if not (category and path and keyPrefix) then
+    if not (category and path) then
         return
     end
 
@@ -96,7 +95,7 @@ function SettingsCommon:AddFrameSettings(category, options)
         return
     end
 
-    local _, defaults = DB.storage:GetTableAtPath(path)
+    local _, defaults = DB.storage:GetValueAndDefaultAtPath(path)
     local defaultAnchorTarget = Utils:SanitizeOption(defaults.anchorTarget, DB.FRAME_ANCHOR_TARGETS) or DB.FRAME_ANCHOR_TARGETS.FRAME
     local defaultPosition = Utils:SanitizeAnchorPoint(defaults.position, Constants.ANCHOR_POINTS.CENTER)
     local defaultAnchorMode = Utils:SanitizeAnchorMode(defaults.anchorMode, Constants.ANCHOR_MODES.INSIDE)
@@ -104,129 +103,98 @@ function SettingsCommon:AddFrameSettings(category, options)
     local defaultOffsetY = Utils:ClampInteger(defaults.offsetY, -40, 40, 0)
     local defaultUseRelativeOffsets = defaults.useRelativeOffsets ~= false
 
-    local function GetValue(key)
-        return DB.storage:GetValue(path .. "." .. key)
-    end
-
-    local function SetValue(key, value)
-        DB.storage:SetValue(path .. "." .. key, value)
-    end
-
     local function OnChanged(settingKey)
         onChanged(settingKey)
     end
 
-    SettingsLib:CreateDropdown(category, {
-        key = keyPrefix .. "AnchorTarget",
+    self:CreateDropdown(category, {
+        path = path .. ".anchorTarget",
         name = "Anchor To",
         default = defaultAnchorTarget,
         values = SettingsCommon.FRAME_ANCHOR_TARGET_LABELS,
-        get = function()
-            return Utils:SanitizeOption(GetValue("anchorTarget"), DB.FRAME_ANCHOR_TARGETS) or defaultAnchorTarget
+        sanitize = function(value, fallback)
+            return Utils:SanitizeOption(value, DB.FRAME_ANCHOR_TARGETS) or fallback
         end,
-        set = function(value)
-            SetValue("anchorTarget", Utils:SanitizeOption(value, DB.FRAME_ANCHOR_TARGETS) or defaultAnchorTarget)
+        onChanged = function()
             OnChanged("anchorTarget")
         end,
         desc = "Choose whether this element is anchored to the unit frame or to the health bar.",
         prefix = prefix,
     })
 
-    SettingsLib:CreateDropdown(category, {
-        key = keyPrefix .. "Position",
+    self:CreateDropdown(category, {
+        path = path .. ".position",
         name = "Position",
         default = defaultPosition,
         values = SettingsCommon.ANCHOR_POINT_LABELS,
-        get = function()
-            return Utils:SanitizeAnchorPoint(GetValue("position"), defaultPosition)
+        sanitize = function(value, fallback)
+            return Utils:SanitizeAnchorPoint(value, fallback or defaultPosition)
         end,
-        set = function(value)
-            SetValue("position", Utils:SanitizeAnchorPoint(value, defaultPosition))
+        onChanged = function()
             OnChanged("position")
         end,
         desc = "Anchor point used for this element.",
         prefix = prefix,
     })
 
-    SettingsLib:CreateDropdown(category, {
-        key = keyPrefix .. "AnchorMode",
+    self:CreateDropdown(category, {
+        path = path .. ".anchorMode",
         name = "Anchor Mode",
         default = defaultAnchorMode,
         values = SettingsCommon.SPELL_BAR_ANCHOR_MODE_LABELS,
-        get = function()
-            return Utils:SanitizeAnchorMode(GetValue("anchorMode"), defaultAnchorMode)
+        sanitize = function(value, fallback)
+            return Utils:SanitizeAnchorMode(value, fallback or defaultAnchorMode)
         end,
-        set = function(value)
-            SetValue("anchorMode", Utils:SanitizeAnchorMode(value, defaultAnchorMode))
+        onChanged = function()
             OnChanged("anchorMode")
         end,
         desc = "Inside uses the same anchor point as Position.\nOutside (Vertical) flips Top <-> Bottom.\nOutside (Horizontal) flips Left <-> Right.\nOutside (Auto) picks Vertical/Horizontal based on the party frame orientation (horizontal vs vertical layout).\nExample: party frames stacked top-to-bottom -> Auto uses Outside (Horizontal).",
         prefix = prefix,
     })
 
-    SettingsLib:CreateSlider(category, {
-        key = keyPrefix .. "OffsetX",
+    self:CreateSlider(category, {
+        path = path .. ".offsetX",
         name = "X Offset",
-        default = defaultOffsetX,
         min = -40,
         max = 40,
         step = 1,
         formatter = function(value)
             return string.format("%ipx", Utils:ClampInteger(value, -40, 40, defaultOffsetX))
         end,
-        get = function()
-            local value = GetValue("offsetX")
-            if value == nil then
-                value = defaultOffsetX
-            end
-            return Utils:ClampInteger(value, -40, 40, defaultOffsetX)
+        sanitize = function(value, fallback)
+            return Utils:ClampInteger(value, -40, 40, fallback)
         end,
-        set = function(value)
-            SetValue("offsetX", Utils:ClampInteger(value, -40, 40, defaultOffsetX))
+        onChanged = function()
             OnChanged("offsetX")
         end,
         desc = "Horizontal offset for anchoring.",
         prefix = prefix,
     })
 
-    SettingsLib:CreateSlider(category, {
-        key = keyPrefix .. "OffsetY",
+    self:CreateSlider(category, {
+        path = path .. ".offsetY",
         name = "Y Offset",
-        default = defaultOffsetY,
         min = -40,
         max = 40,
         step = 1,
         formatter = function(value)
             return string.format("%ipx", Utils:ClampInteger(value, -40, 40, defaultOffsetY))
         end,
-        get = function()
-            local value = GetValue("offsetY")
-            if value == nil then
-                value = defaultOffsetY
-            end
-            return Utils:ClampInteger(value, -40, 40, defaultOffsetY)
+        sanitize = function(value, fallback)
+            return Utils:ClampInteger(value, -40, 40, fallback)
         end,
-        set = function(value)
-            SetValue("offsetY", Utils:ClampInteger(value, -40, 40, defaultOffsetY))
+        onChanged = function()
             OnChanged("offsetY")
         end,
         desc = "Vertical offset for anchoring.",
         prefix = prefix,
     })
 
-    SettingsLib:CreateCheckbox(category, {
-        key = keyPrefix .. "UseRelativeOffsets",
+    self:CreateCheckbox(category, {
+        path = path .. ".useRelativeOffsets",
         name = "Use Relative Offsets",
         default = defaultUseRelativeOffsets,
-        get = function()
-            local value = GetValue("useRelativeOffsets")
-            if value == nil then
-                return defaultUseRelativeOffsets
-            end
-            return value == true
-        end,
-        set = function(value)
-            SetValue("useRelativeOffsets", value == true)
+        onChanged = function()
             OnChanged("useRelativeOffsets")
         end,
         desc = "When enabled, X/Y offsets are flipped based on anchor point.",
@@ -237,13 +205,12 @@ end
 function SettingsCommon:AddTextSettings(category, options)
     local opts = type(options) == "table" and options or {}
     local path = (type(opts.path) == "string" and opts.path ~= "" and opts.path)
-    local keyPrefix = (type(opts.keyPrefix) == "string" and opts.keyPrefix ~= "" and opts.keyPrefix) or nil
     local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil
     local onChanged = type(opts.onChanged) == "function" and opts.onChanged or nil
 
     assert(type(onChanged) == "function", "FoxFrames: AddTextSettings requires onChanged callback")
 
-    if not (category and path and keyPrefix) then
+    if not (category and path) then
         return
     end
 
@@ -251,14 +218,13 @@ function SettingsCommon:AddTextSettings(category, options)
         return
     end
 
-    local _, defaults = DB.storage:GetTableAtPath(path)
+    local _, defaults = DB.storage:GetValueAndDefaultAtPath(path)
     local defaultFontSize = Utils:ClampInteger(defaults.fontSize, 8, 32, 10)
     local defaultColor = Utils:SanitizeColor(defaults.color, { r = 1, g = 1, b = 1 })
     local defaultOpacity = Utils:SanitizeOpacity(defaults.opacity, 1)
-    local defaultUseClassColors = defaults.useClassColors == true
 
     local function GetValue(key)
-        return DB.storage:GetValue(path .. "." .. key)
+        return DB.storage:GetValueAtPath(path .. "." .. key)
     end
 
     local function SetValue(key, value)
@@ -269,35 +235,28 @@ function SettingsCommon:AddTextSettings(category, options)
         onChanged(settingKey)
     end
 
-    SettingsLib:CreateSlider(category, {
-        key = keyPrefix .. "FontSize",
+    self:CreateSlider(category, {
+        path = path .. ".fontSize",
         name = "Size",
-        default = defaultFontSize,
         min = 8,
         max = 32,
         step = 1,
         formatter = function(value)
             return string.format("%ipt", Utils:ClampInteger(value, 8, 32, defaultFontSize))
         end,
-        get = function()
-            local value = GetValue("fontSize")
-            if value == nil then
-                value = defaultFontSize
-            end
-            return Utils:ClampInteger(value, 8, 32, defaultFontSize)
+        sanitize = function(value, fallback)
+            return Utils:ClampInteger(value, 8, 32, fallback)
         end,
-        set = function(value)
-            SetValue("fontSize", Utils:ClampInteger(value, 8, 32, defaultFontSize))
+        onChanged = function()
             OnChanged("fontSize")
         end,
         desc = "Adjust the text size on frames.",
         prefix = prefix,
     })
 
-    SettingsLib:CreateSlider(category, {
-        key = keyPrefix .. "Opacity",
+    self:CreateSlider(category, {
+        path = path .. ".opacity",
         name = "Opacity",
-        default = defaultOpacity,
         min = 0,
         max = 1,
         step = 0.01,
@@ -307,41 +266,30 @@ function SettingsCommon:AddTextSettings(category, options)
                 Utils:ClampInteger((value and (value * 100) or nil), 0, 100, (defaultOpacity or 1) * 100)
             )
         end,
-        get = function()
-            return Utils:SanitizeOpacity(GetValue("opacity"), defaultOpacity)
+        sanitize = function(value, fallback)
+            return Utils:SanitizeOpacity(value, fallback)
         end,
-        set = function(value)
-            local opacity = Utils:SanitizeOpacity(value, defaultOpacity)
-            SetValue("opacity", opacity)
+        onChanged = function()
             OnChanged("opacity")
         end,
         desc = "Adjust opacity for text on frames.",
         prefix = prefix,
     })
 
-    local useClassColorsElement = SettingsLib:CreateCheckbox(category, {
-        key = keyPrefix .. "UseClassColors",
+    local useClassColorsElement = self:CreateCheckbox(category, {
+        path = path .. ".useClassColors",
         name = "Use Class Colors",
-        default = defaultUseClassColors,
-        get = function()
-            local value = GetValue("useClassColors")
-            if value == nil then
-                return defaultUseClassColors
-            end
-            return value == true
-        end,
-        set = function(value)
-            SetValue("useClassColors", (value == true))
-            OnChanged("useClassColors")
-        end,
         desc = "Use class colors instead of the configured static text color.",
         prefix = prefix,
+        onChanged = function()
+            OnChanged("useClassColors")
+        end,
     })
 
     SettingsLib:CreateColorOverrides(category, {
-        key = keyPrefix .. "Color",
+        key = path .. ".color",
         entries = {
-            { key = keyPrefix, label = "Color" },
+            { key = path, label = "Color" },
         },
         getColor = function()
             local color = Utils:SanitizeColor(GetValue("color"), defaultColor)
@@ -368,13 +316,12 @@ end
 function SettingsCommon:AddCooldownTextSettings(category, options)
     local opts = type(options) == "table" and options or {}
     local path = (type(opts.path) == "string" and opts.path ~= "" and opts.path)
-    local keyPrefix = (type(opts.keyPrefix) == "string" and opts.keyPrefix ~= "" and opts.keyPrefix) or nil
     local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil
     local onChanged = type(opts.onChanged) == "function" and opts.onChanged or nil
 
     assert(type(onChanged) == "function", "FoxFrames: AddCooldownTextSettings requires onChanged callback")
 
-    if not (category and path and keyPrefix) then
+    if not (category and path) then
         return
     end
 
@@ -384,12 +331,11 @@ function SettingsCommon:AddCooldownTextSettings(category, options)
 
     local defaults = DB.storage:GetDefaultsTableAtPath(path)
 
-    local defaultShow = defaults.show == true
     local defaultFontSize = Utils:ClampInteger(defaults.fontSize, 8, 32, 12)
     local defaultColor = Utils:SanitizeColor(defaults.color, { r = 1, g = 1, b = 1 })
 
     local function GetValue(key)
-        return DB.storage:GetValue(path .. "." .. key)
+        return DB.storage:GetValueAtPath(path .. "." .. key)
     end
 
     local function SetValue(key, value)
@@ -400,68 +346,43 @@ function SettingsCommon:AddCooldownTextSettings(category, options)
         onChanged(settingKey)
     end
 
-    local showElement = SettingsLib:CreateCheckbox(category, {
-        key = keyPrefix .. "CooldownText",
+    local showElement = self:CreateCheckbox(category, {
+        path = path .. ".show",
         name = "Show Text",
-        default = defaultShow,
-        get = function()
-            local value = GetValue("show")
-            if value == nil then
-                return defaultShow
-            end
-            return value == true
-        end,
-        set = function(value)
-            SetValue("show", value == true)
-            OnChanged("show")
-        end,
         desc = "Toggle cooldown countdown text visibility.",
         prefix = prefix,
+        onChanged = function()
+            OnChanged("show")
+        end,
     })
 
-    local function IsCooldownTextEnabled()
-        local value = GetValue("show")
-        if value == nil then
-            value = defaultShow
-        end
-        return value == true
-    end
-
-    local sliderArgs = {
-        key = keyPrefix .. "CooldownFontSize",
+    self:CreateSlider(category, {
+        path = path .. ".fontSize",
         name = "Text Size",
-        default = defaultFontSize,
         min = 8,
         max = 32,
         step = 1,
         formatter = function(value)
             return string.format("%ipt", Utils:ClampInteger(value, 8, 32, defaultFontSize))
         end,
-        get = function()
-            local value = GetValue("fontSize")
-            if value == nil then
-                value = defaultFontSize
-            end
-            return Utils:ClampInteger(value, 8, 32, defaultFontSize)
+        sanitize = function(value, fallback)
+            return Utils:ClampInteger(value, 8, 32, fallback)
         end,
-        set = function(value)
-            SetValue("fontSize", Utils:ClampInteger(value, 8, 32, defaultFontSize))
+        onChanged = function()
             OnChanged("fontSize")
         end,
         desc = "Adjust cooldown countdown text size.",
         prefix = prefix,
         parent = showElement,
         parentCheck = function()
-            return IsCooldownTextEnabled()
+            return DB.storage:GetBooleanAtPath(path .. ".show") == true
         end,
-    }
-
-    SettingsLib:CreateSlider(category, sliderArgs)
+    })
 
     SettingsLib:CreateColorOverrides(category, {
-        key = keyPrefix .. "CooldownTextColor",
+        key = path .. ".color",
         entries = {
-            { key = keyPrefix, label = "Color" },
+            { key = path, label = "Color" },
         },
         getColor = function()
             local color = Utils:SanitizeColor(GetValue("color"), defaultColor)
@@ -478,22 +399,21 @@ function SettingsCommon:AddCooldownTextSettings(category, options)
         hasOpacity = false,
         parent = showElement,
         parentCheck = function()
-            return IsCooldownTextEnabled()
+            return DB.storage:GetBooleanAtPath(path .. ".show") == true
         end,
         minHeight = 36,
     })
 end
 
-function SettingsCommon:CreateBooleanSettings(category, options)
+function SettingsCommon:CreateCheckbox(category, options)
     local opts = type(options) == "table" and options or {}
-    local key = (type(opts.key) == "string" and opts.key ~= "" and opts.key)
     local path = (type(opts.path) == "string" and opts.path ~= "" and opts.path)
     local name = (type(opts.name) == "string" and opts.name ~= "" and opts.name)
     local desc = (type(opts.desc) == "string" and opts.desc ~= "" and opts.desc)
     local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil
     local onChanged = type(opts.onChanged) == "function" and opts.onChanged or nil
 
-    if not (key and path and name) then
+    if not (path and name) then
         return nil
     end
 
@@ -501,15 +421,19 @@ function SettingsCommon:CreateBooleanSettings(category, options)
         return nil
     end
 
-    local defaults = DB.storage:GetDefaultsTableAtPath(path)
-    local defaultValue = defaults == true
+    local defaultCandidate = DB.storage:GetDefaultAtPath(path)
+    if defaultCandidate == nil then
+        defaultCandidate = DB.storage:GetValueAtPath(path)
+    end
+
+    local defaultValue = defaultCandidate == true
 
     return SettingsLib:CreateCheckbox(category, {
-        key = key,
+        key = path,
         name = name,
         default = defaultValue,
         get = function()
-            local value = DB.storage:GetValue(path)
+            local value = DB.storage:GetValueAtPath(path)
             if value == nil then
                 return defaultValue
             end
@@ -527,16 +451,204 @@ function SettingsCommon:CreateBooleanSettings(category, options)
     })
 end
 
+function SettingsCommon:CreateDropdown(category, options)
+    local opts = type(options) == "table" and options or {}
+    local key = (type(opts.key) == "string" and opts.key ~= "" and opts.key) or nil
+    local path = (type(opts.path) == "string" and opts.path ~= "" and opts.path)
+    local name = (type(opts.name) == "string" and opts.name ~= "" and opts.name)
+    local desc = (type(opts.desc) == "string" and opts.desc ~= "" and opts.desc)
+    local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil
+    local values = (type(opts.values) == "table" and opts.values) or (type(opts.options) == "table" and opts.options)
+    local optionfunc = type(opts.optionfunc) == "function" and opts.optionfunc or nil
+    local sanitize = type(opts.sanitize) == "function" and opts.sanitize or nil
+    local onChanged = type(opts.onChanged) == "function" and opts.onChanged or nil
+
+    -- Non-storage mode: allow callers to centralize dropdown creation without DB.storage.
+    -- Requires a unique key plus explicit get/set functions.
+    if not path then
+        if not (key and name and (values or optionfunc)) then
+            return nil
+        end
+
+        if not (type(opts.get) == "function" and type(opts.set) == "function") then
+            return nil
+        end
+
+        return SettingsLib:CreateDropdown(category, {
+            key = key,
+            name = name,
+            default = opts.default,
+            values = values,
+            order = opts.order,
+            optionfunc = optionfunc,
+            get = opts.get,
+            set = opts.set,
+            desc = desc,
+            prefix = prefix,
+            parent = opts.parent,
+            parentCheck = opts.parentCheck,
+        })
+    end
+
+    if not (path and name and (values or optionfunc)) then
+        return nil
+    end
+
+    if not ValidateSettingsPath(path) then
+        return nil
+    end
+
+    local defaultCandidate = DB.storage:GetDefaultAtPath(path)
+    if defaultCandidate == nil then
+        defaultCandidate = DB.storage:GetValueAtPath(path)
+    end
+
+    if defaultCandidate == nil then
+        return nil
+    end
+
+    local defaultValue = defaultCandidate
+    if sanitize then
+        defaultValue = sanitize(defaultValue, defaultCandidate) or defaultCandidate
+    end
+
+    if defaultValue == nil then
+        return nil
+    end
+
+    return SettingsLib:CreateDropdown(category, {
+        key = path,
+        name = name,
+        default = defaultValue,
+        values = values,
+        order = opts.order,
+        optionfunc = optionfunc,
+        get = function()
+            local value = DB.storage:GetValueAtPath(path)
+            if value == nil then
+                return defaultValue
+            end
+
+            if sanitize then
+                value = sanitize(value, defaultValue)
+            end
+
+            if value == nil then
+                return defaultValue
+            end
+
+            return value
+        end,
+        set = function(value)
+            local newValue = value
+            if sanitize then
+                newValue = sanitize(newValue, defaultValue)
+            end
+            if newValue == nil then
+                newValue = defaultValue
+            end
+
+            if DB.storage:SetValue(path, newValue) and onChanged then
+                onChanged(newValue)
+            end
+        end,
+        desc = desc,
+        prefix = prefix,
+        parent = opts.parent,
+        parentCheck = opts.parentCheck,
+    })
+end
+
+function SettingsCommon:CreateSlider(category, options)
+    local opts = type(options) == "table" and options or {}
+    local path = (type(opts.path) == "string" and opts.path ~= "" and opts.path)
+    local name = (type(opts.name) == "string" and opts.name ~= "" and opts.name)
+    local desc = (type(opts.desc) == "string" and opts.desc ~= "" and opts.desc)
+    local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil
+    local min = type(opts.min) == "number" and opts.min or nil
+    local max = type(opts.max) == "number" and opts.max or nil
+    local step = type(opts.step) == "number" and opts.step or nil
+    local formatter = type(opts.formatter) == "function" and opts.formatter or nil
+    local sanitize = type(opts.sanitize) == "function" and opts.sanitize or nil
+    local onChanged = type(opts.onChanged) == "function" and opts.onChanged or nil
+
+    if not (path and name and min and max and step) then
+        return nil
+    end
+
+    if not ValidateSettingsPath(path) then
+        return nil
+    end
+
+    local defaultCandidate = DB.storage:GetDefaultAtPath(path)
+    if defaultCandidate == nil then
+        defaultCandidate = DB.storage:GetValueAtPath(path)
+    end
+    if defaultCandidate == nil then
+        defaultCandidate = min
+    end
+
+    local defaultValue = defaultCandidate
+    if sanitize then
+        defaultValue = sanitize(defaultValue, defaultCandidate)
+    end
+    if defaultValue == nil then
+        defaultValue = defaultCandidate
+    end
+
+    return SettingsLib:CreateSlider(category, {
+        key = path,
+        name = name,
+        default = defaultValue,
+        min = min,
+        max = max,
+        step = step,
+        formatter = formatter,
+        get = function()
+            local value = DB.storage:GetValueAtPath(path)
+            if value == nil then
+                return defaultValue
+            end
+
+            if sanitize then
+                value = sanitize(value, defaultValue)
+            end
+
+            if value == nil then
+                return defaultValue
+            end
+
+            return value
+        end,
+        set = function(value)
+            local newValue = value
+            if sanitize then
+                newValue = sanitize(newValue, defaultValue)
+            end
+            if newValue == nil then
+                newValue = defaultValue
+            end
+
+            if DB.storage:SetValue(path, newValue) and onChanged then
+                onChanged(newValue)
+            end
+        end,
+        desc = desc,
+        prefix = prefix,
+        parent = opts.parent,
+        parentCheck = opts.parentCheck,
+    })
+end
+
 function SettingsCommon:CreateAuraSettings(category, options)
     local opts = type(options) == "table" and options or {}
     local basePath = (type(opts.basePath) == "string" and opts.basePath ~= "" and opts.basePath)
-    local keyPrefix = (type(opts.keyPrefix) == "string" and opts.keyPrefix ~= "" and opts.keyPrefix)
     local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil
     local onChanged = type(opts.onChanged) == "function" and opts.onChanged or nil
 
     assert(type(onChanged) == "function", "FoxFrames: CreateAuraSettings requires onChanged callback")
 
-    if not (category and basePath and keyPrefix) then
+    if not (category and basePath) then
         return
     end
 
@@ -545,7 +657,6 @@ function SettingsCommon:CreateAuraSettings(category, options)
     end
 
     local cooldownTextPath = basePath .. ".cooldownText"
-    local cooldownKeyPrefix = keyPrefix .. "CooldownText"
 
     SettingsLib:CreateHeader(category, {
         name = "Cooldown",
@@ -553,7 +664,6 @@ function SettingsCommon:CreateAuraSettings(category, options)
 
     self:AddCooldownTextSettings(category, {
         path = cooldownTextPath,
-        keyPrefix = cooldownKeyPrefix,
         prefix = prefix,
         onChanged = onChanged,
     })

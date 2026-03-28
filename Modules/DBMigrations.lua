@@ -30,7 +30,7 @@ function DB:MigrateAndSanitizeDB()
 			return
 		end
 
-		local legacyValue = storage:GetValue(legacyPath)
+		local legacyValue = storage:GetValueAtPath(legacyPath)
 		if legacyValue == nil then
 			return
 		end
@@ -41,44 +41,6 @@ function DB:MigrateAndSanitizeDB()
 		end
 
 		storage:SetValue(legacyPath, nil)
-	end
-
-	if profile.migrations.moveIncomingCastBarToPartyIncomingCasts ~= true then
-		local legacy = storage:GetValuesTableAtPath("profile.incomingCastBar")
-		local partyIncoming = storage:GetValuesTableAtPath("profile.partyFrame.incomingCasts")
-
-		if type(legacy) == "table" then
-			local shouldCopy = true
-			if type(partyIncoming) == "table" then
-				-- Treat any configured key as already migrated.
-				for k, _ in pairs(partyIncoming) do
-					shouldCopy = false
-					break
-				end
-
-				if profile.migrations.moveTrackIncomingCastsToIncomingCastsEnabled ~= true then
-					local legacy = storage:GetValue("profile.partyFrame.trackIncomingCasts")
-					if legacy ~= nil then
-						local enabledPath = "profile.partyFrame.incomingCasts.enabled"
-						storage:SetValue(enabledPath, legacy == true)
-						storage:SetValue("profile.partyFrame.trackIncomingCasts", nil)
-					end
-
-					profile.migrations.moveTrackIncomingCastsToIncomingCastsEnabled = true
-					profile.migrationIndex = Utils:ClampInteger(profile.migrationIndex, 0, 9999, 0) + 1
-				end
-			end
-
-			if shouldCopy then
-				storage:SetValue("profile.partyFrame.incomingCasts", legacy)
-			end
-
-			-- Remove legacy table to avoid ambiguity going forward.
-			storage:SetValue("profile.incomingCastBar", nil)
-		end
-
-		profile.migrations.moveIncomingCastBarToPartyIncomingCasts = true
-		profile.migrationIndex = Utils:ClampInteger(profile.migrationIndex, 0, 9999, 0) + 1
 	end
 
 	if profile.migrations.moveTextSettingsToTextGroup ~= true then
@@ -94,7 +56,7 @@ function DB:MigrateAndSanitizeDB()
 				basePath .. ".useClassColors",
 				basePath .. ".text.useClassColors",
 				function(v)
-					return v == true
+					return Utils:SanitizeBoolean(v, false)
 				end
 			)
 
@@ -118,15 +80,48 @@ function DB:MigrateAndSanitizeDB()
 				basePath .. ".color",
 				basePath .. ".text.color",
 				function(v)
-					if type(v) ~= "table" then
-						return nil
-					end
 					return Utils:SanitizeColor(v, nil)
 				end
 			)
 		end
 
 		profile.migrations.moveTextSettingsToTextGroup = true
+		profile.migrationIndex = Utils:ClampInteger(profile.migrationIndex, 0, 9999, 0) + 1
+	end
+
+	if profile.migrations.groupPartyFrameHealthBarSettings ~= true then
+		local legacyUseCustomPath = "profile.partyFrame.useCustomHealthBarTexture"
+		local newUseCustomPath = "profile.partyFrame.healthBar.useCustomTexture"
+		MigrateValue(legacyUseCustomPath, newUseCustomPath, function(v)
+			return Utils:SanitizeBoolean(v, false)
+		end)
+
+		local legacyTexturePath = "profile.partyFrame.healthBarTexture"
+		local newTexturePath = "profile.partyFrame.healthBar.texture"
+		MigrateValue(legacyTexturePath, newTexturePath, function(v)
+			return Utils:SanitizeString(v, nil, true)
+		end)
+
+		profile.migrations.groupPartyFrameHealthBarSettings = true
+		profile.migrationIndex = Utils:ClampInteger(profile.migrationIndex, 0, 9999, 0) + 1
+	end
+
+	if profile.migrations.groupPartyFrameRoleIconsSettings ~= true then
+		local keys = {
+			"showTankRoleIcon",
+			"showHealerRoleIcon",
+			"showDPSRoleIcon",
+		}
+
+		for _, key in ipairs(keys) do
+			local legacyPath = "profile.partyFrame." .. key
+			local newPath = "profile.partyFrame.roleIcons." .. key
+			MigrateValue(legacyPath, newPath, function(v)
+				return Utils:SanitizeBoolean(v, true)
+			end)
+		end
+
+		profile.migrations.groupPartyFrameRoleIconsSettings = true
 		profile.migrationIndex = Utils:ClampInteger(profile.migrationIndex, 0, 9999, 0) + 1
 	end
 end

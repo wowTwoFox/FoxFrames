@@ -78,6 +78,62 @@ local function LogInvalidValueType(storage, path, value, currentValue, defaultVa
     })
 end
 
+local function LogInvalidDefaultValueType(storage, path, defaultValue, expectedType)
+    Utils:Log("ERROR: INVALID_DEFAULT_VALUE_TYPE", {
+        path = path,
+        expectedType = expectedType,
+        actualType = type(defaultValue),
+        defaultValue = defaultValue,
+        defaults = storage and storage.db and storage.db.defaults,
+        storage = storage and storage.db,
+    })
+end
+
+local function LogMissingDefaultValue(storage, path, value)
+    Utils:Log("ERROR: MISSING_DEFAULT_VALUE", {
+        path = path,
+        value = value,
+        actualType = type(value),
+        defaults = storage and storage.db and storage.db.defaults,
+        storage = storage and storage.db,
+    })
+end
+
+local function LogInvalidStoredValueType(storage, path, value, defaultValue)
+    Utils:Log("ERROR: INVALID_STORED_VALUE_TYPE", {
+        path = path,
+        expectedType = type(defaultValue),
+        actualType = type(value),
+        value = value,
+        defaultValue = defaultValue,
+        defaults = storage and storage.db and storage.db.defaults,
+        storage = storage and storage.db,
+    })
+end
+
+local function LogInvalidStoredValueTypeWithExpectedType(storage, path, value, expectedType)
+    Utils:Log("ERROR: INVALID_STORED_VALUE_TYPE", {
+        path = path,
+        expectedType = expectedType,
+        actualType = type(value),
+        value = value,
+        defaults = storage and storage.db and storage.db.defaults,
+        storage = storage and storage.db,
+    })
+end
+
+local function LogInvalidOptionValue(storage, path, value, defaultValue, allowedOptions)
+    Utils:Log("ERROR: INVALID_OPTION_VALUE", {
+        path = path,
+        value = value,
+        actualType = type(value),
+        defaultValue = defaultValue,
+        allowedOptions = allowedOptions,
+        defaults = storage and storage.db and storage.db.defaults,
+        storage = storage and storage.db,
+    })
+end
+
 local function HasValidRootPath(storage, pathParts)
     local firstKey = type(pathParts) == "table" and pathParts[1] or nil
     local dbRoot = storage and storage.db
@@ -162,13 +218,225 @@ function Object:ValidatePathExists(path)
     return false
 end
 
-function Object:GetValue(path)
+function Object:GetValueAtPath(path)
     if not self:ValidatePathExists(path) then
         return nil
     end
 
     local pathParts = self:NormalizePath(path)
     return GetTableAtPath(self.db, pathParts)
+end
+
+function Object:GetStringAtPath(path)
+    local currentValue, defaultValue = self:GetValueAndDefaultAtPath(path)
+
+    if defaultValue == nil then
+        if currentValue == nil then
+            return nil
+        end
+
+        LogMissingDefaultValue(self, path, currentValue)
+        if type(currentValue) ~= "string" then
+            LogInvalidStoredValueTypeWithExpectedType(self, path, currentValue, "string")
+            return nil
+        end
+        return currentValue
+    end
+
+    if type(defaultValue) ~= "string" then
+        LogInvalidDefaultValueType(self, path, defaultValue, "string")
+        return defaultValue
+    end
+
+    if currentValue == nil then
+        return defaultValue
+    end
+
+    if type(currentValue) ~= "string" then
+        LogInvalidStoredValueType(self, path, currentValue, defaultValue)
+        return defaultValue
+    end
+
+    return currentValue
+end
+
+function Object:GetBooleanAtPath(path)
+    local currentValue, defaultValue = self:GetValueAndDefaultAtPath(path)
+
+    -- Defaults drive the schema: if a key has no default, treat it as not part of the DB contract.
+    if defaultValue == nil then
+        if currentValue == nil then
+            return nil
+        end
+
+        LogMissingDefaultValue(self, path, currentValue)
+        if type(currentValue) ~= "boolean" then
+            LogInvalidStoredValueTypeWithExpectedType(self, path, currentValue, "boolean")
+            return nil
+        end
+        return currentValue
+    end
+
+    if type(defaultValue) ~= "boolean" then
+        LogInvalidDefaultValueType(self, path, defaultValue, "boolean")
+        return defaultValue
+    end
+
+    if currentValue == nil then
+        return defaultValue
+    end
+
+    if type(currentValue) ~= "boolean" then
+        LogInvalidStoredValueType(self, path, currentValue, defaultValue)
+        return defaultValue
+    end
+
+    return currentValue
+end
+
+function Object:GetNumberAtPath(path, minValue, maxValue)
+    local currentValue, defaultValue = self:GetValueAndDefaultAtPath(path)
+
+    if defaultValue == nil then
+        if currentValue == nil then
+            return nil
+        end
+
+        LogMissingDefaultValue(self, path, currentValue)
+        if type(currentValue) ~= "number" then
+            LogInvalidStoredValueTypeWithExpectedType(self, path, currentValue, "number")
+            return nil
+        end
+
+        local min = type(minValue) == "number" and minValue or -math.huge
+        local max = type(maxValue) == "number" and maxValue or math.huge
+        return Utils:ClampNumber(currentValue, min, max, currentValue)
+    end
+
+    if type(defaultValue) ~= "number" then
+        LogInvalidDefaultValueType(self, path, defaultValue, "number")
+        return defaultValue
+    end
+
+    if currentValue == nil then
+        return defaultValue
+    end
+
+    if type(currentValue) ~= "number" then
+        LogInvalidStoredValueType(self, path, currentValue, defaultValue)
+        return defaultValue
+    end
+
+    local min = type(minValue) == "number" and minValue or -math.huge
+    local max = type(maxValue) == "number" and maxValue or math.huge
+    return Utils:ClampNumber(currentValue, min, max, defaultValue)
+end
+
+function Object:GetIntegerAtPath(path, minValue, maxValue)
+    local currentValue, defaultValue = self:GetValueAndDefaultAtPath(path)
+
+    if defaultValue == nil then
+        if currentValue == nil then
+            return nil
+        end
+
+        LogMissingDefaultValue(self, path, currentValue)
+        if type(currentValue) ~= "number" then
+            LogInvalidStoredValueTypeWithExpectedType(self, path, currentValue, "number")
+            return nil
+        end
+
+        local min = type(minValue) == "number" and minValue or -math.huge
+        local max = type(maxValue) == "number" and maxValue or math.huge
+        return Utils:ClampInteger(currentValue, min, max, currentValue)
+    end
+
+    if type(defaultValue) ~= "number" then
+        LogInvalidDefaultValueType(self, path, defaultValue, "number")
+        return defaultValue
+    end
+
+    if currentValue == nil then
+        return defaultValue
+    end
+
+    if type(currentValue) ~= "number" then
+        LogInvalidStoredValueType(self, path, currentValue, defaultValue)
+        return defaultValue
+    end
+
+    local min = type(minValue) == "number" and minValue or -math.huge
+    local max = type(maxValue) == "number" and maxValue or math.huge
+    return Utils:ClampInteger(currentValue, min, max, defaultValue)
+end
+
+function Object:GetColorAtPath(path)
+    local currentValue, defaultValue = self:GetValueAndDefaultAtPath(path)
+
+    if defaultValue == nil then
+        if currentValue == nil then
+            return nil
+        end
+
+        LogMissingDefaultValue(self, path, currentValue)
+        if type(currentValue) ~= "table" then
+            LogInvalidStoredValueTypeWithExpectedType(self, path, currentValue, "table")
+            return nil
+        end
+        return Utils:SanitizeColor(currentValue, nil)
+    end
+
+    if type(defaultValue) ~= "table" then
+        LogInvalidDefaultValueType(self, path, defaultValue, "table")
+        return defaultValue
+    end
+
+    local sanitizedDefault = Utils:SanitizeColor(defaultValue, nil)
+
+    if currentValue == nil then
+        return sanitizedDefault
+    end
+
+    if type(currentValue) ~= "table" then
+        LogInvalidStoredValueType(self, path, currentValue, defaultValue)
+        return sanitizedDefault
+    end
+
+    return Utils:SanitizeColor(currentValue, sanitizedDefault)
+end
+
+function Object:GetOptionAtPath(path, allowedOptions)
+    local options = type(allowedOptions) == "table" and allowedOptions or nil
+    local currentValue, defaultValue = self:GetValueAndDefaultAtPath(path)
+
+    if options and defaultValue ~= nil then
+        local sanitizedDefaultOption = Utils:SanitizeOption(defaultValue, options)
+        if sanitizedDefaultOption == nil then
+            LogInvalidOptionValue(self, path, defaultValue, defaultValue, options)
+            sanitizedDefaultOption = defaultValue
+        end
+        defaultValue = sanitizedDefaultOption
+    end
+
+    if currentValue == nil then
+        return defaultValue
+    end
+
+    if type(currentValue) ~= type(defaultValue) then
+        LogInvalidStoredValueType(self, path, currentValue, defaultValue)
+        return defaultValue
+    end
+
+    if options then
+        local sanitized = Utils:SanitizeOption(currentValue, options)
+        if sanitized == nil then
+            LogInvalidOptionValue(self, path, currentValue, defaultValue, options)
+            return defaultValue
+        end
+        return sanitized
+    end
+
+    return currentValue
 end
 
 function Object:SetValue(path, value)
@@ -210,6 +478,15 @@ function Object:GetDefaultsTableAtPath(path)
     return defaults
 end
 
+function Object:GetDefaultAtPath(path)
+    local pathParts = self:NormalizePath(path)
+    if not pathParts then
+        return nil
+    end
+
+    return GetTableAtPath(self.db and self.db.defaults, pathParts)
+end
+
 function Object:GetValuesTableAtPath(path)
     local pathParts = self:NormalizePath(path)
     if not pathParts then
@@ -219,7 +496,7 @@ function Object:GetValuesTableAtPath(path)
     return GetTableAtPath(self.db, pathParts)
 end
 
-function Object:GetTableAtPath(path)
+function Object:GetValueAndDefaultAtPath(path)
     local pathParts = self:NormalizePath(path)
     if not pathParts then
         LogInvalidPath(self, path)

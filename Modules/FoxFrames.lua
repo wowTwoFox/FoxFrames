@@ -19,10 +19,6 @@ function FF:IsPlayerUnit(unit)
     return UnitIsUnit(unit, "player")
 end
 
-function FF:IsPlayerFrame(frame)
-    return self:IsPlayerUnit(frame and frame.unit)
-end
-
 function FF:SetAllowAnyAnchoring()
     local alwaysUseTopLeftAnchor = not DB:GetAllowAnyAnchoring()
 
@@ -159,269 +155,14 @@ function FF:ApplyAuraCountdownColorForFrame(frame)
 end
 
 function FF:UpdateAuraCountdownFontSize()
-    for _, frame in ipairs(self:GetFrames()) do
+    for _, frame in ipairs(Blizzard:GetFrames()) do
         self:ApplyAuraCountdownFontSizeForFrame(frame)
     end
 end
 
 function FF:UpdateAuraCountdownColor()
-    for _, frame in ipairs(self:GetFrames()) do
+    for _, frame in ipairs(Blizzard:GetFrames()) do
         self:ApplyAuraCountdownColorForFrame(frame)
-    end
-end
-
-function FF:ApplyPlayerStatusAnchorForFrame(frame)
-    local fontString = Utils:EnsureFontString(frame and frame.statusText)
-    if not (fontString and fontString.ClearAllPoints and fontString.SetPoint) then
-        return
-    end
-
-    local useRaidOverride = Blizzard:InRaidGroup() and DB:GetRaidPlayerStatusFrameOverrideEnabled()
-
-    if not (useRaidOverride or DB:GetPlayerStatusFrameCustomize()) then
-        if fontString._ffPointCustomized then
-            Utils:RevertCustomPoint(fontString)
-        end
-        return
-    end
-
-    local layoutAxis = Blizzard:GetPartyFramesLayoutAxis()
-    local point, relativePoint, target, offsetX, offsetY
-    if useRaidOverride then
-        point, relativePoint, target, offsetX, offsetY = DB:GetRaidPlayerStatusAnchorsAndOffsets(layoutAxis)
-    else
-        point, relativePoint, target, offsetX, offsetY = DB:GetPlayerStatusAnchorsAndOffsets(layoutAxis)
-    end
-
-    local relativeTo = frame
-    if target == DB.FRAME_ANCHOR_TARGETS.HEALTHBAR and frame.healthBar then
-        relativeTo = frame.healthBar
-    end
-
-    Utils:RevertingClearAllPoints(fontString)
-    Utils:SetRevertingPoint(fontString, point, relativeTo, relativePoint, offsetX, offsetY)
-end
-
-function FF:UpdatePlayerStatusAnchoring()
-    for _, frame in ipairs(self:GetFrames()) do
-        self:ApplyPlayerStatusAnchorForFrame(frame)
-    end
-end
-
-function FF:ApplyPlayerStatusColorForFrame(frame)
-    local fontString = Utils:EnsureFontString(frame and frame.statusText)
-    if not (fontString and fontString.SetTextColor) then
-        return
-    end
-
-    local useRaidOverride = Blizzard:InRaidGroup() and DB:GetRaidPlayerStatusTextOverrideEnabled()
-    local customizeText = useRaidOverride or DB:GetPlayerStatusTextCustomize()
-
-    if not customizeText then
-        if fontString._ffFontColorCustomized then
-            Utils:RevertCustomFontColor(fontString)
-        end
-        return
-    end
-
-    local useClassColors = useRaidOverride and DB:GetRaidPlayerStatusUseClassColors() or DB:GetPlayerStatusUseClassColors()
-    if useClassColors then
-        local classR, classG, classB = Blizzard:GetClassColorForUnit(frame and frame.unit)
-        if classR and classG and classB then
-            local _, _, _, alpha
-            if useRaidOverride then
-                _, _, _, alpha = DB:GetRaidPlayerStatusColor()
-            else
-                _, _, _, alpha = DB:GetPlayerStatusColor()
-            end
-            Utils:SetRevertingTextColor(fontString, classR, classG, classB, alpha)
-            return
-        end
-    end
-
-    local r, g, b, a
-    if useRaidOverride then
-        r, g, b, a = DB:GetRaidPlayerStatusColor()
-    else
-        r, g, b, a = DB:GetPlayerStatusColor()
-    end
-    Utils:SetRevertingTextColor(fontString, r, g, b, a)
-end
-
-function FF:UpdatePlayerStatusColor()
-    for _, frame in ipairs(self:GetFrames()) do
-        self:ApplyPlayerStatusColorForFrame(frame)
-    end
-end
-
-function FF:ApplyPlayerStatusSettingsForFrame(frame)
-    self:ApplyPlayerStatusAnchorForFrame(frame)
-    self:ApplyPlayerStatusColorForFrame(frame)
-    self:ApplyPlayerStatusFontSizeForFrame(frame)
-end
-
-function FF:ApplyPlayerStatusSettings()
-    for _, frame in ipairs(self:GetFrames()) do
-        self:ApplyPlayerStatusSettingsForFrame(frame)
-    end
-end
-
-function FF:ApplyPlayerNameAnchorForFrame(frame)
-    local fontString = Utils:EnsureFontString(frame and frame.name)
-    if not (fontString and fontString.ClearAllPoints and fontString.SetPoint) then
-        Utils:Log("ERROR: NOT_VALID_FRAME", frame)
-        return
-    end
-
-    local useRaidOverride = Blizzard:InRaidGroup() and DB:GetRaidPlayerNameFrameOverrideEnabled()
-
-    if not (useRaidOverride or DB:GetPlayerNameFrameCustomize()) then
-        if fontString._ffPointCustomized then
-            Utils:RevertCustomPoint(fontString)
-        end
-        return
-    end
-
-    local layoutAxis = Blizzard:GetPartyFramesLayoutAxis()
-    local point, relativePoint, target, offsetX, offsetY
-    if useRaidOverride then
-        point, relativePoint, target, offsetX, offsetY = DB:GetRaidPlayerNameAnchorsAndOffsets(layoutAxis)
-    else
-        point, relativePoint, target, offsetX, offsetY = DB:GetPlayerNameAnchorsAndOffsets(layoutAxis)
-    end
-
-    local relativeTo = frame
-    if target == DB.FRAME_ANCHOR_TARGETS.HEALTHBAR and frame.healthBar then
-        relativeTo = frame.healthBar
-    end
-
-    Utils:RevertingClearAllPoints(fontString)
-    Utils:SetRevertingPoint(fontString, point, relativeTo, relativePoint, offsetX, offsetY)
-end
-
-function FF:UpdatePlayerNameAnchoring()
-    for _, frame in ipairs(self:GetFrames()) do
-        self:ApplyPlayerNameAnchorForFrame(frame)
-    end
-end
-
-function FF:ApplyPlayerNameColorForFrame(frame)
-    local fontString = Utils:EnsureFontString(frame and frame.name)
-    if not (fontString and fontString.SetTextColor) then
-        return
-    end
-
-    local useRaidOverride = Blizzard:InRaidGroup() and DB:GetRaidPlayerNameTextOverrideEnabled()
-    local customizeText = useRaidOverride or DB:GetPlayerNameTextCustomize()
-
-    if not customizeText then
-        if fontString._ffFontColorCustomized then
-            Utils:RevertCustomFontColor(fontString)
-        end
-        return
-    end
-
-    local useClassColors = useRaidOverride and DB:GetRaidPlayerNameUseClassColors() or DB:GetPlayerNameUseClassColors()
-    if useClassColors then
-        local classR, classG, classB = Blizzard:GetClassColorForUnit(frame and frame.unit)
-        if classR and classG and classB then
-            local _, _, _, alpha
-            if useRaidOverride then
-                _, _, _, alpha = DB:GetRaidPlayerNameColor()
-            else
-                _, _, _, alpha = DB:GetPlayerNameColor()
-            end
-            Utils:SetRevertingTextColor(fontString, classR, classG, classB, alpha)
-            return
-        end
-    end
-
-    local r, g, b, a
-    if useRaidOverride then
-        r, g, b, a = DB:GetRaidPlayerNameColor()
-    else
-        r, g, b, a = DB:GetPlayerNameColor()
-    end
-    Utils:SetRevertingTextColor(fontString, r, g, b, a)
-end
-
-function FF:UpdatePlayerNameColor()
-    for _, frame in ipairs(self:GetFrames()) do
-        self:ApplyPlayerNameColorForFrame(frame)
-    end
-end
-
-function FF:ApplyPlayerNameFontSizeForFrame(frame)
-    local fontString = Utils:EnsureFontString(frame and frame.name)
-    if not (fontString and fontString.GetFont and fontString.SetFont) then
-        return
-    end
-
-    local useRaidOverride = Blizzard:InRaidGroup() and DB:GetRaidPlayerNameTextOverrideEnabled()
-    local customizeText = useRaidOverride or DB:GetPlayerNameTextCustomize()
-
-    if not customizeText then
-        if fontString._ffFontCustomized then
-            Utils:RevertCustomFont(fontString)
-        end
-        return
-    end
-
-    local size = useRaidOverride and DB:GetRaidPlayerNameFontSize() or DB:GetPlayerNameFontSize()
-    local fontFile, _, flags = fontString:GetFont()
-    if flags ~= nil then
-        Utils:SetRevertingFont(fontString, fontFile, size, flags)
-    else
-        Utils:SetRevertingFont(fontString, fontFile, size)
-    end
-end
-
-function FF:UpdatePlayerNameFontSize()
-    for _, frame in ipairs(self:GetFrames()) do
-        self:ApplyPlayerNameFontSizeForFrame(frame)
-    end
-end
-
-function FF:ApplyPlayerNameSettingsForFrame(frame)
-    self:ApplyPlayerNameAnchorForFrame(frame)
-    self:ApplyPlayerNameColorForFrame(frame)
-    self:ApplyPlayerNameFontSizeForFrame(frame)
-end
-
-function FF:ApplyPlayerNameSettings()
-    for _, frame in ipairs(self:GetFrames()) do
-        self:ApplyPlayerNameSettingsForFrame(frame)
-    end
-end
-
-function FF:ApplyPlayerStatusFontSizeForFrame(frame)
-    local fontString = Utils:EnsureFontString(frame and frame.statusText)
-    if not (fontString and fontString.GetFont and fontString.SetFont) then
-        return
-    end
-
-    local useRaidOverride = Blizzard:InRaidGroup() and DB:GetRaidPlayerStatusTextOverrideEnabled()
-    local customizeText = useRaidOverride or DB:GetPlayerStatusTextCustomize()
-
-    if not customizeText then
-        if fontString._ffFontCustomized then
-            Utils:RevertCustomFont(fontString)
-        end
-        return
-    end
-
-    local size = useRaidOverride and DB:GetRaidPlayerStatusFontSize() or DB:GetPlayerStatusFontSize()
-    local fontFile, _, flags = fontString:GetFont()
-    if flags ~= nil then
-        Utils:SetRevertingFont(fontString, fontFile, size, flags)
-    else
-        Utils:SetRevertingFont(fontString, fontFile, size)
-    end
-end
-
-function FF:UpdatePlayerStatusFontSize()
-    for _, frame in ipairs(self:GetFrames()) do
-        self:ApplyPlayerStatusFontSizeForFrame(frame)
     end
 end
 
@@ -445,7 +186,7 @@ function FF:ShowBuffCountdownIfNeededForFrame(frame)
 end
 
 function FF:ShowBuffCountdownIfNeeded()
-    for _, frame in ipairs(self:GetFrames()) do
+    for _, frame in ipairs(Blizzard:GetFrames()) do
         self:ShowBuffCountdownIfNeededForFrame(frame)
     end
 end
@@ -470,7 +211,7 @@ function FF:ShowDebuffCountdownIfNeededForFrame(frame)
 end
 
 function FF:ShowDebuffCountdownIfNeeded()
-    for _, frame in ipairs(self:GetFrames()) do
+    for _, frame in ipairs(Blizzard:GetFrames()) do
         self:ShowDebuffCountdownIfNeededForFrame(frame)
     end
 end
@@ -554,12 +295,8 @@ function FF:UpdateFrame(frame)
     self:UpdateTextures(frame)
 end
 
-function FF:GetFrames()
-    return Blizzard:GetFrames()
-end
-
 function FF:UpdateFrames()
-    local partyFrames = self:GetFrames()
+    local partyFrames = Blizzard:GetFrames()
     Utils:Log("FF:UpdateFrames", partyFrames)
 
     for _, frame in ipairs(partyFrames) do
