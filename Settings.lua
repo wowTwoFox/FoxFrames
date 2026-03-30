@@ -637,7 +637,7 @@ local function CreatePartySettings(rootCategory, options)
 
     local basePath = "profile.partyFrame"
 
-    local playerNameCategory = SettingsLib:CreateCategory(category, "Party: Player Name")
+    local playerNameCategory = SettingsLib:CreateCategory(rootCategory, "Party: Player Name")
     CreatePartyPlayerTextElementSettings(playerNameCategory, {
         prefix = prefix .. "PlayerName_",
         path = basePath .. ".playerName",
@@ -646,7 +646,7 @@ local function CreatePartySettings(rootCategory, options)
         end,
     })
 
-    local playerStatusCategory = SettingsLib:CreateCategory(category, "Party: Player Status")
+    local playerStatusCategory = SettingsLib:CreateCategory(rootCategory, "Party: Player Status")
     CreatePartyPlayerTextElementSettings(playerStatusCategory, {
         prefix = prefix .. "PlayerStatus_",
         path = basePath .. ".playerStatus",
@@ -655,7 +655,7 @@ local function CreatePartySettings(rootCategory, options)
         end,
     })
 
-    CreatePartyIncomingCastsSettings(category)
+    CreatePartyIncomingCastsSettings(rootCategory)
 end
 
 local function CreateRaidSettings(category, options)
@@ -666,14 +666,13 @@ local function CreateRaidSettings(category, options)
         return
     end
 
-    local raidCategory = SettingsLib:CreateCategory(category, "Raid")
-    CreateRaidIncomingCastsSettings(raidCategory, {
+    CreateRaidIncomingCastsSettings(category, {
         prefix = prefix,
     })
 
     local basePath = "profile.raidFrame"
 
-    local raidPlayerNameCategory = SettingsLib:CreateCategory(raidCategory, "Raid: Player Name")
+    local raidPlayerNameCategory = SettingsLib:CreateCategory(category, "Raid: Player Name")
     CreateRaidPlayerTextElementSettings(raidPlayerNameCategory, {
         prefix = prefix .. "PlayerName_",
         path = basePath .. ".playerName",
@@ -683,7 +682,7 @@ local function CreateRaidSettings(category, options)
         end,
     })
 
-    local raidPlayerStatusCategory = SettingsLib:CreateCategory(raidCategory, "Raid: Player Status")
+    local raidPlayerStatusCategory = SettingsLib:CreateCategory(category, "Raid: Player Status")
     CreateRaidPlayerTextElementSettings(raidPlayerStatusCategory, {
         prefix = prefix .. "PlayerStatus_",
         path = basePath .. ".playerStatus",
