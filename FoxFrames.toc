@@ -2,7 +2,7 @@
 ## Title: FoxFrames
 ## Notes: FoxFrames is a customizable party frame addon that provides enhanced functionality and visual customization options for party frames in World of Warcraft.
 ## Author: Fantastifox
-## Version: 1.1.1
+## Version: 1.1.2
 ## IconTexture: Interface\AddOns\FoxFrames\icon.png
 ## SavedVariables: FoxFramesDB, FoxFramesGlobalsDB
 ## OptionalDeps: Ace3, LibEQOL, LibSharedMedia-3.0
