@@ -28,15 +28,6 @@ local SPELL_ICON_OVERLAY_ATLAS = "UI-HUD-CoolDownManager-IconOverlay"
 local SPELL_ICON_SWIPE_TEXTURE = "Interface\\HUD\\UI-HUD-CoolDownManager-Icon-Swipe"
 local SPELL_ICON_SWIPE_ALPHA = 0.7
 
-local SPELL_ICON_BACKDROP = {
-    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-    tile = true,
-    tileEdge = true,
-    tileSize = 8,
-    edgeSize = 8,
-    insets = { left = 1, right = 1, top = 1, bottom = 1 },
-}
-
 local function NormalizeSpellIconConfig(iconConfig)
     if type(iconConfig) ~= "table" then
         return {}
@@ -434,9 +425,8 @@ local function CreateSpellIconFrame(container, index, iconConfig)
     icon:SetHitRectInsets(10000, 10000, 10000, 10000)
     wrapper.icon = icon
 
-    local border = CreateFrame("Frame", nil, icon, "BackdropTemplate")
+    local border = CreateFrame("Frame", nil, icon)
     border:SetAllPoints()
-    border:SetBackdrop(SPELL_ICON_BACKDROP)
     border:SetFrameLevel((icon.GetFrameLevel and icon:GetFrameLevel() or 0) + 2)
     border:EnableMouse(false)
     border:SetHitRectInsets(10000, 10000, 10000, 10000)
