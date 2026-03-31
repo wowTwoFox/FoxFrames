@@ -30,9 +30,7 @@ function Object:CreateProfilesSettings(rootCategory, callbacks)
 
     local SettingsCommon = addon and addon.SettingsCommon
     assert(SettingsCommon and type(SettingsCommon.CreateDropdown) == "function", "FoxFrames: SettingsCommon missing CreateDropdown (load order issue)")
-
-    assert(addon and type(addon.CreateSettingsButton) == "function", "FoxFrames: CreateSettingsButton missing (load order issue)")
-    assert(addon and type(addon.RefreshSettingsLayout) == "function", "FoxFrames: RefreshSettingsLayout missing (load order issue)")
+    assert(SettingsCommon and type(SettingsCommon.RefreshSettingsLayout) == "function", "FoxFrames: SettingsCommon missing RefreshSettingsLayout (load order issue)")
     assert(addon and type(addon.CreateSettingsFlow) == "function", "FoxFrames: CreateSettingsFlow missing (load order issue)")
 
     callbacks = callbacks or {}
@@ -85,7 +83,7 @@ function Object:CreateProfilesSettings(rootCategory, callbacks)
         end,
         set = function(value)
             selectedProfileName = Utils:SanitizeString(value)
-            addon:RefreshSettingsLayout()
+            SettingsCommon:RefreshSettingsLayout()
         end,
         optionfunc = function()
             return options
@@ -95,31 +93,28 @@ function Object:CreateProfilesSettings(rootCategory, callbacks)
         prefix = profilesPrefix,
     })
 
-    addon:CreateSettingsRow(profilesCategory, {
+    local function IsRowEnabled()
+        local selectedName = GetSelectedProfileName()
+        return selectedName ~= DB.storage:GetCurrentProfile()
+    end
+
+    local row = addon:CreateSettingsRow(profilesCategory, {
         key = "SelectedProfileActions",
+        name = "Actions",
         label = "Actions",
         searchTags = "Actions",
         parent = selectProfile,
-        isEnabled = function()
-            local selectedName = GetSelectedProfileName()
-            return selectedName ~= DB.storage:GetCurrentProfile()
-        end,
-        createContent = function(parent, existing)
-            local flow = existing
-            if flow then return nil end
-            flow = addon:CreateSettingsFlow(parent, {
+        tooltip = "Copy settings from the selected profile into the current profile.",
+        isEnabled = IsRowEnabled,
+        createContent = function(parent)
+            local flow = addon:CreateSettingsFlow(parent, {
                 direction = "horizontal",
                 fillParent = false,
                 autoSize = true,
             })
 
             flow:AddButton("Copy", {
-                tooltip = "Copy settings from the selected profile into the current profile.",
-                isEnabled = function()
-                    local selectedName = GetSelectedProfileName()
-                    local currentName = DB.storage:GetCurrentProfile()
-                    return type(selectedName) == "string" and selectedName ~= "" and selectedName ~= currentName
-                end,
+                isEnabled = IsRowEnabled,
             }, function()
                 local selectedName = GetSelectedProfileName()
                 local currentName = DB.storage:GetCurrentProfile()
@@ -135,12 +130,14 @@ function Object:CreateProfilesSettings(rootCategory, callbacks)
                     onProfileActivated()
                 end
 
-                addon:RefreshSettingsLayout()
+                SettingsCommon:RefreshSettingsLayout()
             end)
 
             return flow
         end
     })
+
+    Utils:Log("FF_ROW", row)
 end
 
 local profiles = Object:New()

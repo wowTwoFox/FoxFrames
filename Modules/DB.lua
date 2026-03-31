@@ -291,12 +291,9 @@ local function NewDBInstance()
     return instance
 end
 
-function Object:GetIncomingCastBarDB()
-    return self.storage:GetValuesTableAtPath("profile.partyFrame.incomingCasts")
-end
-
-function Object:GetRaidIncomingCastsDB()
-    return self.storage:GetValuesTableAtPath("profile.raidFrame.incomingCasts")
+function Object:GetIncomingCastBarDB(useRaid)
+    local path = useRaid == true and "profile.raidFrame.incomingCasts" or "profile.partyFrame.incomingCasts"
+    return self.storage:GetValuesTableAtPath(path)
 end
 
 function Object:GetIncomingCastIndicatorAnchorsAndOffsets(layoutAxis, useRaid)
@@ -616,7 +613,7 @@ function Object:SetIncomingCastsPreviewEnabled(enabled)
     self.runtime.incomingCastsPreviewEnabled = enabled == true
 end
 
-function Object:SetProfile(profileName, options)
+function Object:SetProfile(profileName)
     local storage = self.storage
     local previousProfileName = storage:GetCurrentProfile()
     local profileAlreadyExists = storage:HasProfile(profileName)

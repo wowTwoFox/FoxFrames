@@ -427,7 +427,7 @@ local function GetIncomingCastIndicatorIconConfig(relativeAnchor, useRaid)
     local incomingCastDefaults = (DB.DEFAULT_SETTINGS and DB.DEFAULT_SETTINGS.partyFrame and DB.DEFAULT_SETTINGS.partyFrame.incomingCasts) or {}
     local iconDefaults = incomingCastDefaults.icon or {}
 
-    local profile = useRaid == true and DB:GetRaidIncomingCastsDB() or DB:GetIncomingCastBarDB()
+    local profile = DB:GetIncomingCastBarDB(useRaid)
     local iconProfile = profile and profile.icon
 
     local spellIconMixin = addon and addon.SpellIconMixin

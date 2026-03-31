@@ -79,6 +79,17 @@ function SettingsCommon:GetTextures()
     return textures
 end
 
+function SettingsCommon:RefreshSettingsLayout()
+	if SettingsInbound and SettingsInbound.RepairDisplay then
+		SettingsInbound.RepairDisplay()
+		return
+	end
+	if SettingsPanel and SettingsPanel.RepairDisplay then
+		SettingsPanel:RepairDisplay()
+		return
+	end
+end
+
 function SettingsCommon:AddFrameSettings(category, options)
     local opts = type(options) == "table" and options or {}
     local path = (type(opts.path) == "string" and opts.path ~= "" and opts.path)

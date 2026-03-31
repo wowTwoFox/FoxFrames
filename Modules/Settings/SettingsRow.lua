@@ -12,7 +12,7 @@ local DEFAULT_LABEL_OFFSET_LEFT = 37
 local DEFAULT_LABEL_OFFSET_RIGHT = -85
 
 -- Align with Blizzard/LibEQOL control placement
-local DEFAULT_CONTENT_LEFT_OFFSET = -74
+local DEFAULT_CONTENT_LEFT_OFFSET = -79
 local DEFAULT_CONTENT_RIGHT_PADDING = -12
 
 local function EvalPredicate(predicate)
@@ -53,20 +53,9 @@ local function AnchorContentWidget(widget, parent)
 		return
 	end
 
-	-- Only force anchors for flows; other widgets may intentionally manage their own points.
-	if widget._ffFlowKind == "flow" then
-		widget:ClearAllPoints()
-		widget:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, 0)
-		if widget._ffFillParent ~= false then
-			widget:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
-		end
-		return
-	end
-
-	if widget.GetNumPoints and widget:GetNumPoints() == 0 then
-		widget:ClearAllPoints()
-		widget:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, 0)
-	end
+	widget:ClearAllPoints()
+	widget:SetPoint("TOPLEFT", parent, "TOP", DEFAULT_CONTENT_LEFT_OFFSET, 0)
+	widget:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", DEFAULT_CONTENT_RIGHT_PADDING, 0)
 end
 
 function FoxFrames_SettingsRowMixin:OnLoad()
@@ -78,12 +67,6 @@ function FoxFrames_SettingsRowMixin:OnLoad()
 			frame:UpdateWidth()
 		end
 	end)
-
-	local content = CreateFrame("Frame", nil, self)
-	content:ClearAllPoints()
-	content:SetPoint("TOPLEFT", self, "TOP", DEFAULT_CONTENT_LEFT_OFFSET, 0)
-	content:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", DEFAULT_CONTENT_RIGHT_PADDING, 0)
-	self.Content = content
 end
 
 function FoxFrames_SettingsRowMixin:UpdateWidth()
@@ -101,18 +84,17 @@ function FoxFrames_SettingsRowMixin:Init(initializer)
 
 	self.initializer = initializer
 	self.data = initializer.data or {}
-	if self.data._ffExtent == nil then
-		self.data._ffExtent = DEFAULT_FRAME_HEIGHT
+	self:SetLabelText(self.data.name)
+
+	local createContent = self.data.createContent
+	assert(type(createContent) == "function", "FoxFrames: SettingsRow requires data.createContent")
+	local result = createContent(self)
+	if result ~= nil then
+		self:SetContentWidget(result)
+		return
 	end
 
-	self:BuildOrUpdateLabel()
-	self:BuildOrUpdateContent()
 	self:EvaluateState()
-end
-
-function FoxFrames_SettingsRowMixin:CalculateHeight()
-	local data = self.data or {}
-	return tonumber(data._ffExtent) or DEFAULT_FRAME_HEIGHT
 end
 
 function FoxFrames_SettingsRowMixin:SetLabelText(text)
@@ -128,17 +110,6 @@ function FoxFrames_SettingsRowMixin:SetLabelText(text)
 	local textLeft = (self:GetIndent() or 0) + DEFAULT_LABEL_OFFSET_LEFT
 	self.Text:SetPoint("LEFT", textLeft, 0)
 	self.Text:SetPoint("RIGHT", self, "CENTER", DEFAULT_LABEL_OFFSET_RIGHT, 0)
-end
-
-function FoxFrames_SettingsRowMixin:BuildOrUpdateLabel()
-	local data = self.data or {}
-	local createLabel = data.createLabel
-	if type(createLabel) == "function" then
-		createLabel(self)
-		return
-	end
-
-	self:SetLabelText(data.label)
 end
 
 function FoxFrames_SettingsRowMixin:SetContentWidget(widget)
@@ -191,28 +162,6 @@ function FoxFrames_SettingsRowMixin:UpdateHeightFromContentWidget()
 	if self.SetHeight then
 		self:SetHeight(desiredHeight)
 	end
-
-	local data = self.data
-	if type(data) == "table" then
-		data._ffExtent = desiredHeight
-	end
-end
-
-function FoxFrames_SettingsRowMixin:BuildOrUpdateContent()
-	self:UpdateWidth()
-
-	local parent = self.Content or self
-	local existingContentWidget = self.ContentWidget
-	local data = self.data or {}
-
-	local createContent = data.createContent
-	assert(type(createContent) == "function", "FoxFrames: SettingsRow requires data.createContent")
-	local result = createContent(parent, existingContentWidget, self)
-	if result ~= nil then
-		self:SetContentWidget(result)
-		return
-	end
-	assert(existingContentWidget ~= nil, "FoxFrames: SettingsRow createContent must return a widget")
 end
 
 function FoxFrames_SettingsRowMixin:IsRowEnabled()
@@ -287,17 +236,6 @@ function addon:CreateSettingsRow(category, data)
 	end
 
 	local initializer = Settings.CreateElementInitializer("FoxFrames_SettingsRowTemplate", data)
-
-	function initializer:GetExtent()
-		local initData = self.data
-		if type(initData) == "table" then
-			local extent = tonumber(initData._ffExtent)
-			if extent ~= nil then
-				return extent
-			end
-		end
-		return DEFAULT_FRAME_HEIGHT
-	end
 
 	if initializer.SetParentInitializer and data.parent then
 		initializer:SetParentInitializer(data.parent, data.parentCheck)
