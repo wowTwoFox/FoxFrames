@@ -347,7 +347,7 @@ local function CreateBuffsSettings(rootCategory, options)
             elseif settingKey == "fontSize" then
                 FF:UpdateAuraCountdownFontSize()
             else
-                FF:UpdateAuraCountdownColor()
+                FF:UpdateAuraCountdownDynamicColor()
             end
         end,
     })
@@ -375,7 +375,7 @@ local function CreateDebuffsSettings(rootCategory, options)
             elseif settingKey == "fontSize" then
                 FF:UpdateAuraCountdownFontSize()
             else
-                FF:UpdateAuraCountdownColor()
+                FF:UpdateAuraCountdownDynamicColor()
             end
         end,
     })

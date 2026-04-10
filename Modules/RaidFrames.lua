@@ -35,6 +35,7 @@ end
 
 function FF:UpdatePlayerStatusAnchoring()
     for _, frame in ipairs(Blizzard:GetFrames()) do
+        Utils:Log("Updating player status anchoring for frame", frame)
         self:ApplyPlayerStatusAnchorForFrame(frame)
     end
 end

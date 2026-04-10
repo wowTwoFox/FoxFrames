@@ -33,6 +33,7 @@ Modules\BlizzardSettings.lua
 Modules\Blizzard.lua
 Modules\Storage.lua
 Modules\DB.lua
+Modules\Auras.lua
 Modules\DBMigrations.lua
 Modules\GlobalsDB.lua
 Modules\FoxFrames.lua

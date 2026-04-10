@@ -414,6 +414,8 @@ function SettingsCommon:AddCooldownTextSettings(category, options)
         end,
         minHeight = 36,
     })
+
+    return showElement
 end
 
 function SettingsCommon:CreateCheckbox(category, options)
@@ -673,10 +675,145 @@ function SettingsCommon:CreateAuraSettings(category, options)
         name = "Cooldown",
     })
 
-    self:AddCooldownTextSettings(category, {
+    local showElement = self:AddCooldownTextSettings(category, {
         path = cooldownTextPath,
         prefix = prefix,
         onChanged = onChanged,
+    })
+
+    local defaults = DB.storage:GetDefaultsTableAtPath(cooldownTextPath) or {}
+
+    local warningDefaults = type(defaults.warning) == "table" and defaults.warning or {}
+    local criticalDefaults = type(defaults.critical) == "table" and defaults.critical or {}
+
+    local defaultWarningThresholdSeconds = Utils:ClampInteger(warningDefaults.thresholdSeconds, 0, 60, 10)
+    local defaultCriticalThresholdSeconds = Utils:ClampInteger(criticalDefaults.thresholdSeconds, 0, 60, 5)
+
+    local defaultWarningColor = Utils:SanitizeColor(warningDefaults.color, { r = 1, g = 0.55, b = 0 })
+    local defaultCriticalColor = Utils:SanitizeColor(criticalDefaults.color, { r = 1, g = 0, b = 0 })
+
+    SettingsLib:CreateHeader(category, {
+        name = "Thresholds",
+    })
+
+    local warningEnabledElement = self:CreateCheckbox(category, {
+        path = cooldownTextPath .. ".warning.enabled",
+        name = "Warning",
+        desc = "Enable Warning threshold coloring for this countdown.",
+        prefix = prefix,
+        onChanged = function()
+            onChanged("warningEnabled")
+        end,
+    })
+
+    local warningThresholdElement = self:CreateSlider(category, {
+        path = cooldownTextPath .. ".warning.thresholdSeconds",
+        name = "Seconds",
+        min = 0,
+        max = 60,
+        step = 1,
+        formatter = function(value)
+            return string.format("%is", Utils:ClampInteger(value, 0, 60, defaultWarningThresholdSeconds))
+        end,
+        sanitize = function(value, fallback)
+            return Utils:ClampInteger(value, 0, 60, fallback)
+        end,
+        onChanged = function()
+            onChanged("warningThresholdSeconds")
+        end,
+        desc = "When remaining duration is at or below this value, countdown text uses the Warning color.",
+        prefix = prefix,
+        parent = warningEnabledElement,
+        parentCheck = function()
+            return DB.storage:GetBooleanAtPath(cooldownTextPath .. ".show") == true
+                and DB.storage:GetBooleanAtPath(cooldownTextPath .. ".warning.enabled") == true
+        end,
+    })
+
+    SettingsLib:CreateColorOverrides(category, {
+        key = cooldownTextPath .. ".warning.color",
+        entries = {
+            { key = cooldownTextPath .. ".warning", label = "Color" },
+        },
+        getColor = function()
+            local color = Utils:SanitizeColor(DB.storage:GetValueAtPath(cooldownTextPath .. ".warning.color"), defaultWarningColor)
+            return color.r, color.g, color.b
+        end,
+        setColor = function(_, r, g, b)
+            DB.storage:SetValue(cooldownTextPath .. ".warning.color", Utils:SanitizeColor({ r = r, g = g, b = b }, defaultWarningColor))
+            onChanged("warningColor")
+        end,
+        getDefaultColor = function()
+            local color = Utils:SanitizeColor(defaultWarningColor, { r = 1, g = 1, b = 1 })
+            return color.r, color.g, color.b
+        end,
+        hasOpacity = false,
+        parent = warningThresholdElement,
+        parentCheck = function()
+            return DB.storage:GetBooleanAtPath(cooldownTextPath .. ".show") == true
+                and DB.storage:GetBooleanAtPath(cooldownTextPath .. ".warning.enabled") == true
+        end,
+        minHeight = 36,
+    })
+
+    local criticalEnabledElement = self:CreateCheckbox(category, {
+        path = cooldownTextPath .. ".critical.enabled",
+        name = "Critical",
+        desc = "Enable Critical threshold coloring for this countdown.",
+        prefix = prefix,
+        onChanged = function()
+            onChanged("criticalEnabled")
+        end,
+    })
+
+    local criticalThresholdElement = self:CreateSlider(category, {
+        path = cooldownTextPath .. ".critical.thresholdSeconds",
+        name = "Seconds",
+        min = 0,
+        max = 60,
+        step = 1,
+        formatter = function(value)
+            return string.format("%is", Utils:ClampInteger(value, 0, 60, defaultCriticalThresholdSeconds))
+        end,
+        sanitize = function(value, fallback)
+            return Utils:ClampInteger(value, 0, 60, fallback)
+        end,
+        onChanged = function()
+            onChanged("criticalThresholdSeconds")
+        end,
+        desc = "When remaining duration is at or below this value, countdown text uses the Critical color.",
+        prefix = prefix,
+        parent = criticalEnabledElement,
+        parentCheck = function()
+            return DB.storage:GetBooleanAtPath(cooldownTextPath .. ".show") == true
+                and DB.storage:GetBooleanAtPath(cooldownTextPath .. ".critical.enabled") == true
+        end,
+    })
+
+    SettingsLib:CreateColorOverrides(category, {
+        key = cooldownTextPath .. ".critical.color",
+        entries = {
+            { key = cooldownTextPath .. ".critical", label = "Color" },
+        },
+        getColor = function()
+            local color = Utils:SanitizeColor(DB.storage:GetValueAtPath(cooldownTextPath .. ".critical.color"), defaultCriticalColor)
+            return color.r, color.g, color.b
+        end,
+        setColor = function(_, r, g, b)
+            DB.storage:SetValue(cooldownTextPath .. ".critical.color", Utils:SanitizeColor({ r = r, g = g, b = b }, defaultCriticalColor))
+            onChanged("criticalColor")
+        end,
+        getDefaultColor = function()
+            local color = Utils:SanitizeColor(defaultCriticalColor, { r = 1, g = 1, b = 1 })
+            return color.r, color.g, color.b
+        end,
+        hasOpacity = false,
+        parent = criticalThresholdElement,
+        parentCheck = function()
+            return DB.storage:GetBooleanAtPath(cooldownTextPath .. ".show") == true
+                and DB.storage:GetBooleanAtPath(cooldownTextPath .. ".critical.enabled") == true
+        end,
+        minHeight = 36,
     })
 end
 

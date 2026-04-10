@@ -55,6 +55,7 @@ end
 
 local function GetPartyMemberUnitFrames()
     if not (CompactPartyFrame and CompactPartyFrame.memberUnitFrames) then
+        Utils:Log("ERROR: Party frames not found", CompactPartyFrame)
         return {}
     end
 
@@ -75,17 +76,6 @@ function Object:GetFrames()
         return GetRaidMemberUnitFrames()
     end
 
-    if self:InPartyGroup() then
-        local settings = BlizzardSettings
-        local useRaidStylePartyFrames = settings and settings.GetUseRaidStylePartyFrames and settings:GetUseRaidStylePartyFrames()
-        if useRaidStylePartyFrames then
-            return GetRaidMemberUnitFrames()
-        end
-
-        return GetPartyMemberUnitFrames()
-    end
-
-    -- Solo: default to party frames (they can optionally be shown in solo).
     return GetPartyMemberUnitFrames()
 end
 

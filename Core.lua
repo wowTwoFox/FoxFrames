@@ -5,6 +5,7 @@ local Utils = addon.Utils
 local DB = addon.DB
 local GlobalsDB = addon.GlobalsDB
 local Blizzard = addon.Blizzard
+local Auras = addon.Auras
 
 -- PartyFrame layout updates can end up triggering Blizzard's GridLayout/Layouts while
 -- some values are "secret" (e.g. during combat / edit mode) which then throws inside
@@ -113,6 +114,8 @@ local function GroupChangeEvent(event, ...)
     end
 
     -- Utils:Log("GROUP_CHANGE_EVENT", event)
+    Auras:RefreshFromFrames(Blizzard:GetFrames())
+
     FF:UpdateFrames()
 
     if FF.SetupIncomingCastIndicators then
@@ -120,6 +123,23 @@ local function GroupChangeEvent(event, ...)
     end
     if FF.UpdateIncomingCastIndicators then
         FF:UpdateIncomingCastIndicators()
+    end
+end
+
+function FF:UNIT_AURA(_, unit)
+    Auras:RefreshUnit(unit)
+
+    -- If the unit that had an aura update is the player, 
+    -- we may need to update the countdown colors on all frames 
+    -- since they can be configured to use the player's debuff type or remaining time
+    if not self:InAllowedGroup() then
+        return
+    end
+
+    for _, frame in ipairs(Blizzard:GetFrames()) do
+        if frame and frame.unit == unit then
+            self:UpdateAuraCountdownDynamicColorForFrame(frame)
+        end
     end
 end
 
@@ -189,6 +209,9 @@ function FF:OnInitialize()
 
     if type(CompactUnitFrame_UpdateAuras) == "function" then
         hooksecurefunc("CompactUnitFrame_UpdateAuras", function(frame)
+            if Auras and Auras.RefreshUnit and frame and frame.unit then
+                Auras:RefreshUnit(frame.unit)
+            end
             FF:ShowBuffCountdownIfNeededForFrame(frame)
             FF:ShowDebuffCountdownIfNeededForFrame(frame)
         end)
@@ -241,6 +264,7 @@ function FF:OnEnable()
     self:RegisterEvent("PLAYER_FOCUS_CHANGED", ReassertPlayerFrameVisibility)
     self:RegisterEvent("UNIT_ENTERED_VEHICLE", ReassertPlayerFrameVisibility)
     self:RegisterEvent("UNIT_EXITED_VEHICLE", ReassertPlayerFrameVisibility)
+    self:RegisterEvent("UNIT_AURA")
 
     -- Switch DB profiles based on the active Edit Mode layout.
     self:RegisterEvent("EDIT_MODE_LAYOUTS_UPDATED")
@@ -257,6 +281,8 @@ function FF:OnEnable()
         self:UpdateRoleIcon(frame)
     end)
 
+    Auras:RefreshFromFrames(Blizzard:GetFrames())
+
     -- The active Edit Mode layout can still be stale during OnInitialize().
     -- Apply the layout-based profile here (PLAYER_LOGIN timing) so the correct
     -- layout/profile is selected on load even if EDIT_MODE_LAYOUTS_UPDATED fired
@@ -264,6 +290,7 @@ function FF:OnEnable()
     self:EDIT_MODE_LAYOUTS_UPDATED()
     self:SetupFrames()
     -- Utils:Log("FOX_FRAMES_LOADED", FF)
+    self:StartAuraCountdownDynamicColorTicker()
 end
 
 function FF:EDIT_MODE_LAYOUTS_UPDATED()
@@ -306,6 +333,10 @@ end
 
 function FF:OnDisable()
     self:Print("Disabled.")
+
+    if self.StopAuraCountdownDynamicColorTicker then
+        self:StopAuraCountdownDynamicColorTicker()
+    end
 
     if self.StopIncomingCastIndicatorPreviewStream then
         self:StopIncomingCastIndicatorPreviewStream()

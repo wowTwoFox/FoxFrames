@@ -5,6 +5,122 @@ local FF = FoxFrames
 local Utils = addon.Utils
 local Blizzard = addon.Blizzard
 local DB = addon.DB
+local Auras = addon.Auras
+
+local AURA_COUNTDOWN_COLOR_UPDATE_INTERVAL_SECONDS = 0.10
+
+local AURA_COUNTDOWN_COLOR_TYPE_NORMAL = 1
+local AURA_COUNTDOWN_COLOR_TYPE_WARNING = 2
+local AURA_COUNTDOWN_COLOR_TYPE_CRITICAL = 3
+
+function FF:ApplyAuraCountdownDynamicColorToCooldown(cooldown, remainingSeconds, config)
+    assert(cooldown, "FoxFrames: cooldown missing")
+    assert(type(config) == "table", "FoxFrames: aura countdown config must be a table")
+
+    local normalColor = assert(config.normalColor, "FoxFrames: aura countdown config.normalColor missing")
+    local warningColor = assert(config.warningColor, "FoxFrames: aura countdown config.warningColor missing")
+    local criticalColor = assert(config.criticalColor, "FoxFrames: aura countdown config.criticalColor missing")
+
+    local warningThresholdSeconds = assert(config.warningThresholdSeconds, "FoxFrames: aura countdown config.warningThresholdSeconds missing")
+    local criticalThresholdSeconds = assert(config.criticalThresholdSeconds, "FoxFrames: aura countdown config.criticalThresholdSeconds missing")
+
+    local warningEnabled = assert(config.warningEnabled, "FoxFrames: aura countdown config.warningEnabled missing")
+    local criticalEnabled = assert(config.criticalEnabled, "FoxFrames: aura countdown config.criticalEnabled missing")
+
+    assert(type(normalColor) == "table", "FoxFrames: aura countdown config.normalColor must be a table")
+    assert(type(warningColor) == "table", "FoxFrames: aura countdown config.warningColor must be a table")
+    assert(type(criticalColor) == "table", "FoxFrames: aura countdown config.criticalColor must be a table")
+
+    assert(type(warningThresholdSeconds) == "number", "FoxFrames: aura countdown config.warningThresholdSeconds must be a number")
+    assert(type(criticalThresholdSeconds) == "number", "FoxFrames: aura countdown config.criticalThresholdSeconds must be a number")
+
+    assert(type(warningEnabled) == "boolean", "FoxFrames: aura countdown config.warningEnabled must be a boolean")
+    assert(type(criticalEnabled) == "boolean", "FoxFrames: aura countdown config.criticalEnabled must be a boolean")
+
+    local colorType
+    local r, g, b
+
+    if type(remainingSeconds) ~= "number" then
+        colorType = AURA_COUNTDOWN_COLOR_TYPE_NORMAL
+        r, g, b = normalColor.r, normalColor.g, normalColor.b
+    elseif criticalEnabled and remainingSeconds <= criticalThresholdSeconds then
+        colorType = AURA_COUNTDOWN_COLOR_TYPE_CRITICAL
+        r, g, b = criticalColor.r, criticalColor.g, criticalColor.b
+    elseif warningEnabled and remainingSeconds <= warningThresholdSeconds then
+        colorType = AURA_COUNTDOWN_COLOR_TYPE_WARNING
+        r, g, b = warningColor.r, warningColor.g, warningColor.b
+    else
+        colorType = AURA_COUNTDOWN_COLOR_TYPE_NORMAL
+        r, g, b = normalColor.r, normalColor.g, normalColor.b
+    end
+
+    if cooldown._ffCountdownColorType ~= colorType then
+        self:ApplyAuraCountdownColorToCooldown(cooldown, r, g, b)
+        cooldown._ffCountdownColorType = colorType
+    end
+end
+
+function FF:ApplyAuraCountdownDynamicColorToAuraFrames(unit, auraFrames, config)
+    assert(type(auraFrames) == "table", "FoxFrames: auraFrames must be a table")
+    assert(type(config) == "table", "FoxFrames: config must be a table")
+    local normalColor = assert(config.normalColor, "FoxFrames: config.normalColor missing")
+    assert(type(normalColor) == "table", "FoxFrames: config.normalColor must be a table")
+
+    for _, auraFrame in ipairs(auraFrames) do
+        local cooldown = auraFrame.cooldown or auraFrame.Cooldown
+
+        if auraFrame:IsShown() then
+            local auraInstanceID = auraFrame.auraInstanceID
+            local remainingSeconds = Auras:GetRemainingSeconds(unit, auraInstanceID)
+            self:ApplyAuraCountdownDynamicColorToCooldown(cooldown, remainingSeconds, config)
+        else
+            assert(cooldown, "FoxFrames: cooldown missing for hidden auraFrame")
+            if cooldown._ffCountdownColorType ~= AURA_COUNTDOWN_COLOR_TYPE_NORMAL then
+                self:ApplyAuraCountdownColorToCooldown(cooldown, normalColor.r, normalColor.g, normalColor.b)
+            end
+            cooldown._ffCountdownColorType = AURA_COUNTDOWN_COLOR_TYPE_NORMAL
+        end
+    end
+end
+
+function FF:UpdateAuraCountdownDynamicColorForFrame(frame)
+    local unit = frame.unit
+
+    -- Buffs
+    if frame.buffFrames then
+        local buffConfig = DB:GetBuffCountdownDynamicColorConfig()
+        self:ApplyAuraCountdownDynamicColorToAuraFrames(unit, frame.buffFrames, buffConfig)
+    end
+
+    -- Debuffs
+    if frame.debuffFrames then
+        local debuffConfig = DB:GetDebuffCountdownDynamicColorConfig()
+        self:ApplyAuraCountdownDynamicColorToAuraFrames(unit, frame.debuffFrames, debuffConfig)
+    end
+end
+
+function FF:UpdateAuraCountdownDynamicColor()
+    local frames = Blizzard:GetFrames()
+    for _, frame in ipairs(frames) do
+        self:UpdateAuraCountdownDynamicColorForFrame(frame)
+    end
+end
+
+function FF:StartAuraCountdownDynamicColorTicker()
+    self:StopAuraCountdownDynamicColorTicker()
+
+    self._ffAuraCountdownDynamicColorTicker = C_Timer.NewTicker(AURA_COUNTDOWN_COLOR_UPDATE_INTERVAL_SECONDS, function()
+        FF:UpdateAuraCountdownDynamicColor()
+    end)
+end
+
+function FF:StopAuraCountdownDynamicColorTicker()
+    local ticker = self._ffAuraCountdownDynamicColorTicker
+    if ticker then
+        ticker:Cancel()
+    end
+    self._ffAuraCountdownDynamicColorTicker = nil
+end
 
 function FF:InAllowedGroup()
     if Blizzard:InRaidGroup() then return true end
@@ -134,7 +250,8 @@ function FF:ApplyAuraCountdownColorForFrame(frame)
     end
 
     if frame.buffFrames then
-        local r, g, b = DB:GetBuffCountdownColor()
+        local color = DB:GetBuffCountdownColor()
+        local r, g, b = color.r, color.g, color.b
         for _, buffFrame in ipairs(frame.buffFrames) do
             local cooldown = buffFrame and buffFrame.cooldown
             if cooldown then
@@ -144,7 +261,8 @@ function FF:ApplyAuraCountdownColorForFrame(frame)
     end
 
     if frame.debuffFrames then
-        local r, g, b = DB:GetDebuffCountdownColor()
+        local color = DB:GetDebuffCountdownColor()
+        local r, g, b = color.r, color.g, color.b
         for _, debuffFrame in ipairs(frame.debuffFrames) do
             local cooldown = debuffFrame and debuffFrame.cooldown
             if cooldown then
@@ -173,14 +291,12 @@ function FF:ShowBuffCountdownIfNeededForFrame(frame)
 
     local show = DB:GetShowBuffCountdown()
     local fontSize = DB:GetBuffCountdownFontSize()
-    local r, g, b = DB:GetBuffCountdownColor()
 
     for _, buffFrame in ipairs(frame.buffFrames) do
         local cooldown = buffFrame and buffFrame.cooldown
         if cooldown then
             Utils:SetHideCountdownNumbersSafe(cooldown, not show)
             self:ApplyAuraCountdownFontSizeToCooldown(cooldown, fontSize)
-            self:ApplyAuraCountdownColorToCooldown(cooldown, r, g, b)
         end
     end
 end
@@ -198,14 +314,12 @@ function FF:ShowDebuffCountdownIfNeededForFrame(frame)
 
     local show = DB:GetShowDebuffCountdown()
     local fontSize = DB:GetDebuffCountdownFontSize()
-    local r, g, b = DB:GetDebuffCountdownColor()
 
     for _, debuffFrame in ipairs(frame.debuffFrames) do
         local cooldown = debuffFrame and debuffFrame.cooldown
         if cooldown then
             Utils:SetHideCountdownNumbersSafe(cooldown, not show)
             self:ApplyAuraCountdownFontSizeToCooldown(cooldown, fontSize)
-            self:ApplyAuraCountdownColorToCooldown(cooldown, r, g, b)
         end
     end
 end
