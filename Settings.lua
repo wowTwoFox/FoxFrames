@@ -843,33 +843,36 @@ function FF:SetupOptions()
     -- Build the options using LibEQOL
     local PARTY_FRAME_PREFIX = SETTINGS_PREFIX .. "PartyFrame_"
     local RAID_FRAME_PREFIX = SETTINGS_PREFIX .. "RaidFrame_"
+    local BUFFS_PREFIX = SETTINGS_PREFIX .. "Buffs_"
+    local DEBUFFS_PREFIX = SETTINGS_PREFIX .. "Debuffs_"
     local rootCategory = SettingsLib:CreateRootCategory("Fox Frames")
     self._rootCategory = rootCategory
 
     CreateFramesSettings(rootCategory, {
-        prefix = PARTY_FRAME_PREFIX,
+        prefix = SETTINGS_PREFIX,
     })
 
     CreateRoleIconsSettings(rootCategory, {
-        prefix = PARTY_FRAME_PREFIX,
-    })
-
-    CreateBuffsSettings(rootCategory, {
-        path = "profile.partyFrame.buffs",
-        prefix = PARTY_FRAME_PREFIX,
-        keyPrefix = "Buff",
-    })
-
-    CreateDebuffsSettings(rootCategory, {
-        path = "profile.partyFrame.debuffs",
-        prefix = PARTY_FRAME_PREFIX,
-        keyPrefix = "Debuff",
+        prefix = SETTINGS_PREFIX,
     })
 
     ProfilesSettings:CreateProfilesSettings(rootCategory, {
         onProfileActivated = function()
             self:SetupFrames()
         end,
+        prefix = SETTINGS_PREFIX,
+    })
+
+    CreateBuffsSettings(rootCategory, {
+        path = "profile.partyFrame.buffs",
+        prefix = BUFFS_PREFIX,
+        keyPrefix = "Buff",
+    })
+
+    CreateDebuffsSettings(rootCategory, {
+        path = "profile.partyFrame.debuffs",
+        prefix = DEBUFFS_PREFIX,
+        keyPrefix = "Debuff",
     })
 
     CreatePartySettings(rootCategory, {
