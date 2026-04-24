@@ -29,6 +29,19 @@ local function GetUnitCache(self, unit)
     return cache
 end
 
+local function AddAura(aura, cache)
+    Utils:Log("FF_ADD_AURA", aura)
+    if not aura then
+        return
+    end
+
+    local auraInstanceID = aura.auraInstanceID
+    if auraInstanceID then
+        cache[auraInstanceID] = aura
+    end
+end
+
+
 function Object:RefreshUnit(unit)
     if not unit then
         return
@@ -40,30 +53,16 @@ function Object:RefreshUnit(unit)
     local index = 1
     while true do
         local aura = C_UnitAuras.GetAuraDataByIndex(unit, index, "HELPFUL")
-        if not aura then
-            break
-        end
-
-        local auraInstanceID = aura.auraInstanceID
-        if auraInstanceID then
-            cache.byAuraInstanceID[auraInstanceID] = aura
-        end
-
+        if not aura then break end
+        AddAura(aura, cache.byAuraInstanceID)
         index = index + 1
     end
 
     index = 1
     while true do
         local aura = C_UnitAuras.GetAuraDataByIndex(unit, index, "HARMFUL")
-        if not aura then
-            break
-        end
-
-        local auraInstanceID = aura.auraInstanceID
-        if auraInstanceID then
-            cache.byAuraInstanceID[auraInstanceID] = aura
-        end
-
+        if not aura then break end
+        AddAura(aura, cache.byAuraInstanceID)
         index = index + 1
     end
 
@@ -100,11 +99,29 @@ function Object:GetRemainingSeconds(unit, auraInstanceID)
     end
 
     local remaining = aura.expirationTime - GetTime()
-    if remaining < 0 then
+    if remaining < 0 or remaining > 60 * 3 then
         return nil
     end
 
     return remaining
+end
+
+function Object:GetAura(unit, auraInstanceID)
+    if not (unit and auraInstanceID) then
+        return nil
+    end
+
+    local cache = self._units[unit]
+    if not cache then
+        return nil
+    end
+
+    return cache.byAuraInstanceID[auraInstanceID]
+end
+
+function Object:CanApplyAura(unit, auraInstanceID)
+    local aura = self:GetAura(unit, auraInstanceID)
+    return aura and aura.canApplyAura == true
 end
 
 local auras = Object:New()

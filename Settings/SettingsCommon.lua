@@ -41,7 +41,9 @@ SettingsCommon.GROWTH_DIRECTION_LABELS = {
 }
 
 local function ValidateSettingsPath(path)
-    return DB.storage and DB.storage:ValidatePathExists(path) == true
+    if DB.storage and type(path) == "string" and path ~= "" then
+        DB.storage:ValidatePathExists(path)
+    end
 end
 
 function SettingsCommon:GetTextures()
@@ -102,11 +104,14 @@ function SettingsCommon:AddFrameSettings(category, options)
         return
     end
 
-    if not ValidateSettingsPath(path) then
+    if not DB.storage then
         return
     end
 
+    ValidateSettingsPath(path)
+
     local _, defaults = DB.storage:GetValueAndDefaultAtPath(path)
+    defaults = type(defaults) == "table" and defaults or {}
     local defaultAnchorTarget = Utils:SanitizeOption(defaults.anchorTarget, DB.FRAME_ANCHOR_TARGETS) or DB.FRAME_ANCHOR_TARGETS.FRAME
     local defaultPosition = Utils:SanitizeAnchorPoint(defaults.position, Constants.ANCHOR_POINTS.CENTER)
     local defaultAnchorMode = Utils:SanitizeAnchorMode(defaults.anchorMode, Constants.ANCHOR_MODES.INSIDE)
@@ -225,11 +230,14 @@ function SettingsCommon:AddTextSettings(category, options)
         return
     end
 
-    if not ValidateSettingsPath(path) then
+    if not DB.storage then
         return
     end
 
+    ValidateSettingsPath(path)
+
     local _, defaults = DB.storage:GetValueAndDefaultAtPath(path)
+    defaults = type(defaults) == "table" and defaults or {}
     local defaultFontSize = Utils:ClampInteger(defaults.fontSize, 8, 32, 10)
     local defaultColor = Utils:SanitizeColor(defaults.color, { r = 1, g = 1, b = 1 })
     local defaultOpacity = Utils:SanitizeOpacity(defaults.opacity, 1)
@@ -324,99 +332,6 @@ function SettingsCommon:AddTextSettings(category, options)
     })
 end
 
-function SettingsCommon:AddCooldownTextSettings(category, options)
-    local opts = type(options) == "table" and options or {}
-    local path = (type(opts.path) == "string" and opts.path ~= "" and opts.path)
-    local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil
-    local onChanged = type(opts.onChanged) == "function" and opts.onChanged or nil
-
-    assert(type(onChanged) == "function", "FoxFrames: AddCooldownTextSettings requires onChanged callback")
-
-    if not (category and path) then
-        return
-    end
-
-    if not ValidateSettingsPath(path) then
-        return
-    end
-
-    local defaults = DB.storage:GetDefaultsTableAtPath(path)
-
-    local defaultFontSize = Utils:ClampInteger(defaults.fontSize, 8, 32, 12)
-    local defaultColor = Utils:SanitizeColor(defaults.color, { r = 1, g = 1, b = 1 })
-
-    local function GetValue(key)
-        return DB.storage:GetValueAtPath(path .. "." .. key)
-    end
-
-    local function SetValue(key, value)
-        DB.storage:SetValue(path .. "." .. key, value)
-    end
-
-    local function OnChanged(settingKey)
-        onChanged(settingKey)
-    end
-
-    local showElement = self:CreateCheckbox(category, {
-        path = path .. ".show",
-        name = "Show Text",
-        desc = "Toggle cooldown countdown text visibility.",
-        prefix = prefix,
-        onChanged = function()
-            OnChanged("show")
-        end,
-    })
-
-    self:CreateSlider(category, {
-        path = path .. ".fontSize",
-        name = "Text Size",
-        min = 8,
-        max = 32,
-        step = 1,
-        formatter = function(value)
-            return string.format("%ipt", Utils:ClampInteger(value, 8, 32, defaultFontSize))
-        end,
-        sanitize = function(value, fallback)
-            return Utils:ClampInteger(value, 8, 32, fallback)
-        end,
-        onChanged = function()
-            OnChanged("fontSize")
-        end,
-        desc = "Adjust cooldown countdown text size.",
-        prefix = prefix,
-        parent = showElement,
-        parentCheck = function()
-            return DB.storage:GetBooleanAtPath(path .. ".show") == true
-        end,
-    })
-
-    SettingsLib:CreateColorOverrides(category, {
-        key = path .. ".color",
-        entries = {
-            { key = path, label = "Color" },
-        },
-        getColor = function()
-            local color = Utils:SanitizeColor(GetValue("color"), defaultColor)
-            return color.r, color.g, color.b
-        end,
-        setColor = function(_, r, g, b)
-            SetValue("color", Utils:SanitizeColor({ r = r, g = g, b = b }, defaultColor))
-            OnChanged("color")
-        end,
-        getDefaultColor = function()
-            local color = Utils:SanitizeColor(defaultColor, { r = 1, g = 1, b = 1 })
-            return color.r, color.g, color.b
-        end,
-        hasOpacity = false,
-        parent = showElement,
-        parentCheck = function()
-            return DB.storage:GetBooleanAtPath(path .. ".show") == true
-        end,
-        minHeight = 36,
-    })
-
-    return showElement
-end
 
 function SettingsCommon:CreateCheckbox(category, options)
     local opts = type(options) == "table" and options or {}
@@ -430,9 +345,11 @@ function SettingsCommon:CreateCheckbox(category, options)
         return nil
     end
 
-    if not ValidateSettingsPath(path) then
+    if not DB.storage then
         return nil
     end
+
+    ValidateSettingsPath(path)
 
     local defaultCandidate = DB.storage:GetDefaultAtPath(path)
     if defaultCandidate == nil then
@@ -507,9 +424,11 @@ function SettingsCommon:CreateDropdown(category, options)
         return nil
     end
 
-    if not ValidateSettingsPath(path) then
+    if not DB.storage then
         return nil
     end
+
+    ValidateSettingsPath(path)
 
     local defaultCandidate = DB.storage:GetDefaultAtPath(path)
     if defaultCandidate == nil then
@@ -589,9 +508,11 @@ function SettingsCommon:CreateSlider(category, options)
         return nil
     end
 
-    if not ValidateSettingsPath(path) then
+    if not DB.storage then
         return nil
     end
+
+    ValidateSettingsPath(path)
 
     local defaultCandidate = DB.storage:GetDefaultAtPath(path)
     if defaultCandidate == nil then
@@ -653,167 +574,116 @@ function SettingsCommon:CreateSlider(category, options)
     })
 end
 
-function SettingsCommon:CreateAuraSettings(category, options)
+function SettingsCommon:CreateCheckboxSlider(category, options)
     local opts = type(options) == "table" and options or {}
-    local basePath = (type(opts.basePath) == "string" and opts.basePath ~= "" and opts.basePath)
+    local path = (type(opts.path) == "string" and opts.path ~= "" and opts.path)
+    local sliderPath = (type(opts.sliderPath) == "string" and opts.sliderPath ~= "" and opts.sliderPath)
+
+    local name = (type(opts.name) == "string" and opts.name ~= "" and opts.name)
+    local desc = (type(opts.desc) == "string" and opts.desc ~= "" and opts.desc)
     local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil
-    local onChanged = type(opts.onChanged) == "function" and opts.onChanged or nil
 
-    assert(type(onChanged) == "function", "FoxFrames: CreateAuraSettings requires onChanged callback")
+    local sliderName = (type(opts.sliderName) == "string" and opts.sliderName ~= "" and opts.sliderName) or nil
+    local sliderDesc = (type(opts.sliderDesc) == "string" and opts.sliderDesc ~= "" and opts.sliderDesc) or nil
+    local min = type(opts.min) == "number" and opts.min or nil
+    local max = type(opts.max) == "number" and opts.max or nil
+    local step = type(opts.step) == "number" and opts.step or nil
+    local formatter = type(opts.formatter) == "function" and opts.formatter or nil
+    local sanitize = type(opts.sanitize) == "function" and opts.sanitize or nil
 
-    if not (category and basePath) then
-        return
+    local onCheckboxChanged = type(opts.onCheckboxChanged) == "function" and opts.onCheckboxChanged or nil
+    local onSliderChanged = type(opts.onSliderChanged) == "function" and opts.onSliderChanged or nil
+
+    if not (path and sliderPath and name and min and max and step) then
+        return nil
     end
 
-    if not ValidateSettingsPath(basePath) then
-        return
+    if not DB.storage then
+        return nil
     end
 
-    local cooldownTextPath = basePath .. ".cooldownText"
+    ValidateSettingsPath(path)
+    ValidateSettingsPath(sliderPath)
 
-    SettingsLib:CreateHeader(category, {
-        name = "Cooldown",
-    })
+    local defaultCheckboxCandidate = DB.storage:GetDefaultAtPath(path)
+    if defaultCheckboxCandidate == nil then
+        defaultCheckboxCandidate = DB.storage:GetValueAtPath(path)
+    end
+    local defaultCheckbox = defaultCheckboxCandidate == true
 
-    local showElement = self:AddCooldownTextSettings(category, {
-        path = cooldownTextPath,
+    local defaultSliderCandidate = DB.storage:GetDefaultAtPath(sliderPath)
+    if defaultSliderCandidate == nil then
+        defaultSliderCandidate = DB.storage:GetValueAtPath(sliderPath)
+    end
+    if defaultSliderCandidate == nil then
+        defaultSliderCandidate = min
+    end
+    local defaultSlider = defaultSliderCandidate
+    if sanitize then
+        defaultSlider = sanitize(defaultSlider, defaultSliderCandidate)
+    end
+    if defaultSlider == nil then
+        defaultSlider = defaultSliderCandidate
+    end
+
+    return SettingsLib:CreateCheckboxSlider(category, {
+        key = path,
+        sliderKey = sliderPath,
+        name = name,
+        desc = desc,
         prefix = prefix,
-        onChanged = onChanged,
-    })
 
-    local defaults = DB.storage:GetDefaultsTableAtPath(cooldownTextPath) or {}
+        sliderName = sliderName,
+        sliderDesc = sliderDesc,
+        sliderMin = min,
+        sliderMax = max,
+        sliderStep = step,
+        sliderFormatter = formatter,
+        sliderDefault = defaultSlider,
 
-    local warningDefaults = type(defaults.warning) == "table" and defaults.warning or {}
-    local criticalDefaults = type(defaults.critical) == "table" and defaults.critical or {}
+        getCheckbox = function()
+            local value = DB.storage:GetValueAtPath(path)
+            if value == nil then
+                return defaultCheckbox
+            end
+            return value == true
+        end,
+        setCheckbox = function(value)
+            local newValue = value == true
+            Utils:Log("SettingsCommon:CreateCheckboxSlider", { value = value, path = path })
+            if DB.storage:SetValue(path, newValue) and onCheckboxChanged then
+                onCheckboxChanged(newValue)
+            end
+        end,
 
-    local defaultWarningThresholdSeconds = Utils:ClampInteger(warningDefaults.thresholdSeconds, 0, 60, 10)
-    local defaultCriticalThresholdSeconds = Utils:ClampInteger(criticalDefaults.thresholdSeconds, 0, 60, 5)
+        sliderGet = function()
+            local value = DB.storage:GetValueAtPath(sliderPath)
+            if value == nil then
+                return defaultSlider
+            end
+            if sanitize then
+                value = sanitize(value, defaultSlider)
+            end
+            if value == nil then
+                return defaultSlider
+            end
+            return value
+        end,
+        sliderSet = function(value)
+            local newValue = value
+            if sanitize then
+                newValue = sanitize(newValue, defaultSlider)
+            end
+            if newValue == nil then
+                newValue = defaultSlider
+            end
+            if DB.storage:SetValue(sliderPath, newValue) and onSliderChanged then
+                onSliderChanged(newValue)
+            end
+        end,
 
-    local defaultWarningColor = Utils:SanitizeColor(warningDefaults.color, { r = 1, g = 0.55, b = 0 })
-    local defaultCriticalColor = Utils:SanitizeColor(criticalDefaults.color, { r = 1, g = 0, b = 0 })
-
-    SettingsLib:CreateHeader(category, {
-        name = "Thresholds",
-    })
-
-    local warningEnabledElement = self:CreateCheckbox(category, {
-        path = cooldownTextPath .. ".warning.enabled",
-        name = "Warning",
-        desc = "Enable Warning threshold coloring for this countdown.",
-        prefix = prefix,
-        onChanged = function()
-            onChanged("warningEnabled")
-        end,
-    })
-
-    local warningThresholdElement = self:CreateSlider(category, {
-        path = cooldownTextPath .. ".warning.thresholdSeconds",
-        name = "Seconds",
-        min = 0,
-        max = 60,
-        step = 1,
-        formatter = function(value)
-            return string.format("%is", Utils:ClampInteger(value, 0, 60, defaultWarningThresholdSeconds))
-        end,
-        sanitize = function(value, fallback)
-            return Utils:ClampInteger(value, 0, 60, fallback)
-        end,
-        onChanged = function()
-            onChanged("warningThresholdSeconds")
-        end,
-        desc = "When remaining duration is at or below this value, countdown text uses the Warning color.",
-        prefix = prefix,
-        parent = warningEnabledElement,
-        parentCheck = function()
-            return DB.storage:GetBooleanAtPath(cooldownTextPath .. ".show") == true
-                and DB.storage:GetBooleanAtPath(cooldownTextPath .. ".warning.enabled") == true
-        end,
-    })
-
-    SettingsLib:CreateColorOverrides(category, {
-        key = cooldownTextPath .. ".warning.color",
-        entries = {
-            { key = cooldownTextPath .. ".warning", label = "Color" },
-        },
-        getColor = function()
-            local color = Utils:SanitizeColor(DB.storage:GetValueAtPath(cooldownTextPath .. ".warning.color"), defaultWarningColor)
-            return color.r, color.g, color.b
-        end,
-        setColor = function(_, r, g, b)
-            DB.storage:SetValue(cooldownTextPath .. ".warning.color", Utils:SanitizeColor({ r = r, g = g, b = b }, defaultWarningColor))
-            onChanged("warningColor")
-        end,
-        getDefaultColor = function()
-            local color = Utils:SanitizeColor(defaultWarningColor, { r = 1, g = 1, b = 1 })
-            return color.r, color.g, color.b
-        end,
-        hasOpacity = false,
-        parent = warningThresholdElement,
-        parentCheck = function()
-            return DB.storage:GetBooleanAtPath(cooldownTextPath .. ".show") == true
-                and DB.storage:GetBooleanAtPath(cooldownTextPath .. ".warning.enabled") == true
-        end,
-        minHeight = 36,
-    })
-
-    local criticalEnabledElement = self:CreateCheckbox(category, {
-        path = cooldownTextPath .. ".critical.enabled",
-        name = "Critical",
-        desc = "Enable Critical threshold coloring for this countdown.",
-        prefix = prefix,
-        onChanged = function()
-            onChanged("criticalEnabled")
-        end,
-    })
-
-    local criticalThresholdElement = self:CreateSlider(category, {
-        path = cooldownTextPath .. ".critical.thresholdSeconds",
-        name = "Seconds",
-        min = 0,
-        max = 60,
-        step = 1,
-        formatter = function(value)
-            return string.format("%is", Utils:ClampInteger(value, 0, 60, defaultCriticalThresholdSeconds))
-        end,
-        sanitize = function(value, fallback)
-            return Utils:ClampInteger(value, 0, 60, fallback)
-        end,
-        onChanged = function()
-            onChanged("criticalThresholdSeconds")
-        end,
-        desc = "When remaining duration is at or below this value, countdown text uses the Critical color.",
-        prefix = prefix,
-        parent = criticalEnabledElement,
-        parentCheck = function()
-            return DB.storage:GetBooleanAtPath(cooldownTextPath .. ".show") == true
-                and DB.storage:GetBooleanAtPath(cooldownTextPath .. ".critical.enabled") == true
-        end,
-    })
-
-    SettingsLib:CreateColorOverrides(category, {
-        key = cooldownTextPath .. ".critical.color",
-        entries = {
-            { key = cooldownTextPath .. ".critical", label = "Color" },
-        },
-        getColor = function()
-            local color = Utils:SanitizeColor(DB.storage:GetValueAtPath(cooldownTextPath .. ".critical.color"), defaultCriticalColor)
-            return color.r, color.g, color.b
-        end,
-        setColor = function(_, r, g, b)
-            DB.storage:SetValue(cooldownTextPath .. ".critical.color", Utils:SanitizeColor({ r = r, g = g, b = b }, defaultCriticalColor))
-            onChanged("criticalColor")
-        end,
-        getDefaultColor = function()
-            local color = Utils:SanitizeColor(defaultCriticalColor, { r = 1, g = 1, b = 1 })
-            return color.r, color.g, color.b
-        end,
-        hasOpacity = false,
-        parent = criticalThresholdElement,
-        parentCheck = function()
-            return DB.storage:GetBooleanAtPath(cooldownTextPath .. ".show") == true
-                and DB.storage:GetBooleanAtPath(cooldownTextPath .. ".critical.enabled") == true
-        end,
-        minHeight = 36,
+        parent = opts.parent,
+        parentCheck = opts.parentCheck,
     })
 end
 

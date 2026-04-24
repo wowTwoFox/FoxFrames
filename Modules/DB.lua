@@ -153,10 +153,7 @@ local defaultPartyIncomingCastsSettings = {
 }
 
 local defaultAuraSettings = {
-    cooldownText = {
-        show = true,
-        fontSize = 12,
-        color = defaultColorSettings,
+    thresholds = {
         warning = {
             enabled = true,
             thresholdSeconds = 10,
@@ -167,6 +164,14 @@ local defaultAuraSettings = {
             thresholdSeconds = 5,
             color = defaultAuraCriticalColorSettings,
         },
+    },
+    cooldownText = {
+        show = true,
+        -- When > 0, countdown text is only shown if remaining duration is <= this many seconds.
+        -- 0 means no limit (always show when cooldownText.show is enabled).
+        showUnderSeconds = 0,
+        fontSize = 12,
+        color = defaultColorSettings,
     },
 }
 
@@ -406,68 +411,73 @@ function Object:GetBuffCountdownColor()
     return color or { r = 1, g = 1, b = 1 }
 end
 
+function Object:GetBuffCountdownShowUnderSeconds()
+    local value = self.storage:GetIntegerAtPath("profile.partyFrame.buffs.cooldownText.showUnderSeconds", 0, 60)
+    return value or 0
+end
+
 function Object:GetDebuffCountdownColor()
     local color = self.storage:GetColorAtPath("profile.partyFrame.debuffs.cooldownText.color")
     return color or { r = 1, g = 1, b = 1 }
 end
 
 function Object:GetBuffCountdownWarningThresholdSeconds()
-    local value = self.storage:GetIntegerAtPath("profile.partyFrame.buffs.cooldownText.warning.thresholdSeconds", 0, 60)
+    local value = self.storage:GetIntegerAtPath("profile.partyFrame.buffs.thresholds.warning.thresholdSeconds", 0, 60)
     return value or 10
 end
 
 function Object:GetBuffCountdownWarningEnabled()
-    local value = self.storage:GetBooleanAtPath("profile.partyFrame.buffs.cooldownText.warning.enabled")
+    local value = self.storage:GetBooleanAtPath("profile.partyFrame.buffs.thresholds.warning.enabled")
     return value == true
 end
 
 function Object:GetBuffCountdownWarningColor()
-    local color = self.storage:GetColorAtPath("profile.partyFrame.buffs.cooldownText.warning.color")
+    local color = self.storage:GetColorAtPath("profile.partyFrame.buffs.thresholds.warning.color")
     return color or { r = 1, g = 0.55, b = 0 }
 end
 
 function Object:GetBuffCountdownCriticalThresholdSeconds()
-    local value = self.storage:GetIntegerAtPath("profile.partyFrame.buffs.cooldownText.critical.thresholdSeconds", 0, 60)
+    local value = self.storage:GetIntegerAtPath("profile.partyFrame.buffs.thresholds.critical.thresholdSeconds", 0, 60)
     return value or 5
 end
 
 function Object:GetBuffCountdownCriticalEnabled()
-    local value = self.storage:GetBooleanAtPath("profile.partyFrame.buffs.cooldownText.critical.enabled")
+    local value = self.storage:GetBooleanAtPath("profile.partyFrame.buffs.thresholds.critical.enabled")
     return value == true
 end
 
 function Object:GetBuffCountdownCriticalColor()
-    local color = self.storage:GetColorAtPath("profile.partyFrame.buffs.cooldownText.critical.color")
+    local color = self.storage:GetColorAtPath("profile.partyFrame.buffs.thresholds.critical.color")
     return color or { r = 1, g = 0, b = 0 }
 end
 
 function Object:GetDebuffCountdownWarningThresholdSeconds()
-    local value = self.storage:GetIntegerAtPath("profile.partyFrame.debuffs.cooldownText.warning.thresholdSeconds", 0, 60)
+    local value = self.storage:GetIntegerAtPath("profile.partyFrame.debuffs.thresholds.warning.thresholdSeconds", 0, 60)
     return value or 10
 end
 
 function Object:GetDebuffCountdownWarningEnabled()
-    local value = self.storage:GetBooleanAtPath("profile.partyFrame.debuffs.cooldownText.warning.enabled")
+    local value = self.storage:GetBooleanAtPath("profile.partyFrame.debuffs.thresholds.warning.enabled")
     return value == true
 end
 
 function Object:GetDebuffCountdownWarningColor()
-    local color = self.storage:GetColorAtPath("profile.partyFrame.debuffs.cooldownText.warning.color")
+    local color = self.storage:GetColorAtPath("profile.partyFrame.debuffs.thresholds.warning.color")
     return color or { r = 1, g = 0.55, b = 0 }
 end
 
 function Object:GetDebuffCountdownCriticalThresholdSeconds()
-    local value = self.storage:GetIntegerAtPath("profile.partyFrame.debuffs.cooldownText.critical.thresholdSeconds", 0, 60)
+    local value = self.storage:GetIntegerAtPath("profile.partyFrame.debuffs.thresholds.critical.thresholdSeconds", 0, 60)
     return value or 5
 end
 
 function Object:GetDebuffCountdownCriticalEnabled()
-    local value = self.storage:GetBooleanAtPath("profile.partyFrame.debuffs.cooldownText.critical.enabled")
+    local value = self.storage:GetBooleanAtPath("profile.partyFrame.debuffs.thresholds.critical.enabled")
     return value == true
 end
 
 function Object:GetDebuffCountdownCriticalColor()
-    local color = self.storage:GetColorAtPath("profile.partyFrame.debuffs.cooldownText.critical.color")
+    local color = self.storage:GetColorAtPath("profile.partyFrame.debuffs.thresholds.critical.color")
     return color or { r = 1, g = 0, b = 0 }
 end
 

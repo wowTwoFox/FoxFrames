@@ -141,5 +141,5 @@ end
 local profiles = Object:New()
 
 if addon then
-    addon.SettingsProfiles = profiles
+    addon.ProfileSettings = profiles
 end

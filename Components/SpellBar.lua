@@ -64,7 +64,7 @@ local SpellBarMixin = {
 
 local function CreateSpellBarFrame(frame)
     if not frame then return nil end
-    Utils:Log("CreateSpellBarFrame for", frame)
+    -- Utils:Log("FF_CreateSpellBarFrame ", frame)
 
     local ok, container = pcall(CreateFrame, "Frame", nil, frame, "GridLayoutFrame")
     if not ok or not container then return nil end
