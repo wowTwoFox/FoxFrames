@@ -1,2 +1,6 @@
-<!-- Embedded libraries for FoxFrames -->
-<Include file="Libs/LibEQOL/LibEQOL.xml" />
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+	<!-- Embedded libraries for FoxFrames -->
+	<Include file="Libs/LibEQOL/LibEQOL.xml" />
+  <Include file="Libs/LibSharedMedia-3.0/lib.xml" />
+  <Include file="Libs/Ace3/Ace3.xml" />
+</Ui>
