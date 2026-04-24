@@ -33,9 +33,9 @@ Modules\BlizzardSettings.lua
 Modules\Blizzard.lua
 Modules\Storage.lua
 Modules\DB.lua
-Modules\Auras.lua
 Modules\DBMigrations.lua
 Modules\GlobalsDB.lua
+Modules\Auras.lua
 Modules\FoxFrames.lua
 Modules\RaidFrames.lua
 Modules\IncomingCasts.lua
@@ -48,7 +48,6 @@ Components\Settings\SettingsRow.lua
 Components\Settings\SettingsRow.xml
 Settings\SettingsCommon.lua
 Settings\ProfileSettings.lua
-Settings\AuraSettings.lua
 Settings\FrameSettings.lua
 Settings\Settings.lua
 Core.lua

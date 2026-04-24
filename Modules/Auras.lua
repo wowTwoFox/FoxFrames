@@ -29,8 +29,7 @@ local function GetUnitCache(self, unit)
     return cache
 end
 
-local function AddAura(aura, cache)
-    Utils:Log("FF_ADD_AURA", aura)
+local function AddAura(aura, cache, seen)
     if not aura then
         return
     end
@@ -38,6 +37,12 @@ local function AddAura(aura, cache)
     local auraInstanceID = aura.auraInstanceID
     if auraInstanceID then
         cache[auraInstanceID] = aura
+
+        if seen[auraInstanceID] then
+            Utils:Log("FF_AURA", aura)
+        end
+
+        seen[auraInstanceID] = true
     end
 end
 
@@ -48,13 +53,14 @@ function Object:RefreshUnit(unit)
     end
 
     local cache = GetUnitCache(self, unit)
+    cache.seenAuras = cache.seenAuras or {}
     wipe(cache.byAuraInstanceID)
 
     local index = 1
     while true do
         local aura = C_UnitAuras.GetAuraDataByIndex(unit, index, "HELPFUL")
         if not aura then break end
-        AddAura(aura, cache.byAuraInstanceID)
+        AddAura(aura, cache.byAuraInstanceID, cache.seenAuras)
         index = index + 1
     end
 
@@ -62,7 +68,7 @@ function Object:RefreshUnit(unit)
     while true do
         local aura = C_UnitAuras.GetAuraDataByIndex(unit, index, "HARMFUL")
         if not aura then break end
-        AddAura(aura, cache.byAuraInstanceID)
+        AddAura(aura, cache.byAuraInstanceID, cache.seenAuras)
         index = index + 1
     end
 

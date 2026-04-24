@@ -4,7 +4,6 @@ local Utils = addon.Utils
 local DB = addon.DB
 local SettingsCommon = addon.SettingsCommon
 local Constants = addon.Constants
-local AuraSettings = addon.AuraSettings
 
 local SettingsLib = LibStub("LibEQOLSettingsMode-1.0")
 local SETTINGS_PREFIX = "FoxFrames_"
@@ -19,11 +18,88 @@ assert(type(SettingsCommon.CreateCheckbox) == "function", "FoxFrames: SettingsCo
 assert(type(SettingsCommon.CreateDropdown) == "function", "FoxFrames: SettingsCommon missing CreateDropdown")
 assert(type(SettingsCommon.CreateSlider) == "function", "FoxFrames: SettingsCommon missing CreateSlider")
 
-assert(AuraSettings, "FoxFrames: AuraSettings module missing (load order issue)")
-assert(type(AuraSettings.AddCooldownTextSettings) == "function", "FoxFrames: AuraSettings missing AddCooldownTextSettings")
-
 local GROWTH_DIRECTION_LABELS = SettingsCommon.GROWTH_DIRECTION_LABELS
 assert(type(GROWTH_DIRECTION_LABELS) == "table", "FoxFrames: SettingsCommon missing GROWTH_DIRECTION_LABELS")
+
+local function AddCooldownTextSettings(category, options)
+    local opts = type(options) == "table" and options or {}
+    local path = (type(opts.path) == "string" and opts.path ~= "" and opts.path)
+    local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil
+    local onChanged = type(opts.onChanged) == "function" and opts.onChanged or nil
+
+    assert(type(onChanged) == "function", "FoxFrames: AddCooldownTextSettings requires onChanged callback")
+
+    if not (category and path) then
+        return nil
+    end
+
+    if DB.storage and type(path) == "string" and path ~= "" then
+        DB.storage:ValidatePathExists(path)
+    end
+
+    local defaults = DB.storage:GetDefaultsTableAtPath(path) or {}
+    local defaultFontSize = Utils:ClampInteger(defaults.fontSize, 8, 32, 12)
+    local defaultColor = Utils:SanitizeColor(defaults.color, { r = 1, g = 1, b = 1 })
+
+    local showElement = SettingsCommon:CreateCheckbox(category, {
+        path = path .. ".show",
+        name = "Show Text",
+        desc = "Toggle cooldown countdown text visibility.",
+        prefix = prefix,
+        onChanged = function()
+            onChanged("show")
+        end,
+    })
+
+    SettingsCommon:CreateSlider(category, {
+        path = path .. ".fontSize",
+        name = "Text Size",
+        min = 8,
+        max = 32,
+        step = 1,
+        formatter = function(value)
+            return string.format("%ipt", Utils:ClampInteger(value, 8, 32, defaultFontSize))
+        end,
+        sanitize = function(value, fallback)
+            return Utils:ClampInteger(value, 8, 32, fallback)
+        end,
+        onChanged = function()
+            onChanged("fontSize")
+        end,
+        desc = "Adjust cooldown countdown text size.",
+        prefix = prefix,
+        parent = showElement,
+        parentCheck = function()
+            return DB.storage:GetBooleanAtPath(path .. ".show") == true
+        end,
+    })
+
+    SettingsLib:CreateColorOverrides(category, {
+        key = path .. ".color",
+        entries = {
+            { key = path, label = "Color" },
+        },
+        getColor = function()
+            local color = Utils:SanitizeColor(DB.storage:GetValueAtPath(path .. ".color"), defaultColor)
+            return color.r, color.g, color.b
+        end,
+        setColor = function(_, r, g, b)
+            DB.storage:SetValue(path .. ".color", Utils:SanitizeColor({ r = r, g = g, b = b }, defaultColor))
+            onChanged("color")
+        end,
+        getDefaultColor = function()
+            local color = Utils:SanitizeColor(defaultColor, { r = 1, g = 1, b = 1 })
+            return color.r, color.g, color.b
+        end,
+        hasOpacity = false,
+        parent = showElement,
+        parentCheck = function()
+            return DB.storage:GetBooleanAtPath(path .. ".show") == true
+        end,
+    })
+
+    return showElement
+end
 
 local function ValidateSettingsPath(path)
     if DB.storage and type(path) == "string" and path ~= "" then
@@ -132,7 +208,7 @@ local function AddIncomingCastsCooldownSettings(category, options)
         prefix = prefix,
     })
 
-    AuraSettings:AddCooldownTextSettings(category, {
+    AddCooldownTextSettings(category, {
         path = iconPath .. ".cooldownText",
         prefix = prefix,
         onChanged = function(settingKey)

@@ -4,7 +4,6 @@ local Utils = addon.Utils
 local DB = addon.DB
 local ProfileSettings = addon.ProfileSettings
 local SettingsCommon = addon.SettingsCommon
-local AuraSettings = addon.AuraSettings
 local FrameSettings = addon.FrameSettings
 
 local SettingsLib = LibStub("LibEQOLSettingsMode-1.0")
@@ -19,11 +18,6 @@ assert(type(SettingsCommon.AddTextSettings) == "function", "FoxFrames: SettingsC
 assert(type(SettingsCommon.CreateCheckbox) == "function", "FoxFrames: SettingsCommon missing CreateCheckbox")
 assert(type(SettingsCommon.CreateDropdown) == "function", "FoxFrames: SettingsCommon missing CreateDropdown")
 assert(type(SettingsCommon.CreateSlider) == "function", "FoxFrames: SettingsCommon missing CreateSlider")
-
-assert(AuraSettings, "FoxFrames: AuraSettings module missing (load order issue)")
-assert(type(AuraSettings.CreateBuffsSettings) == "function", "FoxFrames: AuraSettings missing CreateBuffsSettings")
-assert(type(AuraSettings.CreateDebuffsSettings) == "function", "FoxFrames: AuraSettings missing CreateDebuffsSettings")
-assert(type(AuraSettings.AddCooldownTextSettings) == "function", "FoxFrames: AuraSettings missing AddCooldownTextSettings")
 
 assert(FrameSettings, "FoxFrames: FrameSettings module missing (load order issue)")
 assert(type(FrameSettings.CreatePartySettings) == "function", "FoxFrames: FrameSettings missing CreatePartySettings")
@@ -195,8 +189,6 @@ function FF:SetupOptions()
     -- Build the options using LibEQOL
     local PARTY_FRAME_PREFIX = SETTINGS_PREFIX .. "PartyFrame_"
     local RAID_FRAME_PREFIX = SETTINGS_PREFIX .. "RaidFrame_"
-    local BUFFS_PREFIX = SETTINGS_PREFIX .. "Buffs_"
-    local DEBUFFS_PREFIX = SETTINGS_PREFIX .. "Debuffs_"
     local rootCategory = SettingsLib:CreateRootCategory("Fox Frames")
     self._rootCategory = rootCategory
 
@@ -213,18 +205,6 @@ function FF:SetupOptions()
             self:SetupFrames()
         end,
         prefix = SETTINGS_PREFIX,
-    })
-
-    AuraSettings:CreateBuffsSettings(rootCategory, {
-        path = "profile.partyFrame.buffs",
-        prefix = BUFFS_PREFIX,
-        keyPrefix = "Buff",
-    })
-
-    AuraSettings:CreateDebuffsSettings(rootCategory, {
-        path = "profile.partyFrame.debuffs",
-        prefix = DEBUFFS_PREFIX,
-        keyPrefix = "Debuff",
     })
 
     FrameSettings:CreatePartySettings(rootCategory, {

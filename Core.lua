@@ -128,19 +128,6 @@ end
 
 function FF:UNIT_AURA(_, unit)
     Auras:RefreshUnit(unit)
-
-    -- If the unit that had an aura update is the player, 
-    -- we may need to update the countdown colors on all frames 
-    -- since they can be configured to use the player's debuff type or remaining time
-    if not self:InAllowedGroup() then
-        return
-    end
-
-    for _, frame in ipairs(Blizzard:GetFrames()) do
-        if frame and frame.unit == unit then
-            self:UpdateAuraCountdownDynamicColorForFrame(frame)
-        end
-    end
 end
 
 local function GetProfileNameFromLayout(layout)
@@ -289,8 +276,6 @@ function FF:OnEnable()
     -- before we registered for it.
     self:EDIT_MODE_LAYOUTS_UPDATED()
     self:SetupFrames()
-    -- Utils:Log("FOX_FRAMES_LOADED", FF)
-    self:StartAuraCountdownDynamicColorTicker()
 end
 
 function FF:EDIT_MODE_LAYOUTS_UPDATED()

@@ -15,14 +15,64 @@ function Object:New()
     return instance
 end
 
-function Object:Log(title, logObject)
+function Object:Log(title, ...)
     local DevTool = rawget(_G, "DevTool")
-    local titleWithDate = date("%H:%M:%S") .. " " .. title
-    logObject = logObject or title
+    local titleText = tostring(title or "")
+    local titleWithDate = date("%H:%M:%S") .. " " .. titleText
 
-    if DevTool then
-        DevTool:AddData(logObject, titleWithDate)
+    local argc = select("#", ...)
+    local logObject
+    if argc <= 0 then
+        logObject = title
+    elseif argc == 1 then
+        logObject = select(1, ...)
+        if logObject == nil then
+            logObject = title
+        end
+    else
+        logObject = { n = argc, ... }
     end
+
+    if DevTool and DevTool.AddData then
+        pcall(DevTool.AddData, DevTool, logObject, titleWithDate)
+    end
+end
+
+function Object:ShallowCopySkippingKeyPrefixes(source, skipPrefixes)
+    if type(skipPrefixes) ~= "table" or source == nil then
+        return source, nil
+    end
+
+    local copied = {}
+    local skippedKeys = {}
+    for k, v in pairs(source) do
+        local keyString = type(k) == "string" and k or nil
+
+        local shouldSkip = false
+        if keyString then
+            local lowerKey = keyString:lower()
+            for _, prefix in ipairs(skipPrefixes) do
+                if type(prefix) == "string" and lowerKey:sub(1, #prefix) == prefix:lower() then
+                    shouldSkip = true
+                    break
+                end
+            end
+        end
+
+        if shouldSkip then
+            if keyString then
+                skippedKeys[#skippedKeys + 1] = keyString
+            end
+        else
+            copied[k] = v
+        end
+    end
+
+    if #skippedKeys > 1 then
+        table.sort(skippedKeys)
+    end
+
+    return copied, skippedKeys
 end
 
 function Object:LogBlockedAddon(event, blockedAddon, blockedFunction)
@@ -125,10 +175,6 @@ local function CapturePointDefaults(frame)
 end
 
 local function InstallSafeFrameAnchoringHooks(frame)
-    if type(hooksecurefunc) ~= "function" then
-        return
-    end
-
     if not (frame and frame.SetPoint and frame.ClearAllPoints) then
         return
     end
@@ -137,60 +183,6 @@ local function InstallSafeFrameAnchoringHooks(frame)
         return
     end
     frame._ffSafeAnchoringHooksInstalled = true
-
-    hooksecurefunc(frame, "ClearAllPoints", function(self)
-        if self._ffSafeAnchoringInternal == true then
-            return
-        end
-
-        local defaults = self._ffPointDefaults
-        if type(defaults) ~= "table" then
-            defaults = {}
-            self._ffPointDefaults = defaults
-        end
-
-        defaults.points = {}
-    end)
-
-    hooksecurefunc(frame, "SetPoint", function(self, ...)
-        if self._ffSafeAnchoringInternal == true then
-            return
-        end
-
-        local defaults = self._ffPointDefaults
-        if type(defaults) ~= "table" then
-            defaults = {}
-            self._ffPointDefaults = defaults
-        end
-
-        if type(defaults.points) ~= "table" then
-            defaults.points = {}
-        end
-
-        local n = select("#", ...)
-        if n <= 0 then
-            return
-        end
-
-        local args = { n = n, ... }
-        local point = args[1]
-        if point == nil then
-            return
-        end
-
-        -- Deduplicate per anchor point, but preserve call order:
-        -- if a point is set again, move it to the end.
-        for i = #defaults.points, 1, -1 do
-            local existing = defaults.points[i]
-            local existingPoint = existing and existing[1]
-            if existingPoint == point then
-                table.remove(defaults.points, i)
-            end
-        end
-
-        defaults.points[#defaults.points + 1] = args
-
-    end)
 end
 
 local function EnsureRevertingPointState(frame)
@@ -280,10 +272,6 @@ local function CaptureFontColorDefaults(fontString)
 end
 
 local function InstallRevertingFontHooks(fontString)
-    if type(hooksecurefunc) ~= "function" then
-        return
-    end
-
     if not fontString then
         return
     end
@@ -292,42 +280,9 @@ local function InstallRevertingFontHooks(fontString)
         return
     end
     fontString._ffSafeFontHooksInstalled = true
-
-    if not fontString.SetFont then
-        return
-    end
-
-    hooksecurefunc(fontString, "SetFont", function(self, ...)
-        if self._ffSafeFontInternal == true then
-            return
-        end
-        local n = select("#", ...)
-        if n < 2 then
-            return
-        end
-
-        self._ffFontDefaults = { n = n, ... }
-    end)
-
-    hooksecurefunc(fontString, "SetFontHeight", function(self, ...)
-        if self._ffSafeFontInternal == true then
-            return
-        end
-
-        if self.GetFont then
-            local defaults = CaptureFontDefaults(self)
-            if type(defaults) == "table" then
-                self._ffFontDefaults = defaults
-            end
-        end
-    end)
 end
 
 local function InstallRevertingFontColorHooks(fontString)
-    if type(hooksecurefunc) ~= "function" then
-        return
-    end
-
     if not fontString then
         return
     end
@@ -336,23 +291,6 @@ local function InstallRevertingFontColorHooks(fontString)
         return
     end
     fontString._ffSafeFontColorHooksInstalled = true
-
-    if not fontString.SetTextColor then
-        return
-    end
-
-    hooksecurefunc(fontString, "SetTextColor", function(self, ...)
-        if self._ffSafeFontInternal == true then
-            return
-        end
-
-        local n = select("#", ...)
-        if n <= 0 then
-            return
-        end
-
-        self._ffFontColorDefaults = { n = n, ... }
-    end)
 end
 
 function Object:SetRevertingFont(fontString, ...)
