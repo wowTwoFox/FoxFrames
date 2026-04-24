@@ -1,7 +1,4 @@
 
--- Runtime-only flags (not stored in saved variables)
-Object.runtime = Object.runtime or {}
-Object.runtime.incomingCastsPreviewEnabled = Object.runtime.incomingCastsPreviewEnabled == true
 local addonName, addon = ...
 
 assert(addon and addon.Utils and addon.Constants, "FoxFrames: addon table, Constants, or Utils missing (load order issue)")
@@ -106,50 +103,6 @@ local defaultRaidPlayerNameSettings = {
     frame = defaultPlayerNameSettings.frame
 }
 
-local defaultIncomingCastBarSettings = {
-    spellCount = 3,
-    frame = {
-        anchorTarget = frameAnchorTargets.HEALTHBAR,
-        position = anchorPoints.BOTTOMLEFT,
-        anchorMode = anchorModes.INSIDE,
-        offsetX = 0,
-        offsetY = 0,
-        useRelativeOffsets = true,
-    },
-    growthDirection = growthDirections.RIGHT,
-    icon = {
-        scale = 1,
-        spacing = 0,
-        showBorder = true,
-        showSwipe = true,
-        cooldownText = {
-            show = true,
-            fontSize = 12,
-            color = {
-                r = 1,
-                g = 1,
-                b = 1,
-            },
-        },
-    },
-}
-
-local defaultRaidIncomingCastsSettings = {
-    enabledType = raidFrameOverrideTypes.PARTY,
-    spellCount = defaultIncomingCastBarSettings.spellCount,
-    frame = defaultIncomingCastBarSettings.frame,
-    growthDirection = defaultIncomingCastBarSettings.growthDirection,
-    icon = defaultIncomingCastBarSettings.icon,
-}
-
-local defaultPartyIncomingCastsSettings = {
-    enabled = false,
-    spellCount = defaultIncomingCastBarSettings.spellCount,
-    frame = defaultIncomingCastBarSettings.frame,
-    growthDirection = defaultIncomingCastBarSettings.growthDirection,
-    icon = defaultIncomingCastBarSettings.icon,
-}
-
 local defaultSettings = {
     playerFrame = {
         showType = playerFrameShowTypes.NEVER,
@@ -169,12 +122,10 @@ local defaultSettings = {
         playerStatus = defaultPartyPlayerStatusSettings,
         playerName = defaultPartyPlayerNameSettings,
         allowAnyAnchoring = true,
-        incomingCasts = defaultPartyIncomingCastsSettings,
     },
     raidFrame = {
         playerStatus = defaultRaidPlayerStatusSettings,
         playerName = defaultRaidPlayerNameSettings,
-        incomingCasts = defaultRaidIncomingCastsSettings,
     },
 }
 
@@ -279,94 +230,6 @@ end
 local function NewDBInstance()
     local instance = setmetatable({}, Object)
     return instance
-end
-
-function Object:GetIncomingCastBarDB(useRaid)
-    local path = useRaid == true and "profile.raidFrame.incomingCasts" or "profile.partyFrame.incomingCasts"
-    return self.storage:GetValuesTableAtPath(path)
-end
-
-function Object:GetIncomingCastIndicatorAnchorsAndOffsets(layoutAxis, useRaid)
-    local path = useRaid == true and "profile.raidFrame.incomingCasts.frame" or "profile.partyFrame.incomingCasts.frame"
-    local profile, defaults = self.storage:GetValueAndDefaultAtPath(path)
-    local spellBarAnchor, relativeAnchor, offsetX, offsetY = GetFrameAnchorsAndOffsets(
-        profile,
-        defaults,
-        -200,
-        200,
-        layoutAxis
-    )
-
-    return relativeAnchor, spellBarAnchor, offsetX, offsetY
-end
-
-function Object:GetIncomingCastIndicatorAnchorFrame(useRaid)
-    local path = useRaid == true and "profile.raidFrame.incomingCasts.frame" or "profile.partyFrame.incomingCasts.frame"
-    local profile, defaults = self.storage:GetValueAndDefaultAtPath(path)
-    local fallback = defaults.anchorTarget or frameAnchorTargets.HEALTHBAR
-    return Utils:SanitizeOption(profile and profile.anchorTarget, frameAnchorTargets) or fallback
-end
-
-function Object:GetIncomingCastIndicatorCount(useRaid)
-    local path = useRaid == true and "profile.raidFrame.incomingCasts" or "profile.partyFrame.incomingCasts"
-    local profile, defaults = self.storage:GetValueAndDefaultAtPath(path)
-    return Utils:ClampInteger(profile and profile.spellCount, 1, 6, defaults.spellCount)
-end
-
-function Object:GetIncomingCastIndicatorIconCooldownTextShow(useRaid)
-    local path = useRaid == true
-        and "profile.raidFrame.incomingCasts.icon.cooldownText.show"
-        or "profile.partyFrame.incomingCasts.icon.cooldownText.show"
-
-    local show = self.storage:GetBooleanAtPath(path)
-    return show == true
-end
-
-function Object:GetIncomingCastIndicatorIconCooldownTextFontSize(useRaid)
-    local path = useRaid == true
-        and "profile.raidFrame.incomingCasts.icon.cooldownText.fontSize"
-        or "profile.partyFrame.incomingCasts.icon.cooldownText.fontSize"
-
-    local value = self.storage:GetIntegerAtPath(path, 8, 32)
-    return value or 10
-end
-
-function Object:GetIncomingCastIndicatorIconCooldownTextColor(useRaid)
-    local path = useRaid == true
-        and "profile.raidFrame.incomingCasts.icon.cooldownText.color"
-        or "profile.partyFrame.incomingCasts.icon.cooldownText.color"
-
-    local color = self.storage:GetColorAtPath(path) or { r = 1, g = 1, b = 1 }
-    return color.r, color.g, color.b
-end
-
-function Object:GetIncomingCastIndicatorGrowDirection(useRaid)
-    local path = useRaid == true and "profile.raidFrame.incomingCasts.growthDirection" or "profile.partyFrame.incomingCasts.growthDirection"
-    local value = self.storage:GetOptionAtPath(path, growthDirections)
-    return value or growthDirections.RIGHT
-end
-
-local function GetRaidIncomingCastsEnabledType(self)
-    local profile, defaults = self.storage:GetValueAndDefaultAtPath("profile.raidFrame.incomingCasts")
-    local defaultValue = defaults.enabledType or raidFrameOverrideTypes.PARTY
-    local value = profile and profile.enabledType
-    return Utils:SanitizeOption(value, raidFrameOverrideTypes) or defaultValue
-end
-
-function Object:GetRaidTrackIncomingCasts()
-    local enabledType = GetRaidIncomingCastsEnabledType(self)
-    if enabledType == raidFrameOverrideTypes.DISABLED then
-        return false
-    end
-    if enabledType == raidFrameOverrideTypes.PARTY then
-        return self:GetTrackIncomingCasts()
-    end
-    return true
-end
-
-function Object:ShouldUsePartyIncomingCastsSettingsForRaid()
-    local enabledType = GetRaidIncomingCastsEnabledType(self)
-    return enabledType == raidFrameOverrideTypes.PARTY
 end
 
 local function GetRaidPlayerStatusTextOverrideType(self)
@@ -561,16 +424,6 @@ function Object:GetHealthBarTexture()
         return nil
     end
     return texture
-end
-
-function Object:GetTrackIncomingCasts()
-    local value = self.storage:GetBooleanAtPath("profile.partyFrame.incomingCasts.enabled")
-    return value == true
-end
-
-function Object:SetIncomingCastsPreviewEnabled(enabled)
-    self.runtime = self.runtime or {}
-    self.runtime.incomingCastsPreviewEnabled = enabled == true
 end
 
 function Object:SetProfile(profileName)

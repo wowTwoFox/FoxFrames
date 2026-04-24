@@ -7,18 +7,35 @@ local Utils = addon.Utils
 local function SetAlphaFromBooleanSafe(frame, value)
     if not frame then return end
 
+    -- Do not coerce with comparisons (e.g. `== true`) because WoW can surface
+    -- "secret boolean" values in tainted execution paths. Instead, only
+    -- normalize obviously-invalid inputs (nil/non-boolean) without inspecting
+    -- the boolean value itself.
+    if type(value) ~= "boolean" then
+        value = false
+    end
+
     if frame.SetAlphaFromBoolean then
-        frame:SetAlphaFromBoolean(value, 1, 0)
+        pcall(frame.SetAlphaFromBoolean, frame, value, 1, 0)
         return
     end
 
     if C_CurveUtil and C_CurveUtil.EvaluateColorValueFromBoolean then
-        local alpha = C_CurveUtil.EvaluateColorValueFromBoolean(value, 0, 1)
-        frame:SetAlpha(alpha)
+        local ok, alpha = pcall(C_CurveUtil.EvaluateColorValueFromBoolean, value, 0, 1)
+        if ok and type(alpha) == "number" then
+            frame:SetAlpha(alpha)
+        else
+            frame:SetAlpha(0)
+        end
         return
     end
 
-    frame:SetAlpha(0)
+    -- Fallback for environments without SetAlphaFromBoolean; should be rare.
+    -- Use pcall to avoid propagating taint-related errors.
+    local ok, alpha = pcall(function()
+        return value and 1 or 0
+    end)
+    frame:SetAlpha((ok and alpha) or 0)
 end
 
 local SPELL_ICON_BASE_SIZE = 22

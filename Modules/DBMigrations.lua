@@ -124,4 +124,14 @@ function DB:MigrateAndSanitizeDB()
 		profile.migrations.groupPartyFrameRoleIconsSettings = true
 		profile.migrationIndex = Utils:ClampInteger(profile.migrationIndex, 0, 9999, 0) + 1
 	end
+
+	-- Targetted Spells / Incoming Casts feature was removed (client "secret" restrictions).
+	-- Purge any leftover profile keys so they don't linger in saved variables.
+	if profile.migrations.removeIncomingCastsSettings ~= true then
+		storage:SetValue("profile.partyFrame.incomingCasts", nil)
+		storage:SetValue("profile.raidFrame.incomingCasts", nil)
+
+		profile.migrations.removeIncomingCastsSettings = true
+		profile.migrationIndex = Utils:ClampInteger(profile.migrationIndex, 0, 9999, 0) + 1
+	end
 end

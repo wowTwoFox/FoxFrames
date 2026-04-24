@@ -38,10 +38,6 @@ Modules\GlobalsDB.lua
 Modules\Auras.lua
 Modules\FoxFrames.lua
 Modules\RaidFrames.lua
-Modules\IncomingCasts.lua
-Components\SpellIcon.lua
-Components\SpellBar.lua
-Modules\IncomingCastsPreview.lua
 Components\Settings\SettingsComponentBuilder.lua
 Components\Settings\SettingsFlow.lua
 Components\Settings\SettingsRow.lua

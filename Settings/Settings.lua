@@ -34,11 +34,6 @@ function FF:OpenSettings()
     Settings.OpenToCategory(self._rootCategory:GetID())
 end
 
-function FF:OpenIncomingCastsSettings()
-    if not self._incomingCastsCategory then return end
-    Settings.OpenToCategory(self._incomingCastsCategory:GetID())
-end
-
 local function CreateFramesSettings(rootCategory, options)
     local opts = type(options) == "table" and options or {}
     local prefix = (type(opts.prefix) == "string" and opts.prefix ~= "" and opts.prefix) or nil

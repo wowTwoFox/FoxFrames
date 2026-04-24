@@ -103,10 +103,6 @@ end
 
 -- Update role icons on all frames
 local function GroupChangeEvent(event, ...)
-    if FF.RebuildIncomingCastUnitMap then
-        FF:RebuildIncomingCastUnitMap()
-    end
-
     ReassertPlayerFrameVisibility()
 
     if not FF:InAllowedGroup() then
@@ -117,13 +113,6 @@ local function GroupChangeEvent(event, ...)
     Auras:RefreshFromFrames(Blizzard:GetFrames())
 
     FF:UpdateFrames()
-
-    if FF.SetupIncomingCastIndicators then
-        FF:SetupIncomingCastIndicators()
-    end
-    if FF.UpdateIncomingCastIndicators then
-        FF:UpdateIncomingCastIndicators()
-    end
 end
 
 function FF:UNIT_AURA(_, unit)
@@ -246,7 +235,7 @@ function FF:OnEnable()
     self:RegisterEvent("PLAYER_ENTERING_WORLD", GroupChangeEvent)
     self:RegisterEvent("UNIT_MODEL_CHANGED")
     self:RegisterEvent("PLAYER_REGEN_ENABLED")
-    self:RegisterEvent("PLAYER_REGEN_DISABLED")
+    -- PLAYER_REGEN_DISABLED previously used by Targetted Spells / Incoming Casts.
     self:RegisterEvent("PLAYER_TARGET_CHANGED", ReassertPlayerFrameVisibility)
     self:RegisterEvent("PLAYER_FOCUS_CHANGED", ReassertPlayerFrameVisibility)
     self:RegisterEvent("UNIT_ENTERED_VEHICLE", ReassertPlayerFrameVisibility)
@@ -255,14 +244,6 @@ function FF:OnEnable()
 
     -- Switch DB profiles based on the active Edit Mode layout.
     self:RegisterEvent("EDIT_MODE_LAYOUTS_UPDATED")
-    self:RegisterIncomingCastUnitEvents()
-
-    -- Register internal messages
-    self:RegisterMessage("FOXFRAMES_INCOMING_CASTS_UPDATED")
-
-    if self.RebuildIncomingCastUnitMap then
-        self:RebuildIncomingCastUnitMap()
-    end
 
     hooksecurefunc("CompactUnitFrame_UpdateRoleIcon", function(frame)
         self:UpdateRoleIcon(frame)
@@ -306,14 +287,6 @@ function FF:PLAYER_REGEN_ENABLED()
 end
 
 function FF:PLAYER_REGEN_DISABLED()
-    if self.SetIncomingCastIndicatorPreviewEnabled then
-        self:SetIncomingCastIndicatorPreviewEnabled(false)
-    end
-end
-
-function FF:FOXFRAMES_INCOMING_CASTS_UPDATED(event, casterUnit, cast)
-    if not self.UpdateIncomingCastIndicators then return end
-    self:UpdateIncomingCastIndicators()
 end
 
 function FF:OnDisable()
@@ -321,10 +294,6 @@ function FF:OnDisable()
 
     if self.StopAuraCountdownDynamicColorTicker then
         self:StopAuraCountdownDynamicColorTicker()
-    end
-
-    if self.StopIncomingCastIndicatorPreviewStream then
-        self:StopIncomingCastIndicatorPreviewStream()
     end
 
     self:UnregisterAllEvents()
