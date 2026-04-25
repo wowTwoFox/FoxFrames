@@ -38,9 +38,44 @@ function Object:Log(title, ...)
     end
 end
 
-function Object:ShallowCopySkippingKeyPrefixes(source, skipPrefixes)
-    if type(skipPrefixes) ~= "table" or source == nil then
+function Object:ShallowCopy(source, options)
+    if source == nil then
         return source, nil
+    end
+
+    options = type(options) == "table" and options or nil
+    local skipPrefixes = options and options.skipPrefixes
+    local skipTypes = options and options.skipTypes
+
+    local skipPrefixesTable = type(skipPrefixes) == "table" and skipPrefixes or nil
+    local skipTypesTable = type(skipTypes) == "table" and skipTypes or nil
+
+    local hasSkipPrefixes = skipPrefixesTable ~= nil and (#skipPrefixesTable > 0 or next(skipPrefixesTable) ~= nil)
+    local hasSkipTypes = skipTypesTable ~= nil and (#skipTypesTable > 0 or next(skipTypesTable) ~= nil)
+
+    if not hasSkipPrefixes and not hasSkipTypes then
+        return source, nil
+    end
+
+    local skipTypeSet
+    if hasSkipTypes and skipTypesTable ~= nil then
+        skipTypeSet = {}
+        if #skipTypesTable > 0 then
+            for _, t in ipairs(skipTypesTable) do
+                if type(t) == "string" and t ~= "" then
+                    skipTypeSet[t] = true
+                end
+            end
+        else
+            for t, enabled in pairs(skipTypesTable) do
+                if enabled and type(t) == "string" and t ~= "" then
+                    skipTypeSet[t] = true
+                end
+            end
+        end
+        if next(skipTypeSet) == nil then
+            skipTypeSet = nil
+        end
     end
 
     local copied = {}
@@ -49,13 +84,21 @@ function Object:ShallowCopySkippingKeyPrefixes(source, skipPrefixes)
         local keyString = type(k) == "string" and k or nil
 
         local shouldSkip = false
-        if keyString then
+
+        if hasSkipPrefixes and skipPrefixesTable ~= nil and keyString then
             local lowerKey = keyString:lower()
-            for _, prefix in ipairs(skipPrefixes) do
-                if type(prefix) == "string" and lowerKey:sub(1, #prefix) == prefix:lower() then
+            for _, prefix in ipairs(skipPrefixesTable) do
+                if type(prefix) == "string" and prefix ~= "" and lowerKey:sub(1, #prefix) == prefix:lower() then
                     shouldSkip = true
                     break
                 end
+            end
+        end
+
+        if not shouldSkip and skipTypeSet then
+            local valueType = type(v)
+            if skipTypeSet[valueType] then
+                shouldSkip = true
             end
         end
 

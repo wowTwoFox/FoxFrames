@@ -140,7 +140,7 @@ function FF:UpdateFrame(frame)
         self:UpdateRoleIcon(frame)
 
         if not frame._loggedForDebug then
-            local safeFrame, skippedKeys = Utils:ShallowCopySkippingKeyPrefixes(frame, { "out", "myHealPrediction" })
+            local safeFrame, skippedKeys = Utils:ShallowCopy(frame, { skipPrefixes = { "out", "myHealPrediction" } })
             Utils:Log("FF_FRAME", safeFrame, skippedKeys)
             frame._loggedForDebug = true
         end
